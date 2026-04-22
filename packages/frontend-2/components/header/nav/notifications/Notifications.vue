@@ -1,0 +1,139 @@
+<template>
+  <div>
+    <Menu as="div" class="flex items-center">
+      <MenuButton :id="menuButtonId" v-slot="{ open: menuOpen }" as="div">
+        <div
+          class="relative cursor-pointer p-1 w-8 h-8 flex items-center justify-center rounded-md"
+          :class="menuOpen ? 'border border-outline-2' : ''"
+        >
+          <span class="sr-only">打开通知菜单</span>
+          <div class="relative">
+            <div
+              v-if="!menuOpen && hasNotifications"
+              class="absolute -top-[4px] -right-[4px] size-2 bg-danger rounded-full"
+            />
+
+            <BellIcon v-if="!menuOpen" class="w-5 h-5" />
+            <XMarkIcon v-else class="w-5 h-5" />
+          </div>
+        </div>
+      </MenuButton>
+      <Transition
+        enter-active-class="transition ease-out duration-200"
+        enter-from-class="transform opacity-0 scale-95"
+        enter-to-class="transform opacity-100 scale-100"
+        leave-active-class="transition ease-in duration-75"
+        leave-from-class="transform opacity-100 scale-100"
+        leave-to-class="transform opacity-0 scale-95"
+      >
+        <MenuItems
+          class="absolute z-50 right-0 md:right-20 top-10 mt-1.5 w-full sm:w-72 origin-top-right bg-foundation outline outline-2 outline-primary-muted rounded-md shadow-lg overflow-hidden pb-1"
+        >
+          <div class="px-3.5 pt-2 text-body-xs font-medium">通知</div>
+          <p
+            v-if="!hasNotifications"
+            class="px-3.5 pt-2 pb-2.5 text-body-xs text-foreground-2 text-center"
+          >
+            暂无通知
+          </p>
+          <MenuItem v-for="projectInvite in projectsInvites" :key="projectInvite?.id">
+            <HeaderNavNotificationsProjectInvite :invite="projectInvite" />
+          </MenuItem>
+          <MenuItem
+            v-for="workspacesInvite in workspacesInvites"
+            :key="workspacesInvite?.id"
+          >
+            <HeaderNavNotificationsWorkspaceInvite :invite="workspacesInvite" />
+          </MenuItem>
+          <MenuItem v-if="flowTodoCount > 0" v-slot="{ active }">
+            <button
+              class="w-full text-left px-3.5 py-2 text-body-xs font-medium text-primary"
+              :class="active ? 'bg-foundation-2' : ''"
+              @click="goToFlow"
+            >
+              我的待办（{{ flowTodoCount }}）
+            </button>
+          </MenuItem>
+        </MenuItems>
+      </Transition>
+    </Menu>
+  </div>
+</template>
+<script setup lang="ts">
+import { gql } from '@apollo/client/core'
+import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
+import { XMarkIcon, BellIcon } from '@heroicons/vue/24/outline'
+import { useQuery, useSubscription } from '@vue/apollo-composable'
+import {
+  navigationProjectInvitesQuery,
+  navigationWorkspaceInvitesQuery
+} from '~~/lib/navigation/graphql/queries'
+
+const menuButtonId = useId()
+const isWorkspacesEnabled = useIsWorkspacesEnabled()
+const router = useRouter()
+
+const navigationApprovalFlowTodoCountQuery = gql`
+  query NavigationApprovalFlowTodoCount {
+    approvalFlowStats(rangeDays: 30) {
+      pendingForMeCount
+    }
+  }
+`
+
+const navigationApprovalFlowTodoCountUpdatedSubscription = gql`
+  subscription NavigationApprovalFlowTodoCountUpdated {
+    approvalFlowTodoCountUpdated {
+      pendingForMeCount
+    }
+  }
+`
+
+const { result: projectInviteResult } = useQuery(navigationProjectInvitesQuery)
+const { result: workspaceInviteResult } = useQuery(
+  navigationWorkspaceInvitesQuery,
+  null,
+  { enabled: isWorkspacesEnabled.value }
+)
+const { result: flowTodoResult, refetch: refetchFlowTodo } = useQuery(
+  navigationApprovalFlowTodoCountQuery
+)
+const { onResult: onFlowTodoUpdated } = useSubscription(
+  navigationApprovalFlowTodoCountUpdatedSubscription
+)
+
+const projectsInvites = computed(
+  () => projectInviteResult.value?.activeUser?.projectInvites
+)
+const workspacesInvites = computed(() => {
+  const invites = workspaceInviteResult.value?.activeUser?.workspaceInvites
+
+  // Filter out implicit workspace invites that already show up as project invites here (same ID)
+  return (
+    invites?.filter((invite) => {
+      return !projectsInvites.value?.some(
+        (projectInvite) => projectInvite.id === invite.id
+      )
+    }) || []
+  )
+})
+
+const hasNotifications = computed(
+  () =>
+    (projectsInvites.value?.length || 0) +
+    (workspacesInvites.value?.length || 0) +
+    (flowTodoCount.value || 0)
+)
+
+const flowTodoCount = computed(
+  () => flowTodoResult.value?.approvalFlowStats?.pendingForMeCount || 0
+)
+
+const goToFlow = async () => {
+  await router.push('/flow')
+}
+
+onFlowTodoUpdated(async () => {
+  await refetchFlowTodo()
+})
+</script>
