@@ -1,6 +1,5 @@
 *node_modules
-packages/server/.env
-packages/server/dist
+packages/server
 packages/viewer/dist
 packages/objectloader/dist
 packages/*/dist
