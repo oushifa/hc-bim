@@ -8,7 +8,7 @@
       open ? '' : 'pointer-events-none',
       isEmbedEnabled
         ? 'sm:top-2 sm:h-[calc(100dvh-8rem)]'
-        : 'sm:top-[3.5rem] lg:h-[calc(100dvh-3rem)] lg:top-[3rem] lg:right-0 sm:h-[calc(100dvh-8rem)]'
+        : 'sm:top-2 sm:h-[calc(100dvh-1rem)] lg:h-[100dvh] lg:top-[0] lg:right-0'
     ]"
   >
     <div class="flex h-full" :class="open ? '' : 'sm:translate-x-[100%]'">

@@ -5,8 +5,8 @@
     :class="[
       isEmbedEnabled
         ? 'top-[0.5rem]'
-        : 'top-[3.5rem] lg:top-[3rem] lg:rounded-none lg:px-2 lg:max-h-[calc(100dvh-3rem)] lg:border-l-0 lg:border-t-0 lg:border-b-0 lg:h-full lg:left-0',
-      hasActivePanel && 'h-full max-h-[calc(100dvh-8rem)] rounded-r-none'
+        : 'top-[0.5rem] lg:top-[0] lg:rounded-none lg:px-2 lg:max-h-[100dvh] lg:border-l-0 lg:border-t-0 lg:border-b-0 lg:h-full lg:left-0',
+      hasActivePanel && 'h-full max-h-[100dvh] rounded-r-none'
     ]"
   >
     <div class="flex flex-col gap-2 py-1" :class="isEmbedEnabled ? '' : 'lg:py-2'">
@@ -81,52 +81,6 @@
           class="h-5 w-5 md:h-6 md:w-6"
         />
       </ViewerControlsButtonToggle>
-      <div
-        v-if="!isEmbedEnabled && (!isTablet || activePanel !== 'none')"
-        class="mt-auto flex flex-col gap-2"
-      >
-        <ViewerControlsButtonToggle
-          v-tippy="
-            getTooltipProps('返回上一级', {
-              placement: 'right'
-            })
-          "
-          :icon="LogOut"
-          secondary
-          @click="goBackToPreviousPage"
-        />
-        <!-- <ViewerControlsButtonToggle
-          v-tippy="
-            getTooltipProps(
-              getShortcutDisplayText(shortcuts.ToggleDevMode, { format: 'separate' }),
-              {
-                placement: 'right'
-              }
-            )
-          "
-          :active="activePanel === 'devMode'"
-          :icon="CodeXml"
-          secondary
-          @click="toggleActivePanel('devMode')"
-        />
-        <ViewerControlsButtonToggle
-          v-tippy="
-            getTooltipProps('Documentation', {
-              placement: 'right'
-            })
-          "
-          :icon="BookOpen"
-          secondary
-          @click="openDocs"
-        />
-        <ViewerControlsButtonToggle
-          v-if="isIntercomEnabled"
-          v-tippy="getTooltipProps('Get help')"
-          :icon="CircleQuestionMark"
-          secondary
-          @click="openIntercomChat"
-        /> -->
-      </div>
     </div>
 
     <!-- Resize handle -->
@@ -188,6 +142,19 @@
       <PortalTarget name="panel-extension"></PortalTarget>
     </div>
   </aside>
+
+  <!-- 返回按钮：fixed 悬浮在侧边栏右侧顶部，始终可见 -->
+  <Teleport to="body">
+    <button
+      v-if="!isEmbedEnabled"
+      v-tippy="getTooltipProps('返回上一级', { placement: 'right' })"
+      class="fixed z-[100] top-2 flex items-center justify-center w-9 h-9 rounded-lg bg-foundation border border-outline-2 text-foreground-2 hover:text-primary hover:border-primary transition-colors shadow-md"
+      :style="backBtnStyle"
+      @click="goBackToPreviousPage"
+    >
+      <LogOut class="w-4 h-4" />
+    </button>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -343,6 +310,20 @@ const panelExtensionLeft = computed(() => {
   }
   const mainPanelLeft = isEmbedEnabled.value ? 52 : 60
   return `${mainPanelLeft + width.value}px`
+})
+
+// 返回按钮 fixed 悬浮位置：始终贴着侧边栏右侧
+const backBtnStyle = computed(() => {
+  // 图标栏宽度：embed: 2.5rem(40px), 普通: 3rem(48px)
+  const iconBarWidth = isEmbedEnabled.value ? 40 : 48
+  // 左边定位：左内边距(0 或 0.5rem) + 图标栏宽 + 展开面板宽(hasActivePanel时加上)
+  const leftOffset = isEmbedEnabled.value ? 8 : 0 // aside 的 left-2(8px) 或 left-0
+  let left = leftOffset + iconBarWidth + 8 // 8px 间距
+  if (hasActivePanel.value && !isMobile.value) {
+    const panelWidth = isTablet.value ? 240 : width.value + 4
+    left = leftOffset + iconBarWidth + panelWidth + 8
+  }
+  return { left: `${left}px` }
 })
 
 const { summary } = useFunctionRunsStatusSummary({

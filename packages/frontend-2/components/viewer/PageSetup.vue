@@ -30,7 +30,7 @@
               : 'h-[calc(100dvh-3.5rem)]'
             : 'h-[100dvh]'
         "
-        :loading-bar-classes="isEmbedEnabled ? 'top-0' : 'top-12'"
+        :loading-bar-classes="isEmbedEnabled ? 'top-0' : 'top-0'"
       >
         <template #after-viewer-base>
           <Transition
@@ -76,7 +76,7 @@
           <ViewerSelectionSidebar ref="selectionSidebar" class="z-20" />
         </Transition>
         <div
-          class="absolute z-10 w-screen px-8 grid grid-cols-1 sm:grid-cols-3 gap-2 top-[3.75rem]"
+          class="absolute z-10 w-screen px-8 grid grid-cols-1 sm:grid-cols-3 gap-2 top-[0.5rem]"
         >
           <div class="flex items-end justify-center sm:justify-start">
             <PortalTarget name="pocket-left"></PortalTarget>

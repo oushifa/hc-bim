@@ -3,7 +3,7 @@
     ref="buttonContainer"
     class="absolute z-20"
     :class="
-      isEmbedEnabled ? 'top-[0.5rem]' : 'top-[3.75rem] sm:top-[3.5rem] lg:top-[3.75rem]'
+      isEmbedEnabled ? 'top-[0.5rem]' : 'top-[0.5rem] sm:top-[0.5rem] lg:top-[0.5rem]'
     "
     :style="dynamicStyles"
   >
@@ -33,7 +33,7 @@
     <div
       ref="menuContainer"
       class="absolute right-[2.875rem]"
-      :class="isEmbedEnabled ? 'top-0' : 'top-[2.5rem]'"
+      :class="isEmbedEnabled ? 'top-0' : 'top-0'"
     >
       <ViewerCameraMenu v-show="activePanel === 'cameraControls'" />
     </div>
