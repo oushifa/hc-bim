@@ -20,7 +20,9 @@
       <!-- Left: Role List -->
       <div class="w-60 shrink-0 border-r border-gray-100 bg-[#fafbfc] flex flex-col">
         <!-- Left Header -->
-        <div class="h-12 px-4 border-t border-b border-gray-100 flex items-center justify-between shrink-0">
+        <div
+          class="h-12 px-4 border-t border-b border-gray-100 flex items-center justify-between shrink-0"
+        >
           <span class="text-sm font-medium text-[#333]">角色列表</span>
         </div>
         <!-- Role Items -->
@@ -121,7 +123,9 @@
                   :key="user.id"
                   class="border-b border-gray-50 hover:bg-gray-50 transition-colors"
                 >
-                  <td class="py-3 px-4 text-sm text-[#333] font-medium">{{ user.name }}</td>
+                  <td class="py-3 px-4 text-sm text-[#333] font-medium">
+                    {{ user.name }}
+                  </td>
                   <td class="py-3 px-4 text-xs text-gray-600 leading-relaxed">
                     {{ getMenuPermNames(user.menuPerms) }}
                   </td>
@@ -132,11 +136,15 @@
                     <span
                       v-if="isDefaultPerms(user)"
                       class="px-2 py-1 bg-gray-100 text-gray-600 rounded-[6px] text-xs whitespace-nowrap"
-                    >默认</span>
+                    >
+                      默认
+                    </span>
                     <span
                       v-else
                       class="px-2 py-1 bg-amber-50 text-amber-600 border border-amber-200 rounded-[6px] text-xs whitespace-nowrap"
-                    >非默认</span>
+                    >
+                      非默认
+                    </span>
                   </td>
                   <td class="py-3 px-4 text-sm text-right space-x-3 whitespace-nowrap">
                     <button
@@ -180,8 +188,12 @@
               <h3 class="text-base font-semibold text-[#333]">
                 {{
                   permModal.type === 'role'
-                    ? `设置默认权限 · ${roles.find((r) => r.id === permModal.targetId)?.name}`
-                    : `修改用户权限 · ${users.find((u) => u.id === permModal.targetId)?.name}`
+                    ? `设置默认权限 · ${
+                        roles.find((r) => r.id === permModal.targetId)?.name
+                      }`
+                    : `修改用户权限 · ${
+                        users.find((u) => u.id === permModal.targetId)?.name
+                      }`
                 }}
               </h3>
               <button
@@ -195,7 +207,9 @@
             <div class="p-6 overflow-y-auto space-y-7">
               <!-- Menu Perms -->
               <section>
-                <h4 class="text-xs font-semibold text-gray-400 mb-3 tracking-widest uppercase">
+                <h4
+                  class="text-xs font-semibold text-gray-400 mb-3 tracking-widest uppercase"
+                >
                   菜单功能权限
                 </h4>
                 <div class="grid grid-cols-2 gap-3">
@@ -232,7 +246,9 @@
 
               <!-- Model Perms -->
               <section>
-                <h4 class="text-xs font-semibold text-gray-400 mb-3 tracking-widest uppercase">
+                <h4
+                  class="text-xs font-semibold text-gray-400 mb-3 tracking-widest uppercase"
+                >
                   模型操作权限
                 </h4>
                 <div class="grid grid-cols-2 gap-3">
@@ -293,7 +309,9 @@
           class="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50"
           @click.self="roleModal.isOpen = false"
         >
-          <div class="bg-white rounded-[16px] shadow-2xl w-[400px] flex flex-col overflow-hidden">
+          <div
+            class="bg-white rounded-[16px] shadow-2xl w-[400px] flex flex-col overflow-hidden"
+          >
             <div
               class="px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0"
             >
@@ -308,7 +326,9 @@
               </button>
             </div>
             <div class="p-6">
-              <label class="block text-sm font-medium text-gray-700 mb-2">角色名称</label>
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                角色名称
+              </label>
               <input
                 v-model="roleModal.name"
                 type="text"
@@ -345,7 +365,9 @@
           class="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50"
           @click.self="addUserModalOpen = false"
         >
-          <div class="bg-white rounded-[16px] shadow-2xl w-[480px] flex flex-col overflow-hidden">
+          <div
+            class="bg-white rounded-[16px] shadow-2xl w-[480px] flex flex-col overflow-hidden"
+          >
             <div
               class="px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0"
             >
@@ -360,38 +382,49 @@
               </button>
             </div>
             <div class="p-6">
-              <p class="text-sm text-gray-500 mb-4">请选择要添加的用户（已过滤当前角色中存在的用户）：</p>
-              <div class="max-h-64 overflow-y-auto border border-gray-200 rounded-[8px]">
-                <label
-                  v-for="user in availableOrgUsers"
-                  :key="user.id"
-                  class="flex items-center px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <div
-                    class="w-4 h-4 rounded border flex items-center justify-center mr-3 shrink-0"
-                    :class="
-                      selectedOrgUsers.includes(user.id)
-                        ? 'bg-[#00b4b6] border-[#00b4b6]'
-                        : 'border-gray-300'
-                    "
-                    @click="toggleOrgUserSelect(user.id)"
-                  >
-                    <CheckIcon
-                      v-if="selectedOrgUsers.includes(user.id)"
-                      class="w-3 h-3 text-white"
-                    />
-                  </div>
-                  <div @click="toggleOrgUserSelect(user.id)">
-                    <div class="text-sm font-medium text-[#333]">{{ user.name }}</div>
-                    <div class="text-xs text-gray-500">{{ user.department }}</div>
-                  </div>
-                </label>
+              <p class="text-sm text-gray-500 mb-4">
+                请选择要添加的用户（已过滤当前角色中存在的用户）：
+              </p>
+              <div
+                class="max-h-64 overflow-y-auto border border-gray-200 rounded-[8px]"
+              >
                 <div
-                  v-if="availableOrgUsers.length === 0"
+                  v-if="systemUsersLoading"
                   class="py-10 text-center text-sm text-gray-400"
                 >
-                  所有组织成员均已在该角色中
+                  加载中...
                 </div>
+                <template v-else>
+                  <label
+                    v-for="user in availableOrgUsers"
+                    :key="user.id"
+                    class="flex items-center px-4 py-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <div
+                      class="w-4 h-4 rounded border flex items-center justify-center mr-3 shrink-0"
+                      :class="
+                        selectedOrgUsers.includes(user.id)
+                          ? 'bg-[#00b4b6] border-[#00b4b6]'
+                          : 'border-gray-300'
+                      "
+                      @click="toggleOrgUserSelect(user.id)"
+                    >
+                      <CheckIcon
+                        v-if="selectedOrgUsers.includes(user.id)"
+                        class="w-3 h-3 text-white"
+                      />
+                    </div>
+                    <div @click="toggleOrgUserSelect(user.id)">
+                      <div class="text-sm font-medium text-[#333]">{{ user.name }}</div>
+                    </div>
+                  </label>
+                  <div
+                    v-if="availableOrgUsers.length === 0"
+                    class="py-10 text-center text-sm text-gray-400"
+                  >
+                    所有系统用户均已在该角色中
+                  </div>
+                </template>
               </div>
             </div>
             <div
@@ -399,7 +432,9 @@
             >
               <span class="text-sm text-gray-500">
                 已选择
-                <span class="font-semibold text-[#00b4b6]">{{ selectedOrgUsers.length }}</span>
+                <span class="font-semibold text-[#00b4b6]">
+                  {{ selectedOrgUsers.length }}
+                </span>
                 名用户
               </span>
               <div class="flex space-x-3">
@@ -434,9 +469,10 @@ import {
   TrashIcon,
   UserPlusIcon,
   ShieldCheckIcon,
-  UserGroupIcon,
   Cog6ToothIcon
 } from '@heroicons/vue/24/outline'
+import { useApolloClient } from '@vue/apollo-composable'
+import { gql } from 'graphql-tag'
 
 // ─── 常量数据 ────────────────────────────────────────────────
 const ALL_MENU_PERMS = [
@@ -454,42 +490,58 @@ const ALL_MODEL_PERMS = [
   { id: 'm4', name: '归档模型' }
 ]
 
-const ORG_USERS = [
-  { id: 101, name: '张三', department: '研发部' },
-  { id: 102, name: '李四', department: '研发部' },
-  { id: 103, name: '王五', department: '产品部' },
-  { id: 104, name: '赵六', department: '设计部' },
-  { id: 105, name: '钱七', department: '市场部' },
-  { id: 106, name: '孙八', department: '管理层' },
-  { id: 107, name: '周九', department: '测试部' },
-  { id: 108, name: '吴十', department: '运维部' }
-]
+const searchUsersQuery = gql`
+  query PermissionsSearchUsers($query: String!, $limit: Int!) {
+    users(input: { query: $query, limit: $limit, cursor: null, projectId: null }) {
+      items {
+        id
+        name
+      }
+    }
+  }
+`
+
+type SystemUser = { id: string; name: string }
+
+const apolloClient = useApolloClient().client
 
 // ─── 响应式数据 ──────────────────────────────────────────────
-const roles = ref([
-  { id: 'r1', name: '系统管理员', menuPerms: ['p1', 'p2', 'p3', 'p4', 'p5'], modelPerms: ['m1', 'm2', 'm3', 'm4'] },
-  { id: 'r2', name: '项目经理', menuPerms: ['p1', 'p5'], modelPerms: ['m1', 'm2', 'm3'] },
-  { id: 'r3', name: '模型审核员', menuPerms: ['p1', 'p5'], modelPerms: ['m2', 'm3'] },
-  { id: 'r4', name: '普通成员', menuPerms: ['p1', 'p5'], modelPerms: ['m3'] }
-])
+const roles = ref<
+  Array<{ id: string; name: string; menuPerms: string[]; modelPerms: string[] }>
+>([])
 
-const users = ref([
-  { id: 1, orgUserId: 101, name: '张三', roleId: 'r1', menuPerms: ['p1', 'p2', 'p3', 'p4', 'p5'], modelPerms: ['m1', 'm2', 'm3', 'm4'] },
-  { id: 2, orgUserId: 102, name: '李四', roleId: 'r1', menuPerms: ['p1', 'p5'], modelPerms: ['m1'] },
-  { id: 3, orgUserId: 103, name: '王五', roleId: 'r2', menuPerms: ['p1', 'p5'], modelPerms: ['m1', 'm2', 'm3'] }
-])
+const users = ref<
+  Array<{
+    id: string
+    orgUserId: string
+    name: string
+    roleId: string
+    menuPerms: string[]
+    modelPerms: string[]
+  }>
+>([])
 
-const activeRoleId = ref('r1')
+const activeRoleId = ref('')
+const systemUsers = ref<SystemUser[]>([])
+const systemUsersLoading = ref(false)
 
 // ─── 计算属性 ────────────────────────────────────────────────
 const activeRole = computed(() => roles.value.find((r) => r.id === activeRoleId.value))
-const roleUsers = computed(() => users.value.filter((u) => u.roleId === activeRoleId.value))
+const roleUsers = computed(() =>
+  users.value.filter((u) => u.roleId === activeRoleId.value)
+)
 const availableOrgUsers = computed(() =>
-  ORG_USERS.filter((ou) => !roleUsers.value.some((ru) => ru.orgUserId === ou.id))
+  systemUsers.value.filter(
+    (su) => !roleUsers.value.some((ru) => ru.orgUserId === su.id)
+  )
 )
 
 // ─── 权限弹窗 ────────────────────────────────────────────────
-const permModal = ref<{ isOpen: boolean; type: 'role' | 'user'; targetId: string | number | null }>({
+const permModal = ref<{
+  isOpen: boolean
+  type: 'role' | 'user'
+  targetId: string | number | null
+}>({
   isOpen: false,
   type: 'role',
   targetId: null
@@ -553,7 +605,12 @@ const saveRole = () => {
     if (r) r.name = roleModal.value.name
   } else {
     const newId = 'r_' + Date.now()
-    roles.value.push({ id: newId, name: roleModal.value.name, menuPerms: [], modelPerms: [] })
+    roles.value.push({
+      id: newId,
+      name: roleModal.value.name,
+      menuPerms: [],
+      modelPerms: []
+    })
     activeRoleId.value = newId
   }
   roleModal.value.isOpen = false
@@ -568,26 +625,47 @@ const deleteRole = (id: string) => {
 
 // ─── 添加用户弹窗 ────────────────────────────────────────────
 const addUserModalOpen = ref(false)
-const selectedOrgUsers = ref<number[]>([])
+const selectedOrgUsers = ref<string[]>([])
+
+const loadSystemUsers = async () => {
+  systemUsersLoading.value = true
+  try {
+    const resp = await apolloClient.query({
+      query: searchUsersQuery,
+      variables: { query: '%', limit: 100 },
+      fetchPolicy: 'network-only'
+    })
+    const items =
+      (
+        resp.data as {
+          users?: { items?: Array<{ id: string; name: string | null }> | null } | null
+        }
+      ).users?.items || []
+    systemUsers.value = items.map((u) => ({ id: u.id, name: u.name || u.id }))
+  } finally {
+    systemUsersLoading.value = false
+  }
+}
 
 const openAddUserModal = () => {
   selectedOrgUsers.value = []
   addUserModalOpen.value = true
+  loadSystemUsers()
 }
-const toggleOrgUserSelect = (id: number) => {
+const toggleOrgUserSelect = (id: string) => {
   const idx = selectedOrgUsers.value.indexOf(id)
   if (idx >= 0) selectedOrgUsers.value.splice(idx, 1)
   else selectedOrgUsers.value.push(id)
 }
 const confirmAddUsers = () => {
   if (!activeRole.value) return
-  selectedOrgUsers.value.forEach((orgId) => {
-    const orgUser = ORG_USERS.find((ou) => ou.id === orgId)
-    if (!orgUser) return
+  selectedOrgUsers.value.forEach((userId) => {
+    const sysUser = systemUsers.value.find((u) => u.id === userId)
+    if (!sysUser) return
     users.value.push({
-      id: Date.now() + Math.random(),
-      orgUserId: orgUser.id,
-      name: orgUser.name,
+      id: String(Date.now() + Math.random()),
+      orgUserId: sysUser.id,
+      name: sysUser.name,
       roleId: activeRoleId.value,
       menuPerms: [...(activeRole.value?.menuPerms ?? [])],
       modelPerms: [...(activeRole.value?.modelPerms ?? [])]
@@ -596,7 +674,7 @@ const confirmAddUsers = () => {
   addUserModalOpen.value = false
 }
 
-const removeUser = (id: number) => {
+const removeUser = (id: string) => {
   users.value = users.value.filter((u) => u.id !== id)
 }
 
@@ -618,6 +696,9 @@ const isDefaultPerms = (user: (typeof users.value)[0]) => {
   if (!role) return false
   const sortedEq = (a: string[], b: string[]) =>
     a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i])
-  return sortedEq(user.menuPerms, role.menuPerms) && sortedEq(user.modelPerms, role.modelPerms)
+  return (
+    sortedEq(user.menuPerms, role.menuPerms) &&
+    sortedEq(user.modelPerms, role.modelPerms)
+  )
 }
 </script>

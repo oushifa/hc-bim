@@ -19,7 +19,7 @@
         <MenuItems
           class="absolute right-4 top-14 w-56 origin-top-right bg-foundation outline outline-1 outline-primary-muted rounded-md shadow-lg overflow-hidden"
         >
-          <div class="pt-1">
+          <!-- <div class="pt-1">
             <MenuItem v-if="activeUser" v-slot="{ active }">
               <NuxtLink
                 :to="settingsUserRoutes.profile"
@@ -64,8 +64,8 @@
                 邀请加入项目
               </NuxtLink>
             </MenuItem>
-          </div>
-          <div class="border-t border-outline-3 py-1 mt-1">
+          </div> -->
+          <div class="py-1">
             <MenuItem v-if="activeUser" v-slot="{ active }">
               <NuxtLink
                 :class="[
@@ -74,7 +74,7 @@
                 ]"
                 @click="logout"
               >
-                登出
+                退出登录
               </NuxtLink>
             </MenuItem>
             <MenuItem v-if="!activeUser && loginUrl" v-slot="{ active }">
@@ -89,7 +89,7 @@
               </NuxtLink>
             </MenuItem>
 
-            <div
+            <!-- <div
               class="border-t border-outline-3 py-1 mt-1 text-xs text-foreground-2 px-3 gap-1 flex flex-col"
             >
               <MenuItem v-if="version">
@@ -103,7 +103,7 @@
                   复制支持参考码
                 </NuxtLink>
               </MenuItem>
-            </div>
+            </div> -->
           </div>
         </MenuItems>
       </Transition>

@@ -10,7 +10,7 @@
         @click="openCreateMemberDialog"
       >
         <PlusIcon class="w-4 h-4" />
-        <span>添加成员</span>
+        <span>新增成员</span>
       </button>
     </div>
 
@@ -33,11 +33,10 @@
           </button>
         </div>
         <div class="flex-1 overflow-y-auto p-2 space-y-1">
-          <button
+          <div
             v-for="org in orgTree"
             :key="org.id"
-            class="w-full flex items-center justify-between px-3 py-2 rounded-[8px] text-sm transition-colors"
-            type="button"
+            class="group w-full flex items-center justify-between px-3 py-2 rounded-[8px] text-sm transition-colors cursor-pointer"
             :style="{ paddingLeft: `${org.level * 12 + 12}px` }"
             :class="
               activeOrg === org.id
@@ -46,21 +45,22 @@
             "
             @click="selectTreeRow(org)"
           >
-            <div class="flex items-center space-x-2">
+            <div class="flex items-center space-x-2 truncate pr-1 min-w-0">
               <BuildingIcon
-                class="w-4 h-4"
+                class="w-4 h-4 shrink-0"
                 :class="activeOrg === org.id ? 'text-[#00b4b6]' : 'text-gray-400'"
               />
-              <span>{{ org.name }}</span>
+              <span class="truncate">{{ org.name }}</span>
             </div>
-            <div class="flex items-center gap-1.5">
-              <span
-                class="text-xs bg-white border border-gray-200 text-gray-500 px-2 py-0.5 rounded-full"
+            <div class="flex items-center gap-0.5 shrink-0">
+              <!-- <span
+                class="text-xs bg-white border border-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full mr-1"
               >
                 {{ org.count }}
-              </span>
+              </span> -->
+              <!-- 新增子部门 -->
               <span
-                class="inline-flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-[#00b4b6] hover:bg-white"
+                class="inline-flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-[#00b4b6] hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
                 role="button"
                 tabindex="0"
                 title="新增子部门"
@@ -70,8 +70,32 @@
               >
                 <PlusIcon class="w-3.5 h-3.5" />
               </span>
+              <!-- 编辑部门 -->
+              <!-- <span
+                class="inline-flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-[#00b4b6] hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
+                role="button"
+                tabindex="0"
+                title="重命名部门"
+                @click.stop="openEditDepartmentDialog(org)"
+                @keydown.enter.stop.prevent="openEditDepartmentDialog(org)"
+                @keydown.space.stop.prevent="openEditDepartmentDialog(org)"
+              >
+                <PencilIcon class="w-3.5 h-3.5" />
+              </span> -->
+              <!-- 删除部门 -->
+              <span
+                class="inline-flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-red-500 hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
+                role="button"
+                tabindex="0"
+                title="删除部门"
+                @click.stop="openDeleteDepartmentDialog(org)"
+                @keydown.enter.stop.prevent="openDeleteDepartmentDialog(org)"
+                @keydown.space.stop.prevent="openDeleteDepartmentDialog(org)"
+              >
+                <TrashIcon class="w-3.5 h-3.5" />
+              </span>
             </div>
-          </button>
+          </div>
         </div>
       </div>
 
@@ -161,6 +185,13 @@
                   >
                     角色管理
                   </button>
+                  <!-- <button
+                    class="text-red-400 hover:text-red-600 text-sm font-medium transition-colors"
+                    type="button"
+                    @click="openDeleteMemberDialog(user)"
+                  >
+                    移除
+                  </button> -->
                   <button class="text-gray-400 hover:text-[#00b4b6] transition-colors">
                     <EllipsisHorizontalIcon class="w-4 h-4" />
                   </button>
@@ -176,6 +207,77 @@
         </div>
       </div>
     </div>
+
+    <!-- 编辑部门弹窗 -->
+    <LayoutDialog v-model:open="editDepartmentDialogOpen" max-width="sm">
+      <template #header>重命名部门</template>
+      <div class="flex flex-col gap-3">
+        <label for="organization-edit-department-name" class="sr-only">部门名称</label>
+        <input
+          id="organization-edit-department-name"
+          v-model.trim="editDepartmentName"
+          class="w-full bg-[#f5f7fa] border border-transparent rounded-[8px] py-2 px-3 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white text-[#333] transition-all"
+          placeholder="请输入新的部门名称"
+          @keydown.enter.prevent="submitEditDepartment"
+          @keydown.esc="closeEditDepartmentDialog"
+        />
+        <div v-if="editDepartmentError" class="text-xs text-red-500">
+          {{ editDepartmentError }}
+        </div>
+        <div class="flex justify-end gap-2">
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm rounded-[8px] border border-gray-200 text-gray-600 hover:bg-gray-50"
+            @click="closeEditDepartmentDialog"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm rounded-[8px] bg-[#00b4b6] hover:bg-[#009fa1] text-white disabled:opacity-60"
+            :disabled="!editDepartmentName || editDepartmentLoading"
+            @click="submitEditDepartment"
+          >
+            {{ editDepartmentLoading ? '保存中...' : '确定' }}
+          </button>
+        </div>
+      </div>
+    </LayoutDialog>
+
+    <!-- 删除部门弹窗 -->
+    <LayoutDialog v-model:open="deleteDepartmentDialogOpen" max-width="sm">
+      <template #header>删除部门</template>
+      <div class="flex flex-col gap-4">
+        <div class="text-sm text-gray-600">
+          确认要删除部门
+          <span class="font-semibold text-[#333]">
+            {{ deleteDepartmentTarget?.name }}
+          </span>
+          ？删除后该部门下的成员将被移出。
+        </div>
+        <div v-if="deleteDepartmentError" class="text-xs text-red-500">
+          {{ deleteDepartmentError }}
+        </div>
+        <div class="flex justify-end gap-2">
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm rounded-[8px] border border-gray-200 text-gray-600 hover:bg-gray-50"
+            :disabled="deleteDepartmentLoading"
+            @click="closeDepartmentDeleteDialog"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm rounded-[8px] bg-red-500 hover:bg-red-600 text-white disabled:opacity-60"
+            :disabled="deleteDepartmentLoading"
+            @click="submitDeleteDepartment"
+          >
+            {{ deleteDepartmentLoading ? '删除中...' : '确定删除' }}
+          </button>
+        </div>
+      </div>
+    </LayoutDialog>
 
     <LayoutDialog v-model:open="createDepartmentDialogOpen" max-width="sm">
       <template #header>新建部门</template>
@@ -218,38 +320,37 @@
     </LayoutDialog>
 
     <LayoutDialog v-model:open="createMemberDialogOpen" max-width="sm">
-      <template #header>添加成员</template>
+      <template #header>新增成员</template>
       <div class="flex flex-col gap-3">
         <div class="text-sm text-gray-500">请填写成员信息</div>
-        <label :for="memberSelectButtonId" class="sr-only">成员用户</label>
-        <FormSelectBase
-          v-model="selectedMemberUsers"
-          :items="memberUserOptions"
-          :multiple="true"
-          :search="true"
-          label="成员用户"
-          :show-label="false"
-          name="organization-member-user-select"
-          by="id"
-          :label-id="memberSelectLabelId"
-          :button-id="memberSelectButtonId"
-          search-placeholder="输入用户名搜索"
-          :get-search-results="invokeSearchMemberUsers"
-        >
-          <template #nothing-selected>请选择成员（可多选）</template>
-          <template #something-selected="{ value }">
-            <span v-if="Array.isArray(value) && value.length" class="truncate">
-              {{ value.map((item) => item.name).join(', ') }}
-            </span>
-            <span v-else-if="!Array.isArray(value)" class="truncate">
-              {{ value.name }} ({{ value.id }})
-            </span>
-            <span v-else class="truncate">请选择成员</span>
-          </template>
-          <template #option="{ item }">
-            <span class="truncate">{{ item.name }} ({{ item.id }})</span>
-          </template>
-        </FormSelectBase>
+        <div class="flex flex-col gap-1">
+          <label for="member-name-input" class="text-xs text-gray-500 font-medium">
+            姓名
+            <span class="text-red-500">*</span>
+          </label>
+          <input
+            id="member-name-input"
+            v-model.trim="newMemberForm.name"
+            type="text"
+            placeholder="请输入姓名"
+            class="w-full bg-[#f5f7fa] border border-transparent rounded-[8px] py-2 px-3 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white text-[#333] transition-all"
+            :disabled="createMemberLoading"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label for="member-phone-input" class="text-xs text-gray-500 font-medium">
+            手机号
+            <span class="text-red-500">*</span>
+          </label>
+          <input
+            id="member-phone-input"
+            v-model.trim="newMemberForm.phone"
+            type="tel"
+            placeholder="请输入手机号"
+            class="w-full bg-[#f5f7fa] border border-transparent rounded-[8px] py-2 px-3 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white text-[#333] transition-all"
+            :disabled="createMemberLoading"
+          />
+        </div>
         <div class="text-xs text-gray-400">部门：{{ activeRow?.name || '未选择' }}</div>
         <div v-if="memberFormError" class="text-xs text-red-500">
           {{ memberFormError }}
@@ -265,10 +366,44 @@
           <button
             type="button"
             class="px-3 py-1.5 text-sm rounded-[8px] bg-[#00b4b6] hover:bg-[#009fa1] text-white disabled:opacity-60"
-            :disabled="!newMemberForm.userIds.length || createMemberLoading"
+            :disabled="
+              !newMemberForm.name || !newMemberForm.phone || createMemberLoading
+            "
             @click="submitCreateMember"
           >
             {{ createMemberLoading ? '添加中...' : '确定' }}
+          </button>
+        </div>
+      </div>
+    </LayoutDialog>
+
+    <LayoutDialog v-model:open="deleteMemberDialogOpen" max-width="sm">
+      <template #header>移除成员</template>
+      <div class="flex flex-col gap-4">
+        <div class="text-sm text-gray-600">
+          确认要将成员
+          <span class="font-semibold text-[#333]">{{ deleteMemberTarget?.name }}</span>
+          从当前部门移除？
+        </div>
+        <div v-if="deleteMemberError" class="text-xs text-red-500">
+          {{ deleteMemberError }}
+        </div>
+        <div class="flex justify-end gap-2">
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm rounded-[8px] border border-gray-200 text-gray-600 hover:bg-gray-50"
+            :disabled="deleteMemberLoading"
+            @click="closeDeleteMemberDialog"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm rounded-[8px] bg-red-500 hover:bg-red-600 text-white disabled:opacity-60"
+            :disabled="deleteMemberLoading"
+            @click="submitDeleteMember"
+          >
+            {{ deleteMemberLoading ? '移除中...' : '确定移除' }}
           </button>
         </div>
       </div>
@@ -280,11 +415,16 @@
 import {
   PlusIcon,
   MagnifyingGlassIcon as SearchIcon,
+  BuildingOfficeIcon as BuildingIcon,
   EllipsisHorizontalIcon,
-  BuildingOfficeIcon as BuildingIcon
+  PencilIcon,
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 import { useApolloClient, useMutation, useQuery } from '@vue/apollo-composable'
 import { gql } from 'graphql-tag'
+import { registerAndGetAccessCode } from '~~/lib/auth/services/auth'
+import { randomString } from '~~/lib/common/helpers/random'
+import { useRuntimeConfig } from '#app'
 
 type OrganizationTreeRow = {
   id: string
@@ -317,10 +457,6 @@ type DepartmentUser = {
   name?: string | null
   role?: string | null
   verified?: boolean | null
-}
-type MemberUserOption = {
-  id: string
-  name: string
 }
 
 const departmentTreeQuery = gql`
@@ -408,13 +544,11 @@ const createMemberDialogOpen = ref(false)
 const createMemberLoading = ref(false)
 const memberFormError = ref('')
 const newMemberForm = ref({
-  userIds: [] as string[],
-  title: ''
+  name: '',
+  phone: ''
 })
-const memberUserOptions = ref<MemberUserOption[]>([])
-const memberSelectLabelId = useId()
-const memberSelectButtonId = useId()
 const apolloClient = useApolloClient().client
+const runtimeConfig = useRuntimeConfig()
 
 const { result: departmentTreeResult, refetch: refetchDepartmentTree } =
   useQuery(departmentTreeQuery)
@@ -515,53 +649,124 @@ const filteredUsers = computed(() => {
   })
 })
 
+const deleteMemberDialogOpen = ref(false)
+const deleteMemberLoading = ref(false)
+const deleteMemberError = ref('')
+const deleteMemberTarget = ref<MemberRow | null>(null)
+
+const removeDepartmentMemberMutation = gql`
+  mutation RemoveDepartmentMember($departmentId: String!, $userId: String!) {
+    departmentMutations {
+      removeMember(input: { departmentId: $departmentId, userId: $userId })
+    }
+  }
+`
+
+const adminDeleteUserMutation = gql`
+  mutation OrganizationAdminDeleteUser($userConfirmation: UserDeleteInput!) {
+    adminDeleteUser(userConfirmation: $userConfirmation)
+  }
+`
+
+const updateDepartmentMutation = gql`
+  mutation UpdateDepartment($id: String!, $name: String!) {
+    departmentMutations {
+      update(input: { id: $id, name: $name }) {
+        id
+        name
+      }
+    }
+  }
+`
+
+const deleteDepartmentMutation = gql`
+  mutation DeleteDepartment($id: String!) {
+    departmentMutations {
+      delete(input: { id: $id })
+    }
+  }
+`
+
+// 编辑部门
+const editDepartmentDialogOpen = ref(false)
+const editDepartmentName = ref('')
+const editDepartmentLoading = ref(false)
+const editDepartmentError = ref('')
+const editDepartmentTarget = ref<OrganizationTreeRow | null>(null)
+
+const openEditDepartmentDialog = (org: OrganizationTreeRow) => {
+  editDepartmentTarget.value = org
+  editDepartmentName.value = org.name
+  editDepartmentError.value = ''
+  editDepartmentDialogOpen.value = true
+}
+
+const closeEditDepartmentDialog = () => {
+  editDepartmentDialogOpen.value = false
+  editDepartmentName.value = ''
+  editDepartmentError.value = ''
+  editDepartmentTarget.value = null
+}
+
+const submitEditDepartment = async () => {
+  if (editDepartmentLoading.value || !editDepartmentTarget.value) return
+  const name = editDepartmentName.value.trim()
+  if (!name) return
+  editDepartmentLoading.value = true
+  editDepartmentError.value = ''
+  try {
+    await apolloClient.mutate({
+      mutation: updateDepartmentMutation,
+      variables: { id: editDepartmentTarget.value.id, name }
+    })
+    await refetchDepartmentTree()
+    closeEditDepartmentDialog()
+  } catch (e) {
+    editDepartmentError.value = e instanceof Error ? e.message : '保存失败，请重试'
+  } finally {
+    editDepartmentLoading.value = false
+  }
+}
+
+// 删除部门
+const deleteDepartmentDialogOpen = ref(false)
+const deleteDepartmentLoading = ref(false)
+const deleteDepartmentError = ref('')
+const deleteDepartmentTarget = ref<OrganizationTreeRow | null>(null)
+
+const openDeleteDepartmentDialog = (org: OrganizationTreeRow) => {
+  deleteDepartmentTarget.value = org
+  deleteDepartmentError.value = ''
+  deleteDepartmentDialogOpen.value = true
+}
+
+const closeDepartmentDeleteDialog = () => {
+  deleteDepartmentDialogOpen.value = false
+  deleteDepartmentTarget.value = null
+  deleteDepartmentError.value = ''
+}
+
+const submitDeleteDepartment = async () => {
+  if (deleteDepartmentLoading.value || !deleteDepartmentTarget.value) return
+  deleteDepartmentLoading.value = true
+  deleteDepartmentError.value = ''
+  try {
+    await apolloClient.mutate({
+      mutation: deleteDepartmentMutation,
+      variables: { id: deleteDepartmentTarget.value.id }
+    })
+    await refetchDepartmentTree()
+    closeDepartmentDeleteDialog()
+  } catch (e) {
+    deleteDepartmentError.value = e instanceof Error ? e.message : '删除失败，请重试'
+  } finally {
+    deleteDepartmentLoading.value = false
+  }
+}
+
 const { mutate: createDepartmentMutate, loading: createDepartmentLoading } =
   useMutation(createDepartmentMutation)
 const { mutate: addDepartmentMemberMutate } = useMutation(addDepartmentMemberMutation)
-
-const selectedMemberUsers = computed({
-  get: () => {
-    const selectedIds = newMemberForm.value.userIds
-    return memberUserOptions.value.filter((item) => selectedIds.includes(item.id))
-  },
-  set: (newValue: MemberUserOption[] | MemberUserOption | undefined) => {
-    if (Array.isArray(newValue)) {
-      newMemberForm.value.userIds = newValue.map((item) => item.id)
-      return
-    }
-    newMemberForm.value.userIds = newValue ? [newValue.id] : []
-  }
-})
-
-const loadMemberUserOptions = async (searchKeyword: string) => {
-  const normalizedQuery = searchKeyword.trim().length ? searchKeyword.trim() : '%'
-  const response = await apolloClient.query({
-    query: memberSearchUsersQuery,
-    variables: {
-      query: normalizedQuery,
-      limit: 50,
-      cursor: null
-    },
-    fetchPolicy: 'network-only'
-  })
-
-  const users =
-    (
-      response.data as {
-        users?: { items?: Array<{ id: string; name: string | null }> | null } | null
-      }
-    ).users?.items || []
-
-  memberUserOptions.value = users.map((user) => ({
-    id: user.id,
-    name: user.name || user.id
-  }))
-
-  return memberUserOptions.value
-}
-
-const invokeSearchMemberUsers = async (searchKeyword: string) =>
-  await loadMemberUserOptions(searchKeyword)
 
 const openCreateRootDepartmentDialog = () => {
   createDepartmentParentId.value = null
@@ -610,8 +815,8 @@ const closeCreateMemberDialog = () => {
   createMemberDialogOpen.value = false
   memberFormError.value = ''
   newMemberForm.value = {
-    userIds: [],
-    title: ''
+    name: '',
+    phone: ''
   }
 }
 
@@ -620,38 +825,113 @@ const submitCreateMember = async () => {
 
   const departmentId = activeDepartmentId.value
   if (!departmentId) {
-    memberFormError.value = '请先选择一个部门后再添加成员'
+    memberFormError.value = '请先选择一个部门后再新增成员'
     return
   }
 
-  const selectedUserIds = Array.from(
-    new Set(newMemberForm.value.userIds.map((id) => id.trim()).filter(Boolean))
-  )
-  if (!selectedUserIds.length) {
-    memberFormError.value = '请选择至少一个成员'
+  const name = newMemberForm.value.name.trim()
+  const phone = newMemberForm.value.phone.trim()
+
+  if (!name) {
+    memberFormError.value = '请输入姓名'
     return
   }
-
-  const existingUserIdSet = new Set(activeMemberRows.value.map((row) => row.id))
-  const pendingUserIds = selectedUserIds.filter((id) => !existingUserIdSet.has(id))
-  if (!pendingUserIds.length) {
-    memberFormError.value = '所选成员均已在当前部门中'
+  if (!phone) {
+    memberFormError.value = '请输入手机号'
+    return
+  }
+  if (!/^1[3-9]\d{9}$/.test(phone)) {
+    memberFormError.value = '请输入有效的手机号'
     return
   }
 
   createMemberLoading.value = true
+  memberFormError.value = ''
   try {
+    // Step 1: 调用注册接口创建账号（手机号作 email，密码固定）
+    const apiOrigin = runtimeConfig.public.apiOrigin as string
+    const challenge = randomString(10)
+    await registerAndGetAccessCode({
+      apiOrigin,
+      challenge,
+      user: {
+        email: phone,
+        password: 'Srj@6666',
+        name
+      }
+    }).catch((err: unknown) => {
+      // 如果账号已存在，尝试继续查找用户并加入部门
+      const msg = err instanceof Error ? err.message : String(err)
+      if (!msg.includes('already') && !msg.includes('exists') && !msg.includes('已')) {
+        throw err
+      }
+    })
+
+    // Step 2: 通过手机号搜索用户得到 userId
+    const searchResp = await apolloClient.query({
+      query: memberSearchUsersQuery,
+      variables: { query: phone, limit: 5, cursor: null },
+      fetchPolicy: 'network-only'
+    })
+    const foundUsers =
+      (
+        searchResp.data as {
+          users?: { items?: Array<{ id: string; name: string | null }> | null } | null
+        }
+      ).users?.items || []
+    const matched = foundUsers.find((u) => u.name === name) || foundUsers[0]
+    if (!matched) {
+      memberFormError.value = '创建账号后未找到用户，请重试'
+      return
+    }
+
+    // Step 3: 将用户加入当前部门
     await addDepartmentMemberMutate({
       departmentId,
-      userIds: pendingUserIds,
-      title: newMemberForm.value.title.trim() || null
+      userIds: [matched.id],
+      title: null
     })
-    await refetchDepartmentUsers({
-      departmentId
-    })
+    await refetchDepartmentUsers({ departmentId })
     closeCreateMemberDialog()
+  } catch (e) {
+    memberFormError.value = e instanceof Error ? e.message : '添加失败，请重试'
   } finally {
     createMemberLoading.value = false
+  }
+}
+
+const openDeleteMemberDialog = (user: MemberRow) => {
+  deleteMemberTarget.value = user
+  deleteMemberError.value = ''
+  deleteMemberDialogOpen.value = true
+}
+
+const closeDeleteMemberDialog = () => {
+  deleteMemberDialogOpen.value = false
+  deleteMemberTarget.value = null
+  deleteMemberError.value = ''
+}
+
+const submitDeleteMember = async () => {
+  if (deleteMemberLoading.value || !deleteMemberTarget.value) return
+
+  deleteMemberLoading.value = true
+  deleteMemberError.value = ''
+  try {
+    const userId = deleteMemberTarget.value.id
+    const departmentId = deleteMemberTarget.value.nodeId
+
+    await apolloClient.mutate({
+      mutation: removeDepartmentMemberMutation,
+      variables: { departmentId, userId }
+    })
+
+    await refetchDepartmentUsers({ departmentId: activeDepartmentId.value as string })
+    closeDeleteMemberDialog()
+  } catch (e) {
+    deleteMemberError.value = e instanceof Error ? e.message : '移除失败，请重试'
+  } finally {
+    deleteMemberLoading.value = false
   }
 }
 
@@ -665,7 +945,6 @@ watch(activeDepartmentId, (departmentId) => {
 watch(createMemberDialogOpen, (open) => {
   if (open) {
     memberFormError.value = ''
-    loadMemberUserOptions('')
   }
 })
 

@@ -45,6 +45,15 @@ export function fullyResetForm(
   veeValidateResetForm({ values: {} })
 }
 
+/**
+ * Chinese mobile phone number validation rule (11 digits starting with 1)
+ */
+export const isPhone = (value: string) => {
+  if (!value) return '手机号不能为空'
+  if (!/^1[3-9]\d{9}$/.test(value)) return '请输入有效的手机号'
+  return true
+}
+
 export const isValidWorkspaceSlug = (value: string) => {
   try {
     validateWorkspaceSlug(value)

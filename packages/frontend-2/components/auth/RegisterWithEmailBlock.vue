@@ -5,18 +5,20 @@
       <FormTextInput
         v-model="email"
         name="email"
-        label="工作邮箱"
-        placeholder="邮箱"
+        label="手机号"
+        placeholder="请输入手机号"
+        type="tel"
         size="lg"
         color="foundation"
+        :rules="emailRules"
         show-label
         auto-focus
       />
       <FormTextInput
         type="text"
         name="name"
-        label="全名"
-        placeholder="我的名字"
+        label="用户名"
+        placeholder="请输入用户名"
         size="lg"
         :rules="nameRules"
         color="foundation"
@@ -29,7 +31,7 @@
         type="password"
         name="password"
         label="密码"
-        placeholder="输入强密码"
+        placeholder="请输入密码"
         color="foundation"
         size="lg"
         :rules="passwordRules"
@@ -60,7 +62,7 @@
 </template>
 <script setup lang="ts">
 import { useForm } from 'vee-validate'
-import { isEmail, isRequired } from '~~/lib/common/helpers/validation'
+import { isPhone, isRequired } from '~~/lib/common/helpers/validation'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { ensureError } from '@speckle/shared'
 import { useAuthManager } from '~~/lib/auth/composables/auth'
@@ -68,10 +70,7 @@ import { loginRoute } from '~~/lib/common/helpers/route'
 import { graphql } from '~~/lib/common/generated/gql'
 import type { ServerTermsOfServicePrivacyPolicyFragmentFragment } from '~~/lib/common/generated/gql/graphql'
 import { useMounted } from '@vueuse/core'
-import {
-  passwordRules,
-  doesNotContainBlockedDomain
-} from '~~/lib/auth/helpers/validation'
+import { passwordRules } from '~~/lib/auth/helpers/validation'
 
 graphql(`
   fragment ServerTermsOfServicePrivacyPolicyFragment on ServerInfo {
@@ -92,18 +91,13 @@ const router = useRouter()
 const { signUpWithEmail, inviteToken } = useAuthManager()
 const { triggerNotification } = useGlobalToast()
 const isMounted = useMounted()
-const isNoPersonalEmailsEnabled = useIsNoPersonalEmailsEnabled()
 
 const newsletterConsent = defineModel<boolean>('newsletterConsent', { required: true })
 const loading = ref(false)
 const password = ref('')
 const email = ref('')
 
-const emailRules = computed(() =>
-  inviteToken.value || !isNoPersonalEmailsEnabled.value
-    ? [isEmail]
-    : [isEmail, doesNotContainBlockedDomain]
-)
+const emailRules = computed(() => [isPhone])
 const nameRules = [isRequired]
 
 const isEmailDisabled = computed(() => !!props.inviteEmail?.length || loading.value)

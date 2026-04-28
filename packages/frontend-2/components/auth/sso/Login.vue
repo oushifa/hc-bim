@@ -5,13 +5,13 @@
 
       <FormTextInput
         v-model="email"
-        type="email"
+        type="tel"
         name="email"
-        label="您的工作邮箱"
-        placeholder="输入您的邮箱"
+        label="您的手机号"
+        placeholder="请输入手机号"
         size="lg"
         color="foundation"
-        :rules="[isEmail, isRequired]"
+        :rules="[isPhone, isRequired]"
         :loading="isChecking"
         :help="helpText"
         :custom-error-message="errorMessage"
@@ -41,7 +41,7 @@
 
 <script setup lang="ts">
 import { useForm } from 'vee-validate'
-import { isEmail, isRequired } from '~/lib/common/helpers/validation'
+import { isPhone, isRequired } from '~/lib/common/helpers/validation'
 import { loginRoute } from '~/lib/common/helpers/route'
 import { useQuery } from '@vue/apollo-composable'
 import { workspaceSsoByEmailQuery } from '~/lib/workspaces/graphql/queries'
@@ -101,14 +101,14 @@ const {
 const helpText = computed(() => {
   if (isChecking.value) return 'Checking SSO availability...'
   if (availableWorkspaces.value.length === 0 && emailCheckState.value === 'checked') {
-    return '此邮箱未关联任何启用 SSO 的工作空间'
+    return '此手机号未关联任何启用 SSO 的工作空间'
   }
   return undefined
 })
 
 const errorMessage = computed(() => {
   if (emailCheckState.value === 'checked' && availableWorkspaces.value.length === 0) {
-    return '此邮箱未关联任何启用 SSO 的工作空间'
+    return '此手机号未关联任何启用 SSO 的工作空间'
   }
   return undefined
 })

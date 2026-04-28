@@ -148,7 +148,7 @@
     <button
       v-if="!isEmbedEnabled"
       v-tippy="getTooltipProps('返回上一级', { placement: 'right' })"
-      class="fixed z-[100] top-2 flex items-center justify-center w-9 h-9 rounded-lg bg-foundation border border-outline-2 text-foreground-2 hover:text-primary hover:border-primary transition-colors shadow-md"
+      class="fixed z-[10] top-2 flex items-center justify-center w-9 h-9 rounded-lg bg-foundation border border-outline-2 text-foreground-2 hover:text-primary hover:border-primary transition-colors shadow-md"
       :style="backBtnStyle"
       @click="goBackToPreviousPage"
     >

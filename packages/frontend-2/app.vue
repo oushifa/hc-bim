@@ -19,6 +19,13 @@ import { useFixBraveSafariCookies } from '~~/lib/common/composables/reactiveCook
 useHead({
   // Title suffix
   titleTemplate: (titleChunk) => (titleChunk ? `${titleChunk} | 中建海创` : '中建海创'),
+  link: [
+    {
+      rel: 'icon',
+      type: 'image/png',
+      href: 'https://siruijie.oss-cn-beijing.aliyuncs.com/test/logo.png'
+    }
+  ],
   htmlAttrs: {
     // class: computed(() => (isDarkTheme.value ? `dark` : ``)),
     class: computed(() => ``),
