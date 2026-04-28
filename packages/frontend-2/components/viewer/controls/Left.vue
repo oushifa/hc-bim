@@ -87,7 +87,7 @@
     <div
       v-if="activePanel !== 'none' && !isEmbedEnabled"
       ref="resizeHandle"
-      class="absolute h-full max-h-[calc(100dvh-3rem)] w-4 transition border-l hover:border-l-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30"
+      class="absolute h-full w-4 transition border-l hover:border-l-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30"
       :style="`left:${width + 52}px;`"
       @mousedown="startResizing"
     />
@@ -99,7 +99,7 @@
       :class="[
         'bg-foundation absolute z-10 left-[calc(2.5rem+1px)] top-[-1px] bottom-[-1px] overflow-hidden border-outline-2 border border-l-0 rounded-lg rounded-tl-none rounded-bl-none ',
         hasActivePanel ? 'opacity-100' : 'opacity-0',
-        isEmbedEnabled ? '' : 'lg:left-[calc(3rem+1px)] lg:border-none lg:rounded-none'
+        isEmbedEnabled ? '' : 'lg:left-[calc(3rem+1px)] lg:rounded-none'
       ]"
       :style="`width: ${widthClass};`"
     >
