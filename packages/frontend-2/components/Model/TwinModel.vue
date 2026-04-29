@@ -282,7 +282,7 @@
 
               <td class="py-4 px-4 text-sm space-x-3">
                 <template v-if="activeTab === 'user'">
-                  <div class="relative inline-block">
+                  <div v-if="hasModelOp('canFile')" class="relative inline-block">
                     <button
                       class="text-[#00b4b6] hover:underline cursor-pointer"
                       @click="showOffshelfPopover(model.id, $event)"
@@ -291,6 +291,7 @@
                     </button>
                   </div>
                   <button
+                    v-if="hasModelOp('canEdit')"
                     class="text-[#00b4b6] hover:underline"
                     @click="openEditModal(model as UserModel)"
                   >
@@ -302,6 +303,7 @@
                     版本管理
                   </button>
                   <button
+                    v-if="hasModelOp('canEdit')"
                     class="text-[#00b4b6] hover:underline cursor-pointer"
                     @click="openOfficialEditModal(model as OfficialModel)"
                   >
@@ -926,6 +928,10 @@ import {
   EllipsisHorizontalIcon,
   XMarkIcon
 } from '@heroicons/vue/24/outline'
+import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
+
+const { ensureLoaded: ensureUserPermsLoaded, hasModelOp } = useUserPermissions()
+void ensureUserPermsLoaded()
 
 interface UserModel {
   id: string

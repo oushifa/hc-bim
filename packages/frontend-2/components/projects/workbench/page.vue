@@ -36,6 +36,7 @@
           <span>从模型库导入</span>
         </button>
         <button
+          v-if="hasModelOp('canUpload')"
           class="flex items-center space-x-1 bg-[#e6f7f8] text-[#00b4b6] hover:bg-[#00b4b6] hover:text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
           :disabled="!uploadProject"
           :class="{ 'opacity-60 cursor-not-allowed': !uploadProject }"
@@ -255,6 +256,7 @@
                         <ClockIcon class="h-4 w-4" />
                       </button>
                       <button
+                        v-if="hasModelOp('canDownload')"
                         title="数据下载及导出"
                         class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
                       >
@@ -387,6 +389,7 @@ import type { FileAreaUploadingPayload } from '~/lib/form/helpers/fileUpload'
 import { gql } from 'graphql-tag'
 import ImportDialog from '~/components/projects/workbench/ImportDialog.vue'
 import ProjectCardImportFileArea from '~/components/project/CardImportFileArea.vue'
+import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 
 const props = defineProps<{
   projectId: string
@@ -395,6 +398,8 @@ const props = defineProps<{
 const router = useRouter()
 const logger = useLogger()
 const apollo = useApolloClient().client
+const { ensureLoaded: ensureUserPermsLoaded, hasModelOp } = useUserPermissions()
+void ensureUserPermsLoaded()
 
 const goBack = () => {
   router.push('/projects')

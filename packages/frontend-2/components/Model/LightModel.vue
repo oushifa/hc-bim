@@ -62,7 +62,7 @@
         </div>
 
         <!-- Action Button -->
-        <button class="bg-[#00b4b6] hover:bg-[#009fa1] text-white px-4 py-1.5 rounded-[8px] text-sm font-medium transition-colors">
+        <button v-if="hasModelOp('canUpload')" class="bg-[#00b4b6] hover:bg-[#009fa1] text-white px-4 py-1.5 rounded-[8px] text-sm font-medium transition-colors">
           新建模型
         </button>
       </div>
@@ -122,6 +122,7 @@
                   <div class="fixed inset-0 z-10" @click.stop="activeActionMenu = null" />
                   <div class="absolute right-8 top-10 w-40 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-20 overflow-hidden text-left">
                     <button
+                      v-if="hasModelOp('canDownload')"
                       class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-[#00b4b6] transition-colors"
                       @click.stop="activeActionMenu = null"
                     >
@@ -136,6 +137,7 @@
                       <span>分享</span>
                     </button>
                     <button
+                      v-if="hasModelOp('canEdit')"
                       class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-[#00b4b6] transition-colors"
                       @click.stop="activeActionMenu = null"
                     >
@@ -150,6 +152,7 @@
                       <span>历史版本</span>
                     </button>
                     <button
+                      v-if="hasModelOp('canFile')"
                       class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
                       @click.stop="activeActionMenu = null"
                     >
@@ -195,6 +198,10 @@ import {
   TrashIcon
 } from '@heroicons/vue/24/outline'
 import ModelDetail from './Detail.vue'
+import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
+
+const { ensureLoaded: ensureUserPermsLoaded, hasModelOp } = useUserPermissions()
+void ensureUserPermsLoaded()
 
 interface Model {
   id: number
