@@ -120,7 +120,7 @@ graphql(`
 
 const logger = useLogger()
 
-const infiniteLoaderId = ref('')
+const infiniteLoaderResetToken = ref(0)
 const cursor = ref(null as Nullable<string>)
 const selectedRoles = ref(undefined as Optional<StreamRoles[]>)
 const filterProjectsToMove = ref(false)
@@ -169,8 +169,14 @@ const deleteProject = useDeleteProject()
 
 onProjectsResult((res) => {
   cursor.value = res.data?.activeUser?.projects.cursor || null
-  infiniteLoaderId.value = JSON.stringify(projectsVariables.value?.filter || {})
 })
+
+const infiniteLoaderId = computed(() =>
+  JSON.stringify({
+    filter: projectsVariables.value?.filter || {},
+    reset: infiniteLoaderResetToken.value
+  })
+)
 
 const projects = computed(() => projectsPanelResult.value?.activeUser?.projects)
 const showEmptyState = computed(() => {
@@ -209,9 +215,15 @@ const infiniteLoad = async (state: InfiniteLoaderState) => {
   }
 }
 
-const onProjectCreated = () => {
-  // 项目创建后刷新列表
-  refetch()
+const onProjectCreated = async () => {
+  // 项目创建后重置游标并刷新列表，同时重置无限加载器，避免仅显示首页6条
+  cursor.value = null
+  try {
+    await refetch()
+  } catch (error) {
+    logger.error(error)
+  }
+  infiniteLoaderResetToken.value++
 }
 
 const mixpanel = useMixpanel()
@@ -260,10 +272,12 @@ const onUpdateProject = async (updatedData: any) => {
       name: updatedData.name
     })
     showEditProjectDialog.value = false
-    // 刷新列表
-    refetch()
+    // 刷新列表并重置无限加载器
+    cursor.value = null
+    await refetch()
+    infiniteLoaderResetToken.value++
   } catch (error) {
-    console.error('更新项目失败:', error)
+    logger.error('更新项目失败:', error)
   }
 }
 
@@ -271,10 +285,12 @@ const onConfirmDelete = async (projectId: string) => {
   try {
     await deleteProject(projectId)
     showDeleteProjectDialog.value = false
-    // 刷新列表
-    refetch()
+    // 刷新列表并重置无限加载器
+    cursor.value = null
+    await refetch()
+    infiniteLoaderResetToken.value++
   } catch (error) {
-    console.error('删除项目失败:', error)
+    logger.error('删除项目失败:', error)
   }
 }
 

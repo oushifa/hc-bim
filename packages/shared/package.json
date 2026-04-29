@@ -355,5 +355,6 @@
         "default": "./dist/commonjs/saved-views/index.js"
       }
     }
-  }
+  },
+  "module": "./dist/esm/index.js"
 }

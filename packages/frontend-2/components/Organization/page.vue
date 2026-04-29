@@ -849,22 +849,32 @@ const submitCreateMember = async () => {
   memberFormError.value = ''
   try {
     // Step 1: 调用注册接口创建账号（手机号作 email，密码固定）
+    // fromAdmin=true 告知后端这是管理员代注册，新用户默认为普通用户
     const apiOrigin = runtimeConfig.public.apiOrigin as string
     const challenge = randomString(10)
     await registerAndGetAccessCode({
       apiOrigin,
       challenge,
+      fromAdmin: true,
       user: {
         email: phone,
-        password: 'Srj@6666',
+        password: '51World@51',
         name
       }
     }).catch((err: unknown) => {
-      // 如果账号已存在，尝试继续查找用户并加入部门
+      // 账号已存在：忽略，继续后续流程尝试加入部门
+      // access_code 解析失败：账号已创建成功，fetch 跟随 302 跨域重定向导致
+      // 浏览器无法读取最终 URL，而我们也不需要这个 access_code，因此可以安全忽略
       const msg = err instanceof Error ? err.message : String(err)
-      if (!msg.includes('already') && !msg.includes('exists') && !msg.includes('已')) {
-        throw err
+      if (
+        msg.includes('already') ||
+        msg.includes('exists') ||
+        msg.includes('已') ||
+        msg.includes('access_code')
+      ) {
+        return
       }
+      throw err
     })
 
     // Step 2: 通过手机号搜索用户得到 userId

@@ -80,7 +80,7 @@
                 </NuxtLink> -->
 
                 <NuxtLink
-                  v-if="showWorkspaceLinks"
+                  v-if="showWorkspaceLinks && hasMenu('/projects')"
                   :to="projectsLink"
                   @click="isOpenMobile = false"
                 >
@@ -241,7 +241,7 @@
                 </div>
 
                 <!-- 模型管理（带子菜单） -->
-                <div v-if="showWorkspaceLinks" class="relative">
+                <div v-if="showWorkspaceLinks && hasMenu('/models')" class="relative">
                   <button
                     class="w-full text-left px-2.5 py-3.5 mb-2 rounded-[8px] flex items-center transition-colors"
                     :class="[
@@ -443,7 +443,7 @@
                 </NuxtLink> -->
 
                 <NuxtLink
-                  v-if="showWorkspaceLinks"
+                  v-if="showWorkspaceLinks && hasMenu('/organization')"
                   to="/organization"
                   @click="isOpenMobile = false"
                 >
@@ -471,7 +471,7 @@
                 </NuxtLink>
 
                 <NuxtLink
-                  v-if="showWorkspaceLinks"
+                  v-if="showWorkspaceLinks && hasMenu('/permissions')"
                   to="/permissions"
                   @click="isOpenMobile = false"
                 >
@@ -499,7 +499,7 @@
                 </NuxtLink>
 
                 <NuxtLink
-                  v-if="showWorkspaceLinks"
+                  v-if="showWorkspaceLinks && hasMenu('/logs')"
                   to="/logs"
                   @click="isOpenMobile = false"
                 >
@@ -661,6 +661,7 @@ import {
 import { ChevronRightIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
 import { useRoute } from 'vue-router'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
+import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useActiveWorkspaceSlug } from '~/lib/user/composables/activeWorkspace'
 import { graphql } from '~/lib/common/generated/gql'
@@ -693,6 +694,14 @@ const sidebarPermissionsQuery = graphql(`
 `)
 
 const { isLoggedIn } = useActiveUser()
+const { ensureLoaded: ensureUserPermsLoaded, hasMenu } = useUserPermissions()
+// First-load user perms when sidebar renders (SSR + CSR), so menus are gated
+// from the first paint. A no-op if already cached in the shared useState.
+if (import.meta.server) {
+  await ensureUserPermsLoaded()
+} else {
+  void ensureUserPermsLoaded()
+}
 const isWorkspacesEnabled = useIsWorkspacesEnabled()
 const isDashboardsEnabled = useIsDashboardsModuleEnabled()
 const route = useRoute()

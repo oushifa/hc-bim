@@ -22,6 +22,7 @@ import {
   useWaitForActiveUser
 } from '~~/lib/auth/composables/activeUser'
 import { usePostAuthRedirect } from '~~/lib/auth/composables/postAuthRedirect'
+import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import type { ActiveUserMainMetadataQuery } from '~~/lib/common/generated/gql/graphql'
 import { useScopedState } from '~/lib/common/composables/scopedState'
 import type { ApolloClient } from '@apollo/client/core'
@@ -590,6 +591,13 @@ export const useAuthManager = (
     thirdPartyTokenState.oaUser.value = null
     SafeLocalStorage.remove(ThirdPartyOaTokenLocalStorageKey)
     SafeLocalStorage.remove(ThirdPartyOaUserLocalStorageKey)
+
+    // Clear cached custom-role menu/model permissions so the next login fetches fresh perms.
+    try {
+      useUserPermissions().clear()
+    } catch {
+      // ignore if composable unavailable in edge contexts
+    }
 
     if (!options?.skipToast) {
       triggerNotification({

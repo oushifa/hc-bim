@@ -9,7 +9,7 @@
         class="flex items-center space-x-1 bg-white/80 backdrop-blur-md border border-gray-200 text-gray-600 hover:text-[#00b4b6] hover:border-[#00b4b6] px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors mr-5"
         @click="refreshLogs"
       >
-        <ArrowDownTrayIcon class="w-4 h-4" />
+        <ArrowPathIcon class="w-4 h-4" :class="{ 'animate-spin': isLoading }" />
         <span>{{ isLoading ? '加载中...' : '刷新日志' }}</span>
       </button>
     </div>
@@ -187,7 +187,7 @@
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
-  ArrowDownTrayIcon
+  ArrowPathIcon
 } from '@heroicons/vue/24/outline'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
 

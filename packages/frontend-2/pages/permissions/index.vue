@@ -10,6 +10,6 @@ useHead({
 })
 
 definePageMeta({
-  middleware: ['auth']
+  middleware: ['auth', 'permission']
 })
 </script>
