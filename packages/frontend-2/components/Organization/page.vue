@@ -856,7 +856,7 @@ const submitCreateMember = async () => {
       challenge,
       user: {
         email: phone,
-        password: 'Srj@6666',
+        password: '51World@51',
         name
       }
     }).catch((err: unknown) => {
