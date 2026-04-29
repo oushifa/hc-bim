@@ -5,10 +5,12 @@
       <!-- <ClipboardDocumentListIcon class="h-5 w-5 text-[#00b4b6]" /> -->
       <h2 class="text-heading pl-5">日志管理</h2>
       <button
+        :disabled="isLoading"
         class="flex items-center space-x-1 bg-white/80 backdrop-blur-md border border-gray-200 text-gray-600 hover:text-[#00b4b6] hover:border-[#00b4b6] px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors mr-5"
+        @click="refreshLogs"
       >
         <ArrowDownTrayIcon class="w-4 h-4" />
-        <span>导出日志</span>
+        <span>{{ isLoading ? '加载中...' : '刷新日志' }}</span>
       </button>
     </div>
 
@@ -22,7 +24,9 @@
         class="h-[4.5rem] px-5 border-t border-b border-gray-100 flex items-center justify-between shrink-0 bg-white"
       >
         <!-- Tabs -->
-        <div class="flex space-x-1 bg-[#f5f7fa] p-1 rounded-[8px] border border-gray-200">
+        <div
+          class="flex space-x-1 bg-[#f5f7fa] p-1 rounded-[8px] border border-gray-200"
+        >
           <button
             class="px-4 py-1.5 rounded-[8px] text-sm font-medium transition-colors"
             :class="
@@ -50,10 +54,12 @@
         <!-- Search + Filter -->
         <div class="flex items-center space-x-3">
           <div class="relative">
+            <label for="logs-search-input" class="sr-only">搜索日志</label>
             <MagnifyingGlassIcon
               class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
             />
             <input
+              id="logs-search-input"
               v-model="searchQuery"
               type="text"
               placeholder="搜索操作人/内容..."
@@ -71,6 +77,13 @@
 
       <!-- Table Content -->
       <div class="flex-1 overflow-auto p-5">
+        <div
+          v-if="errorMessage"
+          class="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600"
+        >
+          {{ errorMessage }}
+        </div>
+
         <!-- 模型操作日志 -->
         <template v-if="activeTab === 'model'">
           <table class="w-full text-left border-collapse">
@@ -97,13 +110,18 @@
                 </td>
                 <td class="py-3.5 text-gray-600">{{ log.target }}</td>
                 <td class="py-3.5 text-gray-500">
-                  <span class="px-2.5 py-1 rounded-[6px] bg-gray-100 text-xs">{{
-                    log.version
-                  }}</span>
+                  <span class="px-2.5 py-1 rounded-[6px] bg-gray-100 text-xs">
+                    {{ log.version }}
+                  </span>
                 </td>
                 <td class="py-3.5 pr-6 text-gray-400">{{ log.ip }}</td>
               </tr>
-              <tr v-if="filteredModelLogs.length === 0">
+              <tr v-if="isLoading">
+                <td colspan="6" class="py-16 text-center text-gray-400 text-sm">
+                  正在加载日志...
+                </td>
+              </tr>
+              <tr v-else-if="filteredModelLogs.length === 0">
                 <td colspan="6" class="py-16 text-center text-gray-400 text-sm">
                   暂无匹配的模型操作日志
                 </td>
@@ -147,7 +165,12 @@
                   </span>
                 </td>
               </tr>
-              <tr v-if="filteredLoginLogs.length === 0">
+              <tr v-if="isLoading">
+                <td colspan="5" class="py-16 text-center text-gray-400 text-sm">
+                  正在加载日志...
+                </td>
+              </tr>
+              <tr v-else-if="filteredLoginLogs.length === 0">
                 <td colspan="5" class="py-16 text-center text-gray-400 text-sm">
                   暂无匹配的用户登录日志
                 </td>
@@ -164,94 +187,185 @@
 import {
   MagnifyingGlassIcon,
   FunnelIcon,
-  ClipboardDocumentListIcon,
   ArrowDownTrayIcon
 } from '@heroicons/vue/24/outline'
+import { useAuthCookie } from '~~/lib/auth/composables/auth'
 
 // ─── Tab 状态 ────────────────────────────────────────────────
 const activeTab = ref<'model' | 'login'>('model')
 const searchQuery = ref('')
+const isLoading = ref(false)
+const errorMessage = ref('')
+const authToken = useAuthCookie()
 
-// ─── 模型操作日志数据 ────────────────────────────────────────
-const modelLogs = [
-  {
-    id: 1,
-    time: '2023-12-31 10:05:22',
-    user: '李明',
-    action: '上传模型',
-    target: 'T1塔楼建筑模型_v2.rvt',
-    version: 'V2.0',
-    ip: '192.168.1.105'
-  },
-  {
-    id: 2,
-    time: '2023-12-30 16:20:11',
-    user: '王建国',
-    action: '二三维联动配置',
-    target: '地下室结构模型.ifc',
-    version: 'V1.5',
-    ip: '192.168.1.112'
-  },
-  {
-    id: 3,
-    time: '2023-12-29 14:15:00',
-    user: '张伟',
-    action: '下载模型',
-    target: '暖通空调综合排布.nwd',
-    version: 'V1.0',
-    ip: '192.168.1.88'
-  },
-  {
-    id: 4,
-    time: '2023-12-28 09:30:45',
-    user: '李明',
-    action: '归档模型',
-    target: '园区景观绿化.skp',
-    version: 'V3.1',
-    ip: '192.168.1.105'
+type RawLogEvent = {
+  eventTime?: string
+  action?: string
+  what?: {
+    action?: string
+    targetType?: string | null
+    targetId?: string | null
+    payloadSummary?: Record<string, unknown> | string | null
   }
-]
+  who?: {
+    userId?: string | null
+    user?: {
+      id?: string | null
+      name?: string | null
+      email?: string | null
+    } | null
+    ip?: string | null
+  }
+  where?: {
+    route?: string | null
+    page?: string | null
+  }
+  result?: {
+    status?: 'success' | 'fail' | 'unknown'
+    message?: string | null
+  }
+  metadata?: Record<string, unknown> | null
+}
 
-// ─── 用户登录日志数据 ────────────────────────────────────────
-const loginLogs = [
-  {
-    id: 1,
-    time: '2023-12-31 09:00:12',
-    user: '李明',
-    ip: '192.168.1.105',
-    location: '上海市',
-    status: '成功'
-  },
-  {
-    id: 2,
-    time: '2023-12-31 08:45:33',
-    user: '王建国',
-    ip: '192.168.1.112',
-    location: '北京市',
-    status: '成功'
-  },
-  {
-    id: 3,
-    time: '2023-12-30 22:10:05',
-    user: '未知用户',
-    ip: '114.254.1.22',
-    location: '未知',
-    status: '失败 (密码错误)'
-  },
-  {
-    id: 4,
-    time: '2023-12-30 08:55:20',
-    user: '张伟',
-    ip: '192.168.1.88',
-    location: '广州市',
-    status: '成功'
+type ModelLogItem = {
+  id: string
+  time: string
+  user: string
+  action: string
+  target: string
+  version: string
+  ip: string
+}
+
+type LoginLogItem = {
+  id: string
+  time: string
+  user: string
+  ip: string
+  location: string
+  status: string
+}
+
+const modelLogs = ref<ModelLogItem[]>([])
+const loginLogs = ref<LoginLogItem[]>([])
+
+const formatTime = (value?: string) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+
+const parseEvents = (payload: unknown): RawLogEvent[] => {
+  if (Array.isArray(payload)) return payload as RawLogEvent[]
+  const root = asRecord(payload)
+  const candidates = [root.events, root.items, root.data]
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) return candidate as RawLogEvent[]
   }
-]
+  return []
+}
+
+const isLoginEvent = (event: RawLogEvent) => {
+  const action = event.what?.action || event.action || ''
+  return action.startsWith('auth.login')
+}
+
+const getDisplayUserName = (event: RawLogEvent) => {
+  return (
+    event.who?.user?.name || event.who?.user?.email || event.who?.userId || '未知用户'
+  )
+}
+
+const toModelLogItem = (event: RawLogEvent, index: number): ModelLogItem => {
+  const action = event.what?.action || event.action || '-'
+  const payload = asRecord(event.what?.payloadSummary)
+  const metadata = asRecord(event.metadata)
+
+  return {
+    id: `${event.eventTime || 'model'}-${index}-${action}`,
+    time: formatTime(event.eventTime),
+    user: getDisplayUserName(event),
+    action,
+    target: String(
+      event.what?.targetId ||
+        payload.targetId ||
+        payload.target ||
+        metadata.target ||
+        '-'
+    ),
+    version: String(payload.version || metadata.version || '-'),
+    ip: event.who?.ip || '-'
+  }
+}
+
+const toLoginLogItem = (event: RawLogEvent, index: number): LoginLogItem => {
+  const status = event.result?.status || 'unknown'
+  const statusText =
+    status === 'success'
+      ? '成功'
+      : status === 'fail'
+      ? `失败${event.result?.message ? ` (${event.result.message})` : ''}`
+      : '未知'
+  const metadata = asRecord(event.metadata)
+
+  return {
+    id: `${event.eventTime || 'login'}-${index}-${status}`,
+    time: formatTime(event.eventTime),
+    user: getDisplayUserName(event),
+    ip: event.who?.ip || '-',
+    location: String(
+      metadata.location || event.where?.route || event.where?.page || '未知'
+    ),
+    status: statusText
+  }
+}
+
+const refreshLogs = async () => {
+  isLoading.value = true
+  errorMessage.value = ''
+  try {
+    const token = authToken.value
+    const headers: HeadersInit = { 'Content-Type': 'application/json' }
+    if (token) headers.Authorization = `Bearer ${token}`
+
+    const response = await fetch(`${useApiOrigin()}/api/v1/logs/events?limit=300`, {
+      method: 'GET',
+      headers
+    })
+    if (!response.ok) {
+      throw new Error(`日志加载失败（${response.status}）`)
+    }
+
+    const payload = (await response.json()) as unknown
+    const events = parseEvents(payload)
+
+    const modelEvents = events.filter((event) => !isLoginEvent(event))
+    const loginEvents = events.filter((event) => isLoginEvent(event))
+
+    modelLogs.value = modelEvents.map(toModelLogItem)
+    loginLogs.value = loginEvents.map(toLoginLogItem)
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error ? error.message : '日志加载失败，请稍后重试。'
+    modelLogs.value = []
+    loginLogs.value = []
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  void refreshLogs()
+})
 
 // ─── 计算属性：过滤后的日志 ──────────────────────────────────
 const filteredModelLogs = computed(() => {
-  if (!searchQuery.value) return modelLogs
-  return modelLogs.filter(
+  if (!searchQuery.value) return modelLogs.value
+  return modelLogs.value.filter(
     (log) =>
       log.user.includes(searchQuery.value) ||
       log.action.includes(searchQuery.value) ||
@@ -260,8 +374,8 @@ const filteredModelLogs = computed(() => {
 })
 
 const filteredLoginLogs = computed(() => {
-  if (!searchQuery.value) return loginLogs
-  return loginLogs.filter(
+  if (!searchQuery.value) return loginLogs.value
+  return loginLogs.value.filter(
     (log) =>
       log.user.includes(searchQuery.value) ||
       log.ip.includes(searchQuery.value) ||

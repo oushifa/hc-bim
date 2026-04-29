@@ -1,18 +1,6 @@
-import {
-  projectsRoute,
-  workspaceRoute,
-  workbenchRoute
-} from '~/lib/common/helpers/route'
-import { useApolloClientFromNuxt } from '~~/lib/common/composables/graphql'
-import { activeUserActiveWorkspaceCheckQuery } from '~/lib/auth/graphql/queries'
+import { projectsRoute } from '~/lib/common/helpers/route'
 
 export default defineParallelizedNuxtRouteMiddleware(async () => {
-  const isWorkspacesEnabled = useIsWorkspacesEnabled()
-  const client = useApolloClientFromNuxt()
-
-  console.log(isWorkspacesEnabled)
-  console.log(client)
-
   // if (isWorkspacesEnabled.value) {
   //   const { data: navigationCheckData } = await client
   //     .query({

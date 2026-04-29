@@ -476,18 +476,18 @@ import { gql } from 'graphql-tag'
 
 // ─── 常量数据 ────────────────────────────────────────────────
 const ALL_MENU_PERMS = [
-  { id: 'p1', name: '项目管理' },
-  { id: 'p2', name: '组织管理' },
-  { id: 'p3', name: '权限管理' },
-  { id: 'p4', name: '日志管理' },
-  { id: 'p5', name: '模型库' }
+  { name: '项目管理', id: '/projects' },
+  { id: '/organization', name: '组织管理' },
+  { id: '/permissions', name: '权限管理' },
+  { id: '/logs', name: '日志管理' },
+  { id: '/models', name: '模型库' }
 ]
 
 const ALL_MODEL_PERMS = [
-  { id: 'm1', name: '上传模型' },
-  { id: 'm2', name: '编辑模型' },
-  { id: 'm3', name: '下载模型' },
-  { id: 'm4', name: '归档模型' }
+  { id: 'canUpload', name: '上传模型' },
+  { id: 'canEdit', name: '编辑模型' },
+  { id: 'canDownload', name: '下载模型' },
+  { id: 'canFile', name: '归档模型' }
 ]
 
 const searchUsersQuery = gql`
@@ -502,24 +502,36 @@ const searchUsersQuery = gql`
 `
 
 type SystemUser = { id: string; name: string }
+type PermId = string
+type RoleItem = { id: string; name: string; menuPerms: PermId[]; modelPerms: PermId[] }
+type RoleUserItem = {
+  id: string
+  orgUserId: string
+  name: string
+  roleId: string
+  menuPerms: PermId[]
+  modelPerms: PermId[]
+  isCustomized: boolean
+}
+type BackendRoleUserItem = {
+  id: string
+  userId: string
+  userName: string
+  roleId: string
+  menuPerms?: string[]
+  modelPerms?: string[]
+  isCustomized: boolean
+}
+
+const apiOrigin = useApiOrigin()
+
+const API_BASE = `${apiOrigin}/api/v1/custom-roles`
 
 const apolloClient = useApolloClient().client
 
 // ─── 响应式数据 ──────────────────────────────────────────────
-const roles = ref<
-  Array<{ id: string; name: string; menuPerms: string[]; modelPerms: string[] }>
->([])
-
-const users = ref<
-  Array<{
-    id: string
-    orgUserId: string
-    name: string
-    roleId: string
-    menuPerms: string[]
-    modelPerms: string[]
-  }>
->([])
+const roles = ref<RoleItem[]>([])
+const users = ref<RoleUserItem[]>([])
 
 const activeRoleId = ref('')
 const systemUsers = ref<SystemUser[]>([])
@@ -535,6 +547,66 @@ const availableOrgUsers = computed(() =>
     (su) => !roleUsers.value.some((ru) => ru.orgUserId === su.id)
   )
 )
+
+const notifyError = (message: string, e?: unknown) => {
+  void message
+  void e
+}
+
+const mapRole = (role: {
+  id: string
+  name: string
+  menuPerms?: string[]
+  modelPerms?: string[]
+}): RoleItem => ({
+  id: role.id,
+  name: role.name,
+  menuPerms: role.menuPerms || [],
+  modelPerms: role.modelPerms || []
+})
+
+const mapRoleUser = (user: BackendRoleUserItem): RoleUserItem => ({
+  id: user.id,
+  orgUserId: user.userId,
+  name: user.userName,
+  roleId: user.roleId,
+  menuPerms: user.menuPerms || [],
+  modelPerms: user.modelPerms || [],
+  isCustomized: user.isCustomized
+})
+
+const loadRoles = async () => {
+  try {
+    const res = await $fetch<{ items: RoleItem[] }>(API_BASE, {
+      method: 'GET'
+    })
+    roles.value = (res.items || []).map(mapRole)
+    if (!roles.value.find((r) => r.id === activeRoleId.value)) {
+      activeRoleId.value = roles.value[0]?.id || ''
+    }
+  } catch (e) {
+    notifyError('加载角色失败', e)
+  }
+}
+
+const loadRoleUsers = async (roleId: string) => {
+  if (!roleId) {
+    users.value = []
+    return
+  }
+  try {
+    const res = await $fetch<{ items: BackendRoleUserItem[] }>(
+      `${API_BASE}/${roleId}/users`,
+      {
+        method: 'GET'
+      }
+    )
+    users.value = (res.items || []).map(mapRoleUser)
+  } catch (e) {
+    users.value = []
+    notifyError('加载角色用户失败', e)
+  }
+}
 
 // ─── 权限弹窗 ────────────────────────────────────────────────
 const permModal = ref<{
@@ -572,18 +644,44 @@ const toggleModelPerm = (id: string) => {
   else modalModelPerms.value.push(id)
 }
 
-const savePerms = () => {
-  if (permModal.value.type === 'role') {
-    const r = roles.value.find((r) => r.id === permModal.value.targetId)
-    if (r) {
-      r.menuPerms = [...modalMenuPerms.value]
-      r.modelPerms = [...modalModelPerms.value]
+const savePerms = async () => {
+  if (permModal.value.type === 'role' && permModal.value.targetId) {
+    try {
+      await $fetch(`${API_BASE}/${permModal.value.targetId}/default-permissions`, {
+        method: 'PATCH',
+        body: {
+          menuPerms: [...modalMenuPerms.value],
+          modelPerms: [...modalModelPerms.value],
+          syncNonCustomizedUsers: true
+        }
+      })
+      const role = roles.value.find((r) => r.id === permModal.value.targetId)
+      if (role) {
+        role.menuPerms = [...modalMenuPerms.value]
+        role.modelPerms = [...modalModelPerms.value]
+      }
+      await loadRoleUsers(activeRoleId.value)
+    } catch (e) {
+      notifyError('保存角色默认权限失败', e)
+      return
     }
   } else {
-    const u = users.value.find((u) => u.id === permModal.value.targetId)
-    if (u) {
-      u.menuPerms = [...modalMenuPerms.value]
-      u.modelPerms = [...modalModelPerms.value]
+    const user = users.value.find((u) => u.id === permModal.value.targetId)
+    if (!user) return
+    try {
+      await $fetch(`${API_BASE}/${user.roleId}/users/${user.orgUserId}/permissions`, {
+        method: 'PATCH',
+        body: {
+          menuPerms: [...modalMenuPerms.value],
+          modelPerms: [...modalModelPerms.value]
+        }
+      })
+      user.menuPerms = [...modalMenuPerms.value]
+      user.modelPerms = [...modalModelPerms.value]
+      user.isCustomized = true
+    } catch (e) {
+      notifyError('保存用户权限失败', e)
+      return
     }
   }
   permModal.value.isOpen = false
@@ -598,28 +696,46 @@ const openCreateRoleModal = () => {
 const openEditRoleModal = (role: (typeof roles.value)[0]) => {
   roleModal.value = { isOpen: true, id: role.id, name: role.name }
 }
-const saveRole = () => {
+const saveRole = async () => {
   if (!roleModal.value.name.trim()) return
-  if (roleModal.value.id) {
-    const r = roles.value.find((r) => r.id === roleModal.value.id)
-    if (r) r.name = roleModal.value.name
-  } else {
-    const newId = 'r_' + Date.now()
-    roles.value.push({
-      id: newId,
-      name: roleModal.value.name,
-      menuPerms: [],
-      modelPerms: []
-    })
-    activeRoleId.value = newId
+  try {
+    if (roleModal.value.id) {
+      await $fetch(`${API_BASE}/${roleModal.value.id}`, {
+        method: 'PATCH',
+        body: { name: roleModal.value.name.trim() }
+      })
+    } else {
+      await $fetch(API_BASE, {
+        method: 'POST',
+        body: {
+          name: roleModal.value.name.trim(),
+          menuPerms: [],
+          modelPerms: []
+        }
+      })
+    }
+    await loadRoles()
+    if (!roleModal.value.id) {
+      const created = roles.value.find((r) => r.name === roleModal.value.name.trim())
+      if (created) activeRoleId.value = created.id
+    }
+  } catch (e) {
+    notifyError('保存角色失败', e)
+    return
   }
   roleModal.value.isOpen = false
 }
-const deleteRole = (id: string) => {
-  roles.value = roles.value.filter((r) => r.id !== id)
-  users.value = users.value.filter((u) => u.roleId !== id)
-  if (activeRoleId.value === id) {
-    activeRoleId.value = roles.value[0]?.id || ''
+const deleteRole = async (id: string) => {
+  try {
+    await $fetch(`${API_BASE}/${id}`, {
+      method: 'DELETE'
+    })
+    await loadRoles()
+    if (activeRoleId.value === id) {
+      activeRoleId.value = roles.value[0]?.id || ''
+    }
+  } catch (e) {
+    notifyError('删除角色失败', e)
   }
 }
 
@@ -657,25 +773,33 @@ const toggleOrgUserSelect = (id: string) => {
   if (idx >= 0) selectedOrgUsers.value.splice(idx, 1)
   else selectedOrgUsers.value.push(id)
 }
-const confirmAddUsers = () => {
+const confirmAddUsers = async () => {
   if (!activeRole.value) return
-  selectedOrgUsers.value.forEach((userId) => {
-    const sysUser = systemUsers.value.find((u) => u.id === userId)
-    if (!sysUser) return
-    users.value.push({
-      id: String(Date.now() + Math.random()),
-      orgUserId: sysUser.id,
-      name: sysUser.name,
-      roleId: activeRoleId.value,
-      menuPerms: [...(activeRole.value?.menuPerms ?? [])],
-      modelPerms: [...(activeRole.value?.modelPerms ?? [])]
+  try {
+    await $fetch(`${API_BASE}/${activeRole.value.id}/users`, {
+      method: 'POST',
+      body: {
+        userIds: [...selectedOrgUsers.value]
+      }
     })
-  })
-  addUserModalOpen.value = false
+    await loadRoleUsers(activeRoleId.value)
+    addUserModalOpen.value = false
+  } catch (e) {
+    notifyError('添加用户失败', e)
+  }
 }
 
-const removeUser = (id: string) => {
-  users.value = users.value.filter((u) => u.id !== id)
+const removeUser = async (id: string) => {
+  const target = users.value.find((u) => u.id === id)
+  if (!target) return
+  try {
+    await $fetch(`${API_BASE}/${target.roleId}/users/${target.orgUserId}`, {
+      method: 'DELETE'
+    })
+    users.value = users.value.filter((u) => u.id !== id)
+  } catch (e) {
+    notifyError('移除用户失败', e)
+  }
 }
 
 // ─── 工具函数 ────────────────────────────────────────────────
@@ -692,13 +816,15 @@ const getModelPermNames = (perms: string[]) =>
     .join('、') || '-'
 
 const isDefaultPerms = (user: (typeof users.value)[0]) => {
-  const role = activeRole.value
-  if (!role) return false
-  const sortedEq = (a: string[], b: string[]) =>
-    a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i])
-  return (
-    sortedEq(user.menuPerms, role.menuPerms) &&
-    sortedEq(user.modelPerms, role.modelPerms)
-  )
+  return !user.isCustomized
 }
+
+watch(activeRoleId, async (newRoleId) => {
+  await loadRoleUsers(newRoleId)
+})
+
+onMounted(async () => {
+  await loadRoles()
+  if (activeRoleId.value) await loadRoleUsers(activeRoleId.value)
+})
 </script>

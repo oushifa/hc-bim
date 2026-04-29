@@ -361,6 +361,7 @@ export const useAuthManager = (
   const finalizeLoginWithAccessCode = async (
     options?: Partial<{ skipRedirect: boolean }>
   ) => {
+    const { track } = useLog()
     const accessCode = route.query['access_code'] as Optional<string>
 
     try {
@@ -380,6 +381,19 @@ export const useAuthManager = (
       })
 
       await saveNewToken(newToken, options)
+      track({
+        what: {
+          action: 'auth.login.attempt',
+          targetType: 'auth',
+          targetId: 'local'
+        },
+        result: {
+          status: 'success'
+        },
+        metadata: {
+          source: 'auth.login.form'
+        }
+      })
     } catch (error) {
       await saveNewToken(undefined)
       throw error
