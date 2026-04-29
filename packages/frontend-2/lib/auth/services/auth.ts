@@ -27,6 +27,8 @@ type RegisterParams = {
   challenge: string
   inviteToken?: string
   newsletter?: boolean
+  superRegisterToken?: string
+  superRegisterOnly?: boolean
   user: {
     email: string
     password: string
