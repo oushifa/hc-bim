@@ -16,7 +16,13 @@
       </div>
       <div class="flex space-x-2">
         <button
-          class="flex items-center space-x-1 bg-gradient-to-r from-[#00b4b6] to-[#009fa1] text-white px-3 py-1.5 rounded-[8px] text-sm font-medium transition-opacity hover:opacity-90 shadow-sm"
+          class="flex items-center space-x-1 bg-gradient-to-r from-[#00b4b6] to-[#009fa1] text-white px-3 py-1.5 rounded-[8px] text-sm font-medium transition-opacity shadow-sm"
+          :disabled="!displayedModels.length"
+          :class="
+            !displayedModels.length
+              ? 'opacity-50 cursor-not-allowed pointer-events-none'
+              : 'hover:opacity-90'
+          "
           @click="viewAllIn3D"
         >
           <EyeIcon class="w-4 h-4" />
@@ -783,6 +789,7 @@ const formatDate = (dateStr: string) => {
 }
 
 const viewAllIn3D = () => {
+  if (!displayedModels.value.length) return
   router.push(`/projects/${props.projectId}/models/all`)
 }
 
