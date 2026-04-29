@@ -178,6 +178,11 @@ export function useCreateProject() {
         title: '项目创建失败',
         description: err
       })
+    } else {
+      triggerNotification({
+        type: ToastNotificationType.Success,
+        title: '项目已创建'
+      })
     }
 
     return newProject
@@ -438,6 +443,11 @@ export function useDeleteProject() {
       // evict project from cache
       apollo.cache.evict({
         id: getCacheId('Project', id)
+      })
+
+      triggerNotification({
+        type: ToastNotificationType.Success,
+        title: '项目已删除'
       })
     } else {
       const errMsg = getFirstErrorMessage(result.errors)

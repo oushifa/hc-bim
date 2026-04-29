@@ -2,12 +2,9 @@ import { useApolloClient, useSubscription } from '@vue/apollo-composable'
 import { graphql } from '~/lib/common/generated/gql'
 import { UserProjectsUpdatedMessageType } from '~/lib/common/generated/gql/graphql'
 import { getCacheId, modifyObjectField } from '~/lib/common/helpers/graphql'
-import { ToastNotificationType, useGlobalToast } from '~/lib/common/composables/toast'
-import { projectRoute } from '~/lib/common/helpers/route'
 
 export function useUserProjectsUpdatedTracking() {
   const apollo = useApolloClient().client
-  const { triggerNotification } = useGlobalToast()
   const { activeUser } = useActiveUser()
 
   const { onResult: onUserProjectsUpdate } = useSubscription(
@@ -76,17 +73,6 @@ export function useUserProjectsUpdatedTracking() {
       })
     }
 
-    // Emit toast notification
-    triggerNotification({
-      type: ToastNotificationType.Info,
-      title: isNewProject ? 'New project added' : 'A project has been removed',
-      cta:
-        isNewProject && incomingProject
-          ? {
-              url: projectRoute(incomingProject.id),
-              title: 'View project'
-            }
-          : undefined
-    })
+    // 不再重复触发通知：创建/删除操作已由 useCreateProject / useDeleteProject 统一展示中文 Toast
   })
 }
