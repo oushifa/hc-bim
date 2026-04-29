@@ -87,7 +87,7 @@
     <div
       v-if="activePanel !== 'none' && !isEmbedEnabled"
       ref="resizeHandle"
-      class="absolute h-full w-4 transition border-l hover:border-l-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30"
+      class="absolute h-full w-4 transition border-l hover:border-l-[2px] border-outline-2 hover:border-[#00b4b6] hidden lg:flex items-center cursor-ew-resize z-30"
       :style="`left:${width + 52}px;`"
       @mousedown="startResizing"
     />
@@ -130,13 +130,13 @@
     <!-- Panel Extension - Portal target for additional content -->
     <div
       id="panel-extension"
-      class="absolute z-50 left-[calc(100dvw-16rem)] sm:left-72 max-h-[calc(100dvh-6rem)] md:max-h-[calc(100dvh-4rem)] top-1.5 bg-foundation rounded-lg overflow-hidden"
+      class="absolute z-50 left-[calc(100dvw-16rem)] sm:left-72 max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] top-12 bg-foundation rounded-lg overflow-hidden"
       :style="`left: ${panelExtensionLeft} !important; width: ${panelExtensionWidth}px;`"
     >
       <!-- Resize handle for panel extension -->
       <div
         ref="panelExtensionResizeHandle"
-        class="absolute h-full max-h-[calc(100dvh-6rem)] md:max-h-[calc(100dvh-4rem)] w-4 transition border-r hover:border-r-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30 right-0"
+        class="absolute h-full max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] w-4 transition border-r hover:border-r-[2px] border-outline-2 hover:border-[#00b4b6] hidden lg:flex items-center cursor-ew-resize z-30 right-0"
         @mousedown="startPanelExtensionResizing"
       />
       <PortalTarget name="panel-extension"></PortalTarget>
@@ -148,11 +148,12 @@
     <button
       v-if="!isEmbedEnabled"
       v-tippy="getTooltipProps('返回上一级', { placement: 'right' })"
-      class="fixed z-[10] top-2 flex items-center justify-center w-9 h-9 rounded-lg bg-foundation border border-outline-2 text-foreground-2 hover:text-primary hover:border-primary transition-colors shadow-md"
+      class="fixed z-[10] top-2 flex items-center space-x-1 text-black bg-white hover:bg-gray-100 px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors shadow-sm"
       :style="backBtnStyle"
       @click="goBackToPreviousPage"
     >
-      <LogOut class="w-4 h-4" />
+      <ArrowLeft class="w-4 h-4" />
+      <span>返回</span>
     </button>
   </Teleport>
 </template>
@@ -177,7 +178,7 @@ import { type Nullable, isNonNullable } from '@speckle/shared'
 import { useFunctionRunsStatusSummary } from '~/lib/automate/composables/runStatus'
 import { projectsRoute } from '~~/lib/common/helpers/route'
 import { useAreSavedViewsEnabled } from '~/lib/viewer/composables/savedViews/general'
-import { Camera, Box, ListFilter, MessageSquareText, LogOut } from 'lucide-vue-next'
+import { Camera, Box, ListFilter, MessageSquareText, ArrowLeft } from 'lucide-vue-next'
 import { useViewerPanelsUtilities } from '~/lib/viewer/composables/setup/panels'
 import type { ActivePanel } from '~/lib/viewer/helpers/sceneExplorer'
 import { useSettingsMenuState } from '~/lib/settings/composables/menu'
