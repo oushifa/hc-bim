@@ -27,16 +27,8 @@ type RegisterParams = {
   challenge: string
   inviteToken?: string
   newsletter?: boolean
-<<<<<<< HEAD
   superRegisterToken?: string
   superRegisterOnly?: boolean
-=======
-  /**
-   * 是否为管理员后台代注册（组织/权限管理页面新增成员），
-   * 设置后后端会将新用户角色默认为普通用户。
-   */
-  fromAdmin?: boolean
->>>>>>> ea4d5e73f1dac0ba30dbe5262725824da097dafa
   user: {
     email: string
     password: string
@@ -109,7 +101,15 @@ export async function getAccessCode(params: LoginParams) {
 }
 
 export async function registerAndGetAccessCode(params: RegisterParams) {
-  const { apiOrigin, challenge, user, inviteToken, newsletter, fromAdmin } = params
+  const {
+    apiOrigin,
+    challenge,
+    user,
+    inviteToken,
+    newsletter,
+    superRegisterToken,
+    superRegisterOnly
+  } = params
   if (!user.email || !user.password || !user.name) {
     throw new InvalidRegisterParametersError(
       "Can't register without a valid email, password and name!"
@@ -126,8 +126,12 @@ export async function registerAndGetAccessCode(params: RegisterParams) {
     registerUrl.searchParams.append('newsletter', 'true')
   }
 
-  if (fromAdmin) {
-    registerUrl.searchParams.append('fromAdmin', 'true')
+  if (superRegisterOnly) {
+    registerUrl.searchParams.append('superRegisterOnly', 'true')
+  }
+
+  if (superRegisterToken) {
+    registerUrl.searchParams.append('superRegisterToken', superRegisterToken)
   }
 
   const res = await fetch(registerUrl, {
