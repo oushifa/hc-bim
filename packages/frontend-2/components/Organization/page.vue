@@ -424,6 +424,68 @@
         </div>
       </div>
     </LayoutDialog>
+
+    <!-- 角色管理弹窗 -->
+    <LayoutDialog v-model:open="roleManageDialogOpen" max-width="sm">
+      <template #header>角色管理</template>
+      <div class="flex flex-col gap-4">
+        <div class="text-sm text-gray-600">
+          为成员
+          <span class="font-semibold text-[#333]">{{ roleManageTarget?.name }}</span>
+          分配角色
+        </div>
+        
+        <div class="flex flex-col gap-2">
+          <label class="text-xs text-gray-500 font-medium">
+            选择角色
+            <span class="text-red-500">*</span>
+          </label>
+          <div class="max-h-48 overflow-y-auto border border-gray-200 rounded-[8px] p-2 space-y-1">
+            <div
+              v-for="role in roleList"
+              :key="role.id"
+              class="flex items-center px-3 py-2 rounded cursor-pointer transition-colors"
+              :class="selectedRoleId === role.id ? 'bg-[#e6f7f8] border border-[#00b4b6]' : 'hover:bg-gray-50 border border-transparent'"
+              @click="selectedRoleId = role.id"
+            >
+              <div
+                class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center"
+                :class="selectedRoleId === role.id ? 'border-[#00b4b6] bg-[#00b4b6]' : 'border-gray-300'"
+              >
+                <div v-if="selectedRoleId === role.id" class="w-1.5 h-1.5 rounded-full bg-white"></div>
+              </div>
+              <span class="text-sm text-[#333]">{{ role.name }}</span>
+            </div>
+            <div v-if="roleList.length === 0" class="text-center py-4 text-sm text-gray-400">
+              暂无可用角色
+            </div>
+          </div>
+        </div>
+
+        <div v-if="roleManageError" class="text-xs text-red-500">
+          {{ roleManageError }}
+        </div>
+        
+        <div class="flex justify-end gap-2">
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm rounded-[8px] border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+            :disabled="roleManageLoading"
+            @click="closeRoleManageDialog"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            class="px-3 py-1.5 text-sm rounded-[8px] bg-[#00b4b6] hover:bg-[#009fa1] text-white disabled:opacity-60 transition-colors"
+            :disabled="!selectedRoleId || roleManageLoading"
+            @click="submitRoleUpdate"
+          >
+            {{ roleManageLoading ? '更新中...' : '确定' }}
+          </button>
+        </div>
+      </div>
+    </LayoutDialog>
   </div>
 </template>
 
@@ -997,10 +1059,95 @@ const closeActionMenu = () => {
 }
 
 // 角色管理对话框
+const roleManageDialogOpen = ref(false)
+const roleManageLoading = ref(false)
+const roleManageError = ref('')
+const roleManageTarget = ref<MemberRow | null>(null)
+const selectedRoleId = ref<string>('')
+
 const openRoleManageDialog = (user: MemberRow) => {
-  // TODO: 打开角色管理对话框
-  console.log('打开角色管理对话框:', user)
+  roleManageTarget.value = user
+  roleManageError.value = ''
+  
+  // 查找用户当前的角色
+  const currentRole = roleList.value.find(r => r.name === user.role)
+  selectedRoleId.value = currentRole?.id || ''
+  
+  roleManageDialogOpen.value = true
   activeActionMenu.value = null // 关闭下拉菜单
+}
+
+const closeRoleManageDialog = () => {
+  roleManageDialogOpen.value = false
+  roleManageTarget.value = null
+  roleManageError.value = ''
+  selectedRoleId.value = ''
+}
+
+const submitRoleUpdate = async () => {
+  if (roleManageLoading.value || !roleManageTarget.value) return
+  
+  if (!selectedRoleId.value) {
+    roleManageError.value = '请选择一个角色'
+    return
+  }
+
+  roleManageLoading.value = true
+  roleManageError.value = ''
+  
+  try {
+    const userId = roleManageTarget.value.id
+    const selectedRole = roleList.value.find(r => r.id === selectedRoleId.value)
+    
+    if (!selectedRole) {
+      roleManageError.value = '所选角色不存在'
+      return
+    }
+
+    // 首先获取用户当前的角色信息
+    let currentRoleId: string | null = null
+    try {
+      const permRes = await $fetch<{ roleId: string | null }>(
+        `${ROLE_API_BASE}/users/${userId}/effective-permissions`,
+        { method: 'GET' }
+      )
+      currentRoleId = permRes.roleId
+    } catch (e) {
+      console.log('用户可能还没有分配角色')
+    }
+
+    // 如果用户已经有角色，先移除
+    if (currentRoleId) {
+      await $fetch(`${ROLE_API_BASE}/${currentRoleId}/users/${userId}`, {
+        method: 'DELETE'
+      })
+    }
+
+    // 将用户添加到新角色
+    await $fetch(`${ROLE_API_BASE}/${selectedRoleId.value}/users`, {
+      method: 'POST',
+      body: {
+        userIds: [userId]
+      }
+    })
+
+    // 刷新角色数据
+    await loadRoleData()
+    await refetchDepartmentUsers({ departmentId: activeDepartmentId.value as string })
+    
+    // 显示成功提示
+    triggerToast({
+      type: ToastNotificationType.Success,
+      title: '角色更新成功',
+      description: `用户 ${roleManageTarget.value.name} 的角色已更新为 ${selectedRole.name}`
+    })
+    
+    closeRoleManageDialog()
+  } catch (e) {
+    roleManageError.value = e instanceof Error ? e.message : '更新角色失败，请重试'
+  } finally {
+    roleManageLoading.value = false
+  }
 }
 
 // 监听窗口点击事件，关闭菜单
