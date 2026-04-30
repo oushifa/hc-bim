@@ -116,13 +116,13 @@
                 class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
               />
               <label for="organization-member-search" class="sr-only">
-                搜索姓名或工号
+                搜索姓名或手机号
               </label>
               <input
                 id="organization-member-search"
                 v-model="searchQuery"
                 type="text"
-                placeholder="搜索姓名/工号..."
+                placeholder="搜索姓名/手机号..."
                 class="w-56 bg-[#f5f7fa] border border-transparent rounded-[8px] py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white text-[#333] transition-all"
               />
             </div>
@@ -135,7 +135,7 @@
             <thead>
               <tr class="bg-slate-50/80 text-gray-500 text-sm border-b border-gray-100">
                 <th class="py-3 pl-6 font-medium">姓名</th>
-                <th class="py-3 font-medium">工号</th>
+                <th class="py-3 font-medium">手机号</th>
                 <th class="py-3 font-medium">部门</th>
                 <th class="py-3 font-medium">角色</th>
                 <th class="py-3 font-medium">状态</th>
@@ -158,7 +158,7 @@
                     <span class="font-medium">{{ user.name }}</span>
                   </div>
                 </td>
-                <td class="py-3.5 text-gray-500">{{ user.empNo }}</td>
+                <td class="py-3.5 text-gray-500">{{ user.phone }}</td>
                 <td class="py-3.5 text-gray-500">{{ user.dept }}</td>
                 <td class="py-3.5">
                   <span
@@ -180,21 +180,34 @@
                   </span>
                 </td>
                 <td class="py-3.5 pr-6 text-right">
-                  <button
-                    class="text-[#00b4b6] hover:text-[#009fa1] text-sm font-medium mr-4 transition-colors"
-                  >
-                    角色管理
-                  </button>
-                  <!-- <button
-                    class="text-red-400 hover:text-red-600 text-sm font-medium transition-colors"
-                    type="button"
-                    @click="openDeleteMemberDialog(user)"
-                  >
-                    移除
-                  </button> -->
-                  <button class="text-gray-400 hover:text-[#00b4b6] transition-colors">
-                    <EllipsisHorizontalIcon class="w-4 h-4" />
-                  </button>
+                  <div class="relative inline-block text-left action-menu-container">
+                    <button
+                      class="text-gray-400 hover:text-[#00b4b6] transition-colors p-1 rounded hover:bg-gray-100"
+                      @click.stop="toggleActionMenu(user.id)"
+                    >
+                      <EllipsisHorizontalIcon class="w-4 h-4" />
+                    </button>
+                    
+                    <!-- 下拉菜单 -->
+                    <div
+                      v-if="activeActionMenu === user.id"
+                      class="absolute right-0 mt-2 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10"
+                    >
+                      <button
+                        class="w-full px-4 py-2 text-sm text-left text-[#00b4b6] hover:bg-gray-50 transition-colors"
+                        @click.stop="openRoleManageDialog(user)"
+                      >
+                        角色管理
+                      </button>
+                      <div class="border-t border-gray-100 my-1"></div>
+                      <button
+                        class="w-full px-4 py-2 text-sm text-left text-red-500 hover:bg-red-50 transition-colors"
+                        @click.stop="openDeleteMemberDialog(user)"
+                      >
+                        删除成员
+                      </button>
+                    </div>
+                  </div>
                 </td>
               </tr>
               <tr v-if="filteredUsers.length === 0">
@@ -378,12 +391,15 @@
     </LayoutDialog>
 
     <LayoutDialog v-model:open="deleteMemberDialogOpen" max-width="sm">
-      <template #header>移除成员</template>
+      <template #header>删除成员</template>
       <div class="flex flex-col gap-4">
         <div class="text-sm text-gray-600">
-          确认要将成员
+          确认要删除成员
           <span class="font-semibold text-[#333]">{{ deleteMemberTarget?.name }}</span>
-          从当前部门移除？
+          ？
+        </div>
+        <div class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          ⚠️ 警告：该操作将永久删除该用户账号，且无法恢复！
         </div>
         <div v-if="deleteMemberError" class="text-xs text-red-500">
           {{ deleteMemberError }}
@@ -391,7 +407,7 @@
         <div class="flex justify-end gap-2">
           <button
             type="button"
-            class="px-3 py-1.5 text-sm rounded-[8px] border border-gray-200 text-gray-600 hover:bg-gray-50"
+            class="px-3 py-1.5 text-sm rounded-[8px] border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
             :disabled="deleteMemberLoading"
             @click="closeDeleteMemberDialog"
           >
@@ -399,11 +415,11 @@
           </button>
           <button
             type="button"
-            class="px-3 py-1.5 text-sm rounded-[8px] bg-red-500 hover:bg-red-600 text-white disabled:opacity-60"
+            class="px-3 py-1.5 text-sm rounded-[8px] bg-red-500 hover:bg-red-600 text-white disabled:opacity-60 transition-colors"
             :disabled="deleteMemberLoading"
             @click="submitDeleteMember"
           >
-            {{ deleteMemberLoading ? '移除中...' : '确定移除' }}
+            {{ deleteMemberLoading ? '删除中...' : '确定删除' }}
           </button>
         </div>
       </div>
@@ -425,6 +441,8 @@ import { gql } from 'graphql-tag'
 import { registerAndGetAccessCode } from '~~/lib/auth/services/auth'
 import { randomString } from '~~/lib/common/helpers/random'
 import { useRuntimeConfig } from '#app'
+import { useApiOrigin } from '~~/composables/env'
+import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 
 type OrganizationTreeRow = {
   id: string
@@ -438,7 +456,7 @@ type MemberStatus = '正常' | '离线' | '禁用'
 type MemberRow = {
   id: string
   name: string
-  empNo: string
+  phone: string
   dept: string
   role: string
   status: MemberStatus
@@ -457,6 +475,7 @@ type DepartmentUser = {
   name?: string | null
   role?: string | null
   verified?: boolean | null
+  email?: string | null
 }
 
 const departmentTreeQuery = gql`
@@ -505,6 +524,7 @@ const departmentUsersQuery = gql`
       name
       role
       verified
+      email
     }
   }
 `
@@ -529,6 +549,7 @@ const memberSearchUsersQuery = gql`
       items {
         id
         name
+        email
       }
     }
   }
@@ -549,6 +570,14 @@ const newMemberForm = ref({
 })
 const apolloClient = useApolloClient().client
 const runtimeConfig = useRuntimeConfig()
+const { triggerNotification: triggerToast } = useGlobalToast()
+
+// 角色相关数据
+const roleList = ref<Array<{ id: string; name: string }>>([])
+const userRoleMap = ref<Map<string, string>>(new Map()) // userId -> roleName
+
+const apiOrigin = useApiOrigin()
+const ROLE_API_BASE = `${apiOrigin}/api/v1/custom-roles`
 
 const { result: departmentTreeResult, refetch: refetchDepartmentTree } =
   useQuery(departmentTreeQuery)
@@ -628,16 +657,19 @@ const activeMemberRows = computed<MemberRow[]>(() => {
   if (!departmentId || !departmentName) return []
 
   const users = (departmentUsersResult.value?.departmentUsers || []) as DepartmentUser[]
-  return users.map((user) => ({
-    id: user.id,
-    name: user.name || user.id,
-    empNo: user.id.toUpperCase().slice(0, 8),
-    dept: departmentName,
-    role: user.role || '普通成员',
-    status: user.verified === false ? '离线' : '正常',
-    organizationId: 'departments-root',
-    nodeId: departmentId
-  }))
+  return users.map((user) => {
+    const roleName = userRoleMap.value.get(user.id) || '暂无'
+    return {
+      id: user.id,
+      name: user.name || user.id,
+      phone: user.email || '-',
+      dept: departmentName,
+      role: roleName,
+      status: user.verified === false ? '离线' : '正常',
+      organizationId: 'departments-root',
+      nodeId: departmentId
+    }
+  })
 })
 
 const filteredUsers = computed(() => {
@@ -645,7 +677,7 @@ const filteredUsers = computed(() => {
 
   return activeMemberRows.value.filter((u) => {
     if (!keyword) return true
-    return u.name.includes(keyword) || u.empNo.includes(keyword)
+    return u.name.includes(keyword) || u.phone.includes(keyword)
   })
 })
 
@@ -653,6 +685,9 @@ const deleteMemberDialogOpen = ref(false)
 const deleteMemberLoading = ref(false)
 const deleteMemberError = ref('')
 const deleteMemberTarget = ref<MemberRow | null>(null)
+
+// 操作菜单控制
+const activeActionMenu = ref<string | null>(null)
 
 const removeDepartmentMemberMutation = gql`
   mutation RemoveDepartmentMember($departmentId: String!, $userId: String!) {
@@ -849,32 +884,22 @@ const submitCreateMember = async () => {
   memberFormError.value = ''
   try {
     // Step 1: 调用注册接口创建账号（手机号作 email，密码固定）
-    // fromAdmin=true 告知后端这是管理员代注册，新用户默认为普通用户
     const apiOrigin = runtimeConfig.public.apiOrigin as string
     const challenge = randomString(10)
     await registerAndGetAccessCode({
       apiOrigin,
       challenge,
-      fromAdmin: true,
       user: {
         email: phone,
         password: '51World@51',
         name
       }
     }).catch((err: unknown) => {
-      // 账号已存在：忽略，继续后续流程尝试加入部门
-      // access_code 解析失败：账号已创建成功，fetch 跟随 302 跨域重定向导致
-      // 浏览器无法读取最终 URL，而我们也不需要这个 access_code，因此可以安全忽略
+      // 如果账号已存在，尝试继续查找用户并加入部门
       const msg = err instanceof Error ? err.message : String(err)
-      if (
-        msg.includes('already') ||
-        msg.includes('exists') ||
-        msg.includes('已') ||
-        msg.includes('access_code')
-      ) {
-        return
+      if (!msg.includes('already') && !msg.includes('exists') && !msg.includes('已')) {
+        throw err
       }
-      throw err
     })
 
     // Step 2: 通过手机号搜索用户得到 userId
@@ -914,6 +939,7 @@ const openDeleteMemberDialog = (user: MemberRow) => {
   deleteMemberTarget.value = user
   deleteMemberError.value = ''
   deleteMemberDialogOpen.value = true
+  activeActionMenu.value = null // 关闭下拉菜单
 }
 
 const closeDeleteMemberDialog = () => {
@@ -929,20 +955,70 @@ const submitDeleteMember = async () => {
   deleteMemberError.value = ''
   try {
     const userId = deleteMemberTarget.value.id
-    const departmentId = deleteMemberTarget.value.nodeId
+    const userName = deleteMemberTarget.value.name
+    const userPhone = deleteMemberTarget.value.phone
 
+    // 使用 adminDeleteUser 删除用户账号（需要 email 作为标识）
     await apolloClient.mutate({
-      mutation: removeDepartmentMemberMutation,
-      variables: { departmentId, userId }
+      mutation: adminDeleteUserMutation,
+      variables: {
+        userConfirmation: {
+          email: userPhone // 使用手机号作为 email 标识
+        }
+      }
     })
 
+    // 刷新部门用户列表
     await refetchDepartmentUsers({ departmentId: activeDepartmentId.value as string })
+    
+    // 显示成功提示
+    triggerToast({
+      type: ToastNotificationType.Success,
+      title: '删除成功',
+      description: `用户 ${userName} 已被永久删除`
+    })
+    
     closeDeleteMemberDialog()
   } catch (e) {
-    deleteMemberError.value = e instanceof Error ? e.message : '移除失败，请重试'
+    deleteMemberError.value = e instanceof Error ? e.message : '删除失败，请重试'
   } finally {
     deleteMemberLoading.value = false
   }
+}
+
+// 切换操作菜单
+const toggleActionMenu = (userId: string) => {
+  activeActionMenu.value = activeActionMenu.value === userId ? null : userId
+}
+
+// 关闭操作菜单
+const closeActionMenu = () => {
+  activeActionMenu.value = null
+}
+
+// 角色管理对话框
+const openRoleManageDialog = (user: MemberRow) => {
+  // TODO: 打开角色管理对话框
+  console.log('打开角色管理对话框:', user)
+  activeActionMenu.value = null // 关闭下拉菜单
+}
+
+// 监听窗口点击事件，关闭菜单
+const handleClickOutside = (e: MouseEvent) => {
+  const target = e.target as HTMLElement
+  if (!target.closest('.action-menu-container')) {
+    closeActionMenu()
+  }
+}
+
+if (import.meta.client) {
+  onMounted(() => {
+    document.addEventListener('click', handleClickOutside)
+  })
+
+  onBeforeUnmount(() => {
+    document.removeEventListener('click', handleClickOutside)
+  })
 }
 
 watch(activeDepartmentId, (departmentId) => {
@@ -969,4 +1045,52 @@ const statusDotColor = (status: string) => {
   if (status === '离线') return 'bg-gray-400'
   return 'bg-red-500'
 }
+
+// 加载角色列表并构建用户角色映射
+const loadRoleData = async () => {
+  try {
+    // 获取所有角色
+    const rolesRes = await $fetch<{ items: Array<{ id: string; name: string }> }>(
+      ROLE_API_BASE,
+      { method: 'GET' }
+    )
+    roleList.value = rolesRes.items || []
+
+    // 构建用户 ID 到角色名称的映射
+    const userRoleMapping = new Map<string, string>()
+
+    // 遍历所有角色，获取每个角色下的用户
+    for (const role of roleList.value) {
+      try {
+        const usersRes = await $fetch<{
+          items: Array<{ userId: string; userName: string }>
+        }>(`${ROLE_API_BASE}/${role.id}/users`, { method: 'GET' })
+
+        const roleUsers = usersRes.items || []
+        roleUsers.forEach((user) => {
+          // 如果用户还没有被分配角色，或者当前角色优先级更高，则更新映射
+          if (!userRoleMapping.has(user.userId)) {
+            userRoleMapping.set(user.userId, role.name)
+          }
+        })
+      } catch (e) {
+        console.error(`加载角色 ${role.name} 的用户失败:`, e)
+      }
+    }
+
+    userRoleMap.value = userRoleMapping
+  } catch (e) {
+    console.error('加载角色数据失败:', e)
+  }
+}
+
+// 在组件挂载时加载角色数据
+onMounted(() => {
+  loadRoleData()
+})
+
+// 监听部门用户变化，重新加载角色数据
+watch(departmentUsersResult, () => {
+  loadRoleData()
+})
 </script>

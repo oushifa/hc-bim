@@ -21,11 +21,12 @@
           {{ project.name }}
         </h3>
         <p class="text-xs text-gray-500">{{ updatedAt.relative }}更新</p>
+        <p v-if="creatorName" class="text-xs text-gray-400 mt-1">创建人：{{ creatorName }}</p>
       </div>
     </NuxtLink>
 
     <!-- 操作按钮区域（在 NuxtLink 外部） -->
-    <div class="absolute bottom-4 right-4 z-10">
+    <div class="absolute bottom-3 right-3 z-30">
       <button
         type="button"
         class="p-1.5 bg-gray-50 hover:bg-white rounded-full shadow-sm text-gray-600 hover:text-[#00b4b6] transition-colors border border-gray-100"
@@ -101,6 +102,14 @@ const props = defineProps<{
     updatedAt: string
     updatedOn?: string
     role?: string | null
+    team?: {
+      id: string
+      user?: {
+        id: string
+        name: string
+        avatar?: string | null
+      } | null
+    }[]
     models?: {
       items?: Array<{
         previewUrl?: string | null
@@ -130,6 +139,10 @@ const updatedAt = computed(() => {
 
 const firstModelPreviewUrl = computed(() => {
   return props.project.models?.items?.[0]?.previewUrl || null
+})
+
+const creatorName = computed(() => {
+  return props.project.team?.[0]?.user?.name || null
 })
 
 const toggleActionMenu = () => {

@@ -24,3 +24,14 @@ export const useFeatureFlags = (): FeatureFlags => {
   const { public: featureFlags } = useRuntimeConfig()
   return featureFlags
 }
+
+/**
+ * Get the DTP API origin for external API calls
+ */
+export const useDtpApiOrigin = () => {
+  const {
+    public: { dtpApiOrigin }
+  } = useRuntimeConfig()
+
+  return dtpApiOrigin
+}

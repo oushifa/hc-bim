@@ -1,127 +1,60 @@
 <template>
-  <form class="flex flex-col text-foreground" @submit="onSubmit">
-    <div class="flex flex-col gap-y-4 mb-2">
-      <FormTextInput
-        name="name"
-        label="项目名称"
-        placeholder="名称"
-        color="foundation"
-        :rules="[isRequired, isStringOfLength({ maxLength: 512 })]"
-        auto-focus
-        autocomplete="off"
-        show-label
-      />
-      <FormTextArea
-        name="description"
-        label="项目描述"
-        placeholder="描述"
-        color="foundation"
-        size="lg"
-        show-label
-        show-optional
-        :rules="[isStringOfLength({ maxLength: 65536 })]"
-      />
-      <FormTextInput
-        name="address"
-        label="地址"
-        placeholder="请输入地址"
-        color="foundation"
-        show-label
-        show-optional
-        :rules="[isStringOfLength({ maxLength: 512 })]"
-      />
-      <FormTextInput
-        name="progress"
-        label="进度"
-        placeholder="请输入进度（数字）"
-        type="number"
-        min="0"
-        max="100"
-        step="0.01"
-        color="foundation"
-        show-label
-        show-optional
-      />
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <FormTextInput
-          name="start_date"
-          label="开始时间"
-          type="datetime-local"
-          color="foundation"
-          show-label
-          show-optional
-        />
-        <FormTextInput
-          name="end_date"
-          label="结束时间"
-          type="datetime-local"
-          color="foundation"
-          show-label
-          show-optional
-        />
-      </div>
-      <FormTextInput
-        name="status"
-        label="当前状态"
-        placeholder="请输入状态"
-        color="foundation"
-        show-label
-        show-optional
-        :rules="[isStringOfLength({ maxLength: 128 })]"
-      />
-      <FormTextInput
-        name="responsible"
-        label="负责人"
-        placeholder="请输入负责人"
-        color="foundation"
-        show-label
-        show-optional
-        :rules="[isStringOfLength({ maxLength: 128 })]"
-      />
-      <!-- <div>
-        <h3 class="label mb-2">访问权限</h3>
-        <ProjectVisibilitySelect
-          v-model="visibility"
-          mount-menu-on-body
-          :workspace-id="workspaceId"
-        />
-      </div> -->
-    </div>
-    <div class="flex justify-end gap-2 my-2">
-      <FormButton
-        type="button"
-        color="outline"
-        :disabled="isDisabled"
-        @click="() => (supportGoBack ? $emit('back') : $emit('canceled'))"
+  <Teleport to="body">
+    <div
+      class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-white/40 backdrop-blur-sm"
+      @click="$emit('canceled')"
+    >
+      <div
+        class="bg-white/80 backdrop-blur-md rounded-[26px] shadow-xl w-full max-w-md overflow-hidden border border-white/40"
+        @click.stop
       >
-        {{ supportGoBack ? '返回' : '取消' }}
-      </FormButton>
-      <FormButton type="submit" color="primary" :loading="isDisabled">创建</FormButton>
+        <div class="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-white/50">
+          <h3 class="text-xl font-bold text-gray-800">新建项目</h3>
+          <button
+            class="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            @click="$emit('canceled')"
+          >
+            <XMarkIcon class="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+        <form class="p-8 space-y-6" @submit="onSubmit">
+          <div class="space-y-2">
+            <label class="text-sm font-medium text-gray-600">项目名称</label>
+            <input
+              v-model="formData.name"
+              type="text"
+              class="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-xl focus:outline-none focus:border-[#00b4b6] focus:bg-white transition-all text-gray-700"
+              placeholder="输入项目名称"
+              required
+              autofocus
+            />
+          </div>
+          <div class="flex space-x-4 pt-4">
+            <button
+              type="button"
+              class="flex-1 py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+              @click="$emit('canceled')"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              class="flex-1 py-3 bg-[#00b4b6] text-white rounded-xl font-medium hover:bg-[#009fa1] transition-colors shadow-lg shadow-[#00b4b6]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="isDisabled || !formData.name.trim()"
+            >
+              {{ isDisabled ? '创建中...' : '创建项目' }}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
-  </form>
+  </Teleport>
 </template>
 <script setup lang="ts">
+import { XMarkIcon } from '@heroicons/vue/24/outline'
 import type { MaybeNullOrUndefined } from '@speckle/shared'
-import { useForm } from 'vee-validate'
-import dayjs from 'dayjs'
-import { SupportedProjectVisibility } from '~/lib/projects/helpers/visibility'
-import { isRequired, isStringOfLength } from '~~/lib/common/helpers/validation'
 import { useMixpanel } from '~~/lib/core/composables/mp'
-import {
-  useCreateProject,
-  useUpdateProject
-} from '~~/lib/projects/composables/projectManagement'
-
-type FormValues = {
-  name: string
-  description?: string
-  address?: string
-  progress?: string | number
-  start_date?: string
-  end_date?: string
-  status?: string
-  responsible?: string
-}
+import { useCreateProject } from '~~/lib/projects/composables/projectManagement'
 
 const props = defineProps<{
   supportGoBack?: boolean
@@ -135,104 +68,47 @@ const emit = defineEmits<{
 }>()
 
 const createProject = useCreateProject()
-const updateProject = useUpdateProject()
 const logger = useLogger()
-const { handleSubmit, isSubmitting } = useForm<FormValues>()
-
-const visibility = ref(
-  props.workspaceId
-    ? SupportedProjectVisibility.Workspace
-    : SupportedProjectVisibility.Private
-)
-const isLoading = ref(false)
-
 const mp = useMixpanel()
 
-const isDisabled = computed(() => isSubmitting.value || isLoading.value)
-const toTimestamp = (value?: string) => {
-  if (!value) return ''
-  const timestamp = new Date(value).getTime()
-  return Number.isNaN(timestamp) ? '' : timestamp
-}
-const toNumberValue = (value?: string | number | null) => {
-  if (value === null || value === undefined || value === '') return ''
-  const numberValue = typeof value === 'number' ? value : Number(String(value).trim())
-  return Number.isNaN(numberValue) ? '' : numberValue
-}
+const formData = ref({
+  name: ''
+})
 
-const onSubmit = handleSubmit(async (values) => {
-  if (isLoading.value) return
+const isLoading = ref(false)
+const isDisabled = computed(() => isLoading.value)
+
+const onSubmit = async (e: Event) => {
+  e.preventDefault()
+  
+  if (isLoading.value || !formData.value.name.trim()) return
 
   try {
     isLoading.value = true
 
     const newProject = await createProject({
-      name: values.name,
-      description: values.description,
+      name: formData.value.name.trim(),
+      description: '',
       visibility: 'WORKSPACE',
-      address: values.address || '',
+      address: '',
       ...(props.workspaceId ? { workspaceId: props.workspaceId } : {})
     })
 
     if (newProject?.id) {
-      try {
-        const updatePayload: Record<string, unknown> = {}
-        const trimmedStatus = values.status?.trim() || ''
-        const trimmedResponsible = values.responsible?.trim() || ''
-        const nextProgress = toNumberValue(values.progress)
-        const nextStartDate = toTimestamp(values.start_date)
-        const nextEndDate = toTimestamp(values.end_date)
-
-        if (nextProgress !== '') {
-          updatePayload.progress = nextProgress
-        }
-        if (nextStartDate !== '') {
-          updatePayload.startDate = nextStartDate
-        }
-        if (nextEndDate !== '') {
-          updatePayload.endDate = nextEndDate
-        }
-        if (trimmedStatus) {
-          updatePayload.status = trimmedStatus
-        }
-        if (trimmedResponsible) {
-          updatePayload.responsible = trimmedResponsible
-        }
-
-        if (Object.keys(updatePayload).length) {
-          await updateProject({
-            id: newProject.id,
-            ...updatePayload,
-            timeZone: dayjs.tz.guess() || ''
-          })
-        }
-      } catch (error) {
-        logger.error('Failed to initialize project metadata:', error)
-      }
-
       emit('created', { id: newProject.id })
       mp.track('Stream Action', {
         type: 'action',
         name: 'create',
-        // eslint-disable-next-line camelcase
         workspace_id: props.workspaceId
       })
+      
+      // 重置表单
+      formData.value.name = ''
     }
   } catch (error) {
     logger.error('Failed to create project:', error)
   } finally {
     isLoading.value = false
   }
-})
-
-watch(
-  () => props.workspaceId,
-  (newVal, oldVal) => {
-    if (newVal !== oldVal) {
-      visibility.value = props.workspaceId
-        ? SupportedProjectVisibility.Workspace
-        : SupportedProjectVisibility.Private
-    }
-  }
-)
+}
 </script>

@@ -66,6 +66,7 @@ export default defineNuxtConfig({
       ...featureFlags,
       apiOrigin: '',
       backendApiOrigin: '',
+      dtpApiOrigin: '',
       baseUrl: '',
       mixpanelApiHost: '',
       mixpanelTokenId: '',
