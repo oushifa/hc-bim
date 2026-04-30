@@ -6,8 +6,31 @@ import { useAuthCookie } from '~~/lib/auth/composables/auth'
  */
 export default defineNuxtPlugin(() => {
   const dtpApiOrigin = useDtpApiOrigin()
-  const dtpApiBase = new URL(dtpApiOrigin)
   const authToken = useAuthCookie()
+
+  // Guard: if DTP API origin is not configured, skip plugin init to avoid
+  // `new URL('')` throwing "Invalid URL" and crashing SSR for the whole app.
+  if (!dtpApiOrigin || !dtpApiOrigin.trim()) {
+    return {
+      provide: {
+        dtpFetch: $fetch
+      }
+    }
+  }
+
+  let dtpApiBase: URL
+  try {
+    dtpApiBase = new URL(dtpApiOrigin)
+  } catch {
+    console.warn(
+      `[fetchDtp] Invalid NUXT_PUBLIC_DTP_API_ORIGIN: "${dtpApiOrigin}", falling back to default $fetch.`
+    )
+    return {
+      provide: {
+        dtpFetch: $fetch
+      }
+    }
+  }
 
   // Create a dedicated fetch instance for DTP API
   const dtpFetch = $fetch.create({
