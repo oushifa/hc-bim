@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>兼容版本</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>兼容版本v0.0.1</title>
     <style>
       :root {
         color-scheme: light;
@@ -140,6 +143,7 @@
       ;(function () {
         var COOKIE_AUTH = 'authn'
         var COOKIE_POST_AUTH_REDIRECT = 'postAuthRedirect'
+        var NO_CACHE_QUERY_KEY = '_t'
         var apiOrigin = window.location.origin
         // var apiOrigin = 'http://127.0.0.1:3000'
         var state = {
@@ -154,6 +158,14 @@
           termsOfService: '',
           context: null,
           autoAllowTriggered: false
+        }
+
+        function ensureNoCacheQuery() {
+          var url = new URL(window.location.href)
+          if (url.searchParams.get(NO_CACHE_QUERY_KEY)) return true
+          url.searchParams.set(NO_CACHE_QUERY_KEY, String(Date.now()))
+          window.location.replace(url.toString())
+          return false
         }
 
         function getCookie(name) {
@@ -261,6 +273,7 @@
           }
           var res = await fetch(apiOrigin + '/graphql', {
             method: 'POST',
+            cache: 'no-store',
             headers: headers,
             body: JSON.stringify(body)
           })
@@ -410,8 +423,8 @@
             '<h1>登录</h1>' +
             '<p class="muted">请输入账号信息以继续授权。</p>' +
             '<form id="loginForm" class="spaced">' +
-            '<div class="spaced"><label>邮箱</label><br />' +
-            '<input id="loginEmail" type="email" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px" /></div>' +
+            '<div class="spaced"><label>账号</label><br />' +
+            '<input id="loginAccount" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px" /></div>' +
             '<div class="spaced"><label>密码</label><br />' +
             '<input id="loginPassword" type="password" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px" /></div>' +
             '<div id="loginError"></div>' +
@@ -436,7 +449,7 @@
               '<h1 class="success">Success</h1>' +
               '<p><span class="app-name">' +
               appName +
-              '</span> 已连接到您的 中建海创 账号。</p>' +
+              '</span> 已连接到您的 数智南北 账号。</p>' +
               '<div class="muted">您将自动被重定向，无需等待。</div>'
             )
           }
@@ -444,7 +457,7 @@
             '<h1 class="denied">Denied</h1>' +
             '<p><span class="app-name">' +
             appName +
-            '</span> 未连接到您的 中建海创 账号。</p>' +
+            '</span> 未连接到您的 数智南北 账号。</p>' +
             '<div class="muted">您将自动被重定向，无需等待。</div>'
           )
         }
@@ -455,7 +468,13 @@
 
         function renderErrorView() {
           return (
-            '<h1>授权应用</h1><div class="error">' + escapeHtml(state.error) + '</div>'
+            '<h1>授权应用</h1>' +
+            '<div class="error">' +
+            escapeHtml(state.error) +
+            '</div>' +
+            '<div class="actions">' +
+            '<button id="manualLoginBtn" type="button">手动输入账号密码登录</button>' +
+            '</div>'
           )
         }
 
@@ -466,6 +485,7 @@
             root.innerHTML = renderLoadingView()
           } else if (state.error) {
             root.innerHTML = renderErrorView()
+            bindErrorActions()
           } else if (state.view === 'login') {
             root.innerHTML = renderLoginView()
             bindLoginAction()
@@ -485,10 +505,34 @@
           render()
         }
 
+        function goToManualLogin() {
+          deleteCookie(COOKIE_AUTH)
+          state.error = ''
+          state.loading = false
+          state.action = null
+          state.view = 'login'
+          render()
+        }
+
+        function bindErrorActions() {
+          var manualLoginBtn = document.getElementById('manualLoginBtn')
+          if (manualLoginBtn) {
+            manualLoginBtn.onclick = goToManualLogin
+          }
+        }
+
         function showInlineError(message) {
           var el = document.getElementById('errorBox')
           if (!el) return
-          el.innerHTML = '<div class="error">' + escapeHtml(message) + '</div>'
+          el.innerHTML =
+            '<div class="error">' +
+            escapeHtml(message) +
+            '</div>' +
+            '<div class="actions"><button id="inlineManualLoginBtn" type="button">手动输入账号密码登录</button></div>'
+          var inlineManualLoginBtn = document.getElementById('inlineManualLoginBtn')
+          if (inlineManualLoginBtn) {
+            inlineManualLoginBtn.onclick = goToManualLogin
+          }
         }
 
         function clearInlineError() {
@@ -621,6 +665,7 @@
           loginUrl.searchParams.set('challenge', state.context.challenge)
           return fetch(loginUrl.toString(), {
             method: 'POST',
+            cache: 'no-store',
             headers: { 'Content-Type': 'application/json' },
             redirect: 'follow',
             body: JSON.stringify({ email: email, password: password })
@@ -631,6 +676,7 @@
           var url = new URL('/auth/token', apiOrigin)
           return fetch(url.toString(), {
             method: 'POST',
+            cache: 'no-store',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               accessCode: accessCode,
@@ -662,12 +708,14 @@
 
         async function login() {
           if (state.loading) return
-          var emailEl = document.getElementById('loginEmail')
+          var emailEl =
+            document.getElementById('loginAccount') ||
+            document.getElementById('loginEmail')
           var passwordEl = document.getElementById('loginPassword')
           var email = emailEl && emailEl.value ? String(emailEl.value).trim() : ''
           var password = passwordEl && passwordEl.value ? String(passwordEl.value) : ''
           if (!email || !password) {
-            showLoginError('请输入邮箱和密码')
+            showLoginError('请输入账号和密码')
             return
           }
           clearLoginError()
@@ -727,6 +775,7 @@
           }
         }
 
+        if (!ensureNoCacheQuery()) return
         render()
         void init()
       })()
