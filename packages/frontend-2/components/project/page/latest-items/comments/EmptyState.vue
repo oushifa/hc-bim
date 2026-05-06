@@ -4,7 +4,7 @@
   >
     <IllustrationEmptystateDiscussionTab />
     <div>
-      <p class="text-foreground-2 text-heading-sm">暂无问题讨论</p>
+      <p class="text-foreground-2 text-heading-sm">暂无模型标注</p>
     </div>
   </div>
 </template>

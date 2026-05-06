@@ -35,6 +35,19 @@ export type LayoutMenuItem<I extends string = string> = {
   active?: boolean
 }
 
+export type LayoutTreeKey = string | number
+
+export type LayoutTreeNode<K extends LayoutTreeKey = LayoutTreeKey> = {
+  key: K
+  title: string
+  disabled?: boolean
+  disableCheckbox?: boolean
+  selectable?: boolean
+  checkable?: boolean
+  isLeaf?: boolean
+  children?: LayoutTreeNode<K>[]
+}
+
 export type LayoutDialogButton = {
   text: string
   props?: Record<string, unknown> & FormButtonProps

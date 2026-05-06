@@ -17,7 +17,7 @@ export const PanelShortcuts = {
     action: 'ToggleFilters'
   },
   ToggleDiscussions: {
-    name: '问题讨论',
+    name: '模型标注',
     description: '切换讨论面板',
     modifiers: [ModifierKeys.Shift],
     key: 'D',
@@ -29,6 +29,13 @@ export const PanelShortcuts = {
     modifiers: [ModifierKeys.Shift],
     key: 'X',
     action: 'ToggleDevMode'
+  },
+  ToggleCatalog: {
+    name: '目录',
+    description: '切换目录面板',
+    modifiers: [ModifierKeys.Shift],
+    key: 'C',
+    action: 'ToggleCatalog'
   },
   ToggleSavedViews: {
     name: '保存视图',

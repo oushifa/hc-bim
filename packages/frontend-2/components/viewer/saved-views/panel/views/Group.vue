@@ -40,7 +40,7 @@
             @click="showMenu = !showMenu"
           />
         </LayoutMenu>
-        <div v-if="!isUngroupedGroup" v-tippy="getTooltipProps('Present')">
+        <!-- <div v-if="!isUngroupedGroup" v-tippy="getTooltipProps('Present')">
           <FormButton
             size="sm"
             color="subtle"
@@ -49,10 +49,10 @@
             name="presentGroup"
             @click="onPresentGroup"
           />
-        </div>
+        </div> -->
         <div v-tippy="canCreateView?.errorMessage">
           <FormButton
-            v-tippy="getTooltipProps('Create view')"
+            v-tippy="getTooltipProps('创建视图')"
             size="sm"
             color="subtle"
             :icon-left="Plus"
@@ -194,19 +194,13 @@ const menuItems = computed((): LayoutMenuItem<MenuItems>[][] => {
   items.push([
     {
       id: MenuItems.Rename,
-      title: 'Rename group',
+      title: '重命名',
       disabled: !canUpdate.value?.authorized || isLoading.value,
       disabledTooltip: canUpdate.value.errorMessage
     },
     {
-      id: MenuItems.Share,
-      title: 'Share presentation...',
-      disabled: isLoading.value,
-      disabledTooltip: canUpdate.value.errorMessage
-    },
-    {
       id: MenuItems.Delete,
-      title: 'Delete group...',
+      title: '删除分组',
       disabled: !canUpdate.value?.authorized || isLoading.value,
       disabledTooltip: canUpdate.value.errorMessage
     }
@@ -246,7 +240,7 @@ const onRename = async (newName: string) => {
   if (!newName.trim() || newName.length > 255) {
     triggerNotification({
       type: ToastNotificationType.Danger,
-      title: 'Name must be between 1 and 255 characters long'
+      title: '名称长度需在225字节内'
     })
     renameMode.value = false
     return

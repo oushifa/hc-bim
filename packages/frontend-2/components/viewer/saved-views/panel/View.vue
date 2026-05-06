@@ -81,9 +81,7 @@
       <div
         v-tippy="
           getTooltipProps(
-            canOpenEditDialog?.authorized
-              ? 'Edit view'
-              : canOpenEditDialog?.errorMessage
+            canOpenEditDialog?.authorized ? '编辑视图' : canOpenEditDialog?.errorMessage
           )
         "
         class="shrink-0 opacity-0 group-hover:opacity-100"
@@ -222,7 +220,7 @@ const isOriginalVersionAlreadyLoaded = computed(() => {
 const canLoadOriginal = computed(
   (): { authorized: boolean; message: Optional<string> } => {
     if (isOriginalVersionAlreadyLoaded.value) {
-      return { authorized: false, message: 'Original version is already loaded' }
+      return { authorized: false, message: '当前已为原始版本' }
     }
 
     return { authorized: true, message: undefined }
@@ -233,7 +231,7 @@ const menuItems = computed((): LayoutMenuItem<MenuItems>[][] => [
   [
     {
       id: MenuItems.MoveToGroup,
-      title: 'Move to group',
+      title: '移动分组',
       disabled: !canMove.value?.authorized || isLoading.value,
       disabledTooltip: canMove.value?.errorMessage
     },
@@ -243,10 +241,10 @@ const menuItems = computed((): LayoutMenuItem<MenuItems>[][] => [
       disabled: !canUpdate.value?.authorized || isLoading.value,
       disabledTooltip: canUpdate.value?.errorMessage
     },
-    {
-      id: MenuItems.CopyLink,
-      title: '复制链接'
-    },
+    // {
+    //   id: MenuItems.CopyLink,
+    //   title: '复制链接'
+    // },
     {
       id: MenuItems.LoadOriginalVersions,
       title: '加载原始模型版本',
@@ -261,19 +259,19 @@ const menuItems = computed((): LayoutMenuItem<MenuItems>[][] => [
       active: !!isHomeView.value,
       disabled: !canSetHomeView.value.authorized,
       disabledTooltip: canSetHomeView.value.message
-    },
-    {
-      id: MenuItems.ChangeVisibility,
-      title: isOnlyVisibleToMe.value ? '将视图设为共享' : '将视图设为私有',
-      disabled: !canToggleVisibility.value.authorized,
-      disabledTooltip: canToggleVisibility.value.message
-    },
-    {
-      id: MenuItems.Embed,
-      title: '嵌入视图',
-      disabled: !canEmbed.value?.authorized,
-      disabledTooltip: canEmbed.value?.errorMessage
     }
+    // {
+    //   id: MenuItems.ChangeVisibility,
+    //   title: isOnlyVisibleToMe.value ? '将视图设为共享' : '将视图设为私有',
+    //   disabled: !canToggleVisibility.value.authorized,
+    //   disabledTooltip: canToggleVisibility.value.message
+    // },
+    // {
+    //   id: MenuItems.Embed,
+    //   title: '嵌入视图',
+    //   disabled: !canEmbed.value?.authorized,
+    //   disabledTooltip: canEmbed.value?.errorMessage
+    // }
   ],
   [
     {

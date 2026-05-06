@@ -2,7 +2,7 @@
   <FormSelectBase
     v-model="selectedValue"
     :name="name || 'savedViewGroup'"
-    :label="label || 'Group'"
+    :label="label || '分组'"
     :label-id="labelId"
     :button-id="buttonId"
     mount-menu-on-body
@@ -14,7 +14,7 @@
     :allow-unset="allowUnset"
     search
   >
-    <template #nothing-selected>Select a group</template>
+    <template #nothing-selected>选择一个分组</template>
     <template #something-selected="{ value }">
       <div class="truncate text-foreground capitalize">
         {{ isArrayValue(value) ? value.map((v) => v.title).join(', ') : value.title }}

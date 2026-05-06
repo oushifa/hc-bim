@@ -1,7 +1,7 @@
 <template>
   <ViewerLayoutSidePanel>
     <template #title>
-      <span>问题讨论</span>
+      <span>模型标注</span>
     </template>
     <template #actions>
       <div class="flex items-center leading-none">
@@ -139,7 +139,7 @@ watch(includeArchived, (newVal) =>
 const actionsItems = computed<LayoutMenuItem[][]>(() => [
   [
     {
-      title: '显示问题讨论',
+      title: '显示模型标注',
       id: ActionTypes.HideBubbles,
       active: !hideBubbles.value
     },

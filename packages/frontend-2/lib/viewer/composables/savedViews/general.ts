@@ -10,6 +10,7 @@ import {
 } from '~/lib/viewer/helpers/savedViews'
 
 export const useAreSavedViewsEnabled = () => {
+  return true
   const {
     public: { FF_SAVED_VIEWS_ENABLED, FF_WORKSPACES_MODULE_ENABLED }
   } = useRuntimeConfig()

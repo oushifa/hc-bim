@@ -1,7 +1,7 @@
 <template>
   <LayoutDialog
     v-model:open="open"
-    title="Edit view"
+    title="编辑视图"
     max-width="sm"
     :buttons="buttons"
     :on-submit="onSubmit"
@@ -9,7 +9,7 @@
     <div class="flex flex-col gap-4">
       <FormTextInput
         name="name"
-        label="Name"
+        label="名称"
         show-label
         color="foundation"
         auto-focus
@@ -17,10 +17,10 @@
       />
       <FormTextArea
         name="description"
-        label="Description"
+        label="描述"
         show-label
         color="foundation"
-        placeholder="Add a description..."
+        placeholder="添加描述..."
         :rules="[isStringOfLength({ maxLength: 1000 })]"
       />
       <FormSelectSavedViewGroup
@@ -30,15 +30,6 @@
         :resource-id-string="resourceIdString"
         :rules="[isRequired]"
       />
-      <div v-tippy="canToggleVisibility.message">
-        <FormRadioGroup
-          :options="visibilityOptions"
-          :disabled="!canToggleVisibility.authorized"
-          size="sm"
-          name="visibility"
-          :rules="[isRequired, validateVisibility]"
-        />
-      </div>
     </div>
   </LayoutDialog>
 </template>

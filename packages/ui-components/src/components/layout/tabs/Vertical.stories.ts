@@ -5,7 +5,7 @@ import { useStorybookVmodel } from '~~/src/composables/testing'
 
 const items: LayoutPageTabItem[] = [
   { title: '模型', id: 'models', count: 300 },
-  { title: '问题讨论', id: 'discussions' },
+  { title: '模型标注', id: 'discussions' },
   { title: '自动操作', id: 'automations', tag: 'New' },
   { title: '设置', id: 'settings' },
   {

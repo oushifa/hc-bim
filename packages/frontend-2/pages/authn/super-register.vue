@@ -105,8 +105,4 @@ const onSubmit = handleSubmit(async () => {
     loading.value = false
   }
 })
-
-onMounted(() => {
-  mixpanel.track('Visit Super Register')
-})
 </script>

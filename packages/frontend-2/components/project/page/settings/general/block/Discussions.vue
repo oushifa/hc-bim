@@ -1,5 +1,5 @@
 <template>
-  <ProjectPageSettingsBlock background title="问题讨论" :auth-check="canUpdate">
+  <ProjectPageSettingsBlock background title="模型标注" :auth-check="canUpdate">
     <template #introduction>
       <p class="text-body-xs text-foreground">控制谁可以在这个项目上发表评论。</p>
     </template>

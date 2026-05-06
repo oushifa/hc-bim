@@ -1,14 +1,9 @@
 <template>
-  <LayoutDialog
-    v-model:open="open"
-    title="Delete group"
-    max-width="sm"
-    :buttons="buttons"
-  >
+  <LayoutDialog v-model:open="open" title="删除分组" max-width="sm" :buttons="buttons">
     <!-- prettier-ignore -->
     <p>
-      Are you sure you want to delete the group <span class="font-bold">{{ groupName }}</span>?
-      <br/>This action is irreversible and all of the views inside of it will be ungrouped.
+      确认要删除分组 <span class="font-bold">{{ groupName }}</span> 吗?
+      <br/>该操作不可逆，且分组下所有视图将被删除
     </p>
   </LayoutDialog>
 </template>
@@ -44,7 +39,7 @@ const groupName = computed(() => props.group?.title)
 const buttons = computed((): LayoutDialogButton[] => [
   {
     id: 'cancel',
-    text: 'Cancel',
+    text: '取消',
     props: {
       color: 'outline'
     },
@@ -54,7 +49,7 @@ const buttons = computed((): LayoutDialogButton[] => [
   },
   {
     id: 'delete',
-    text: 'Delete',
+    text: '删除',
     props: {
       color: 'danger'
     },

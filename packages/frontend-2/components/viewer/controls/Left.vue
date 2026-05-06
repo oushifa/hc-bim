@@ -51,6 +51,19 @@
         @click="toggleActivePanel('discussions')"
       />
 
+      <ViewerControlsButtonToggle
+        v-tippy="
+          getTooltipProps(
+            getShortcutDisplayText(shortcuts.ToggleCatalog, { format: 'separate' }),
+            {
+              placement: 'right'
+            }
+          )
+        "
+        :active="activePanel === 'catalog'"
+        :icon="ListTree"
+        @click="toggleActivePanel('catalog')"
+      ></ViewerControlsButtonToggle>
       <!-- Saved views -->
       <ViewerControlsButtonToggle
         v-if="isSavedViewsEnabled"
@@ -104,7 +117,7 @@
       :style="`width: ${widthClass};`"
     >
       <ViewerModelsPanel
-        v-show="activePanel === 'models'"
+        v-if="activePanel === 'models'"
         v-model:sub-view="modelsSubView"
       />
       <ViewerFiltersPanel v-if="activePanel === 'filters'" />
@@ -117,11 +130,10 @@
         :summary="summary"
       />
       <ViewerDataviewerPanel v-if="activePanel === 'devMode'" />
+      <ViewerCatalogPanel v-if="activePanel === 'catalog'"></ViewerCatalogPanel>
       <KeepAlive>
         <ViewerSavedViewsPanel
-          v-if="
-            isSavedViewsEnabled && isWorkspacesEnabled && activePanel === 'savedViews'
-          "
+          v-if="isSavedViewsEnabled && activePanel === 'savedViews'"
           @close="activePanel = 'none'"
         />
       </KeepAlive>
@@ -178,7 +190,14 @@ import { type Nullable, isNonNullable } from '@speckle/shared'
 import { useFunctionRunsStatusSummary } from '~/lib/automate/composables/runStatus'
 import { projectsRoute } from '~~/lib/common/helpers/route'
 import { useAreSavedViewsEnabled } from '~/lib/viewer/composables/savedViews/general'
-import { Camera, Box, ListFilter, MessageSquareText, ArrowLeft } from 'lucide-vue-next'
+import {
+  Camera,
+  Box,
+  ListFilter,
+  MessageSquareText,
+  ArrowLeft,
+  ListTree
+} from 'lucide-vue-next'
 import { useViewerPanelsUtilities } from '~/lib/viewer/composables/setup/panels'
 import type { ActivePanel } from '~/lib/viewer/helpers/sceneExplorer'
 import { useSettingsMenuState } from '~/lib/settings/composables/menu'
