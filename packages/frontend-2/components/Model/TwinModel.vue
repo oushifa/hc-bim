@@ -675,18 +675,33 @@
               </p>
             </div>
 
-            <!-- 分类（下拉多选） -->
-            <div>
+            <!-- 分类（下拉选择） -->
+            <div class="relative">
               <label class="block text-sm font-medium text-gray-700 mb-1.5">分类</label>
-              <select
-                v-model="officialEditForm.category"
-                class="w-full px-3 py-1.5 border border-gray-200 rounded-[8px] text-sm text-gray-600 focus:outline-none focus:border-[#00b4b6] cursor-pointer transition-colors"
+              <div
+                class="w-full px-3 py-1.5 border border-gray-200 rounded-[8px] text-sm focus:outline-none focus:border-[#00b4b6] cursor-pointer transition-colors flex items-center justify-between"
+                :class="officialEditForm.category ? 'text-gray-600' : 'text-gray-400'"
+                @click.stop="officialCategoryDropdownOpen = !officialCategoryDropdownOpen"
               >
-                <option value="">请选择分类</option>
-                <option v-for="cat in flatCategoryList" :key="cat.id" :value="cat.name">
+                <span>{{ officialEditForm.category || flatCategoryList[0]?.name || '' }}</span>
+                <svg class="w-4 h-4 text-gray-400 transition-transform" :class="officialCategoryDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+              <div
+                v-if="officialCategoryDropdownOpen && flatCategoryList.length"
+                class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-50 max-h-60 overflow-y-auto"
+              >
+                <div
+                  v-for="cat in flatCategoryList"
+                  :key="cat.id"
+                  class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
+                  :class="officialEditForm.category === cat.name ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
+                  @click.stop="officialEditForm.category = cat.name; officialCategoryDropdownOpen = false"
+                >
                   {{ cat.name }}
-                </option>
-              </select>
+                </div>
+              </div>
             </div>
 
             <!-- 缩略图 -->
@@ -1158,12 +1173,12 @@ const officialCategoryDropdownOpen = ref(false)
 const openOfficialEditModal = (model: OfficialModel) => {
   officialEditForm.name = model.name
   officialEditForm.nameEn = model.nameEn || ''
-  // 解析 category 字符串，如 '["植物/乔木"]'，取第一个作为单选值
+  // 解析 category 字符串，如 '植物/乔木'，取第一个作为单选值
   try {
     const parsed = JSON.parse(model.category)
-    officialEditForm.category = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : ''
+    officialEditForm.category = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : (flatCategoryList.value[0]?.name || '')
   } catch {
-    officialEditForm.category = ''
+    officialEditForm.category = flatCategoryList.value[0]?.name || ''
   }
   officialEditErrors.name = ''
   officialEditErrors.nameEn = ''

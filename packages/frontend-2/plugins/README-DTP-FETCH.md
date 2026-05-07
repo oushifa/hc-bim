@@ -17,7 +17,7 @@
 在 `.env` 文件中配置 DTP API 地址：
 
 ```env
-NUXT_PUBLIC_DTP_API_ORIGIN=http://10.66.8.185:30080/service
+NUXT_PUBLIC_DTP_API_ORIGIN=http://10.66.8.185:30080/ui
 ```
 
 ## 使用方法
