@@ -106,8 +106,8 @@
               "
             >
               <option value="">请选择状态</option>
-              <option value="1">已上架</option>
-              <option value="2">已下架</option>
+              <option value="已上架">已上架</option>
+              <option value="已下架">已下架</option>
             </select>
           </div>
           <div class="flex items-center space-x-2">
@@ -121,9 +121,10 @@
                   : 'border-transparent bg-gray-50'
               "
             >
-              <option value="">请选择</option>
-              <option value="plant">植物/乔木</option>
-              <option value="character">角色/人类</option>
+              <option value="">请选择分类</option>
+              <option v-for="cat in flatCategoryList" :key="cat.id" :value="cat.name">
+                {{ cat.name }}
+              </option>
             </select>
           </div>
         </template>
@@ -330,59 +331,57 @@
       >
         <div class="flex items-center space-x-4 text-sm text-gray-500">
           <span>
-            共 {{ activeTab === 'user' ? '11373' : '2308' }} 条记录 / 第 1 - 20 条
+            共 {{ totalRecords }} 条记录 / 第 {{ startRecord }} - {{ endRecord }} 条
           </span>
           <div class="flex items-center space-x-1">
+            <!-- 上一页 -->
             <button
-              class="p-1 border border-gray-200 rounded-[8px] text-gray-400 hover:text-[#00b4b6] hover:border-[#00b4b6] disabled:opacity-50"
+              class="p-1 border border-gray-200 rounded-[8px] text-gray-400 hover:text-[#00b4b6] hover:border-[#00b4b6] disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="currentPage <= 1"
+              @click="changePage(currentPage - 1)"
             >
               <ChevronLeftIcon class="w-4 h-4" />
             </button>
+            
+            <!-- 页码按钮 -->
+            <template v-for="page in visiblePages" :key="page">
+              <button
+                v-if="page === '...'"
+                class="w-8 h-8 flex items-center justify-center border-0 text-gray-400"
+              >
+                <EllipsisHorizontalIcon class="w-4 h-4" />
+              </button>
+              <button
+                v-else
+                class="w-8 h-8 flex items-center justify-center border rounded hover:border-[#00b4b6] hover:text-[#00b4b6] transition-colors"
+                :class="
+                  page === currentPage
+                    ? 'border-[#00b4b6] text-[#00b4b6] bg-[#e6f7f8]'
+                    : 'border-gray-200 text-gray-600'
+                "
+                @click="changePage(page as number)"
+              >
+                {{ page }}
+              </button>
+            </template>
+            
+            <!-- 下一页 -->
             <button
-              class="w-8 h-8 flex items-center justify-center border border-[#00b4b6] text-[#00b4b6] rounded bg-[#e6f7f8]"
-            >
-              1
-            </button>
-            <button
-              class="w-8 h-8 flex items-center justify-center border border-gray-200 text-gray-600 rounded hover:border-[#00b4b6] hover:text-[#00b4b6]"
-            >
-              2
-            </button>
-            <button
-              class="w-8 h-8 flex items-center justify-center border border-gray-200 text-gray-600 rounded hover:border-[#00b4b6] hover:text-[#00b4b6]"
-            >
-              3
-            </button>
-            <button
-              class="w-8 h-8 flex items-center justify-center border border-gray-200 text-gray-600 rounded hover:border-[#00b4b6] hover:text-[#00b4b6]"
-            >
-              4
-            </button>
-            <button
-              class="w-8 h-8 flex items-center justify-center border border-gray-200 text-gray-600 rounded hover:border-[#00b4b6] hover:text-[#00b4b6]"
-            >
-              5
-            </button>
-            <span class="px-1">
-              <EllipsisHorizontalIcon class="w-4 h-4 text-gray-400" />
-            </span>
-            <button
-              class="w-8 h-8 flex items-center justify-center border border-gray-200 text-gray-600 rounded hover:border-[#00b4b6] hover:text-[#00b4b6]"
-            >
-              {{ activeTab === 'user' ? '569' : '116' }}
-            </button>
-            <button
-              class="p-1 border border-gray-200 rounded text-gray-600 hover:text-[#00b4b6] hover:border-[#00b4b6]"
+              class="p-1 border border-gray-200 rounded text-gray-600 hover:text-[#00b4b6] hover:border-[#00b4b6] disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="currentPage >= totalPages"
+              @click="changePage(currentPage + 1)"
             >
               <ChevronRightIcon class="w-4 h-4" />
             </button>
           </div>
           <select
+            v-model="currentPageSize"
             class="border border-[#00b4b6] rounded-[8px] px-2 py-1 text-sm focus:outline-none focus:border-[#00b4b6] cursor-pointer"
+            @change="onPageSizeChange"
           >
-            <option>20 / page</option>
-            <option>50 / page</option>
-            <option>100 / page</option>
+            <option :value="20">20 / page</option>
+            <option :value="50">50 / page</option>
+            <option :value="100">100 / page</option>
           </select>
         </div>
       </div>
@@ -679,103 +678,15 @@
             <!-- 分类（下拉多选） -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1.5">分类</label>
-              <div class="relative" @click.stop>
-                <!-- 触发器 -->
-                <div
-                  class="w-full min-h-[38px] px-3 py-1.5 border border-gray-200 rounded-[8px] text-sm cursor-pointer flex items-center flex-wrap gap-1.5 focus-within:border-[#00b4b6] transition-colors"
-                  :class="
-                    officialCategoryDropdownOpen
-                      ? 'border-[#00b4b6]'
-                      : 'border-gray-200'
-                  "
-                  @click="officialCategoryDropdownOpen = !officialCategoryDropdownOpen"
-                >
-                  <template v-if="officialEditForm.categories.length > 0">
-                    <span
-                      v-for="cat in officialEditForm.categories"
-                      :key="cat"
-                      class="inline-flex items-center gap-1 px-2 py-0.5 bg-[#e6f7f8] text-[#00b4b6] text-xs rounded-[4px]"
-                    >
-                      {{ cat }}
-                      <button
-                        class="hover:text-[#007a7c] cursor-pointer"
-                        @click.stop="removeCategory(cat)"
-                      >
-                        <XMarkIcon class="w-3 h-3" />
-                      </button>
-                    </span>
-                  </template>
-                  <span v-else class="text-gray-400">请选择分类</span>
-                  <svg
-                    class="w-4 h-4 text-gray-400 ml-auto shrink-0 transition-transform"
-                    :class="officialCategoryDropdownOpen ? 'rotate-180' : ''"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M19 9l-7 7-7-7"
-                    />
-                  </svg>
-                </div>
-                <!-- 下拉面板 -->
-                <Transition
-                  enter-active-class="transition-all duration-150"
-                  enter-from-class="opacity-0 -translate-y-1"
-                  enter-to-class="opacity-100 translate-y-0"
-                  leave-active-class="transition-all duration-100"
-                  leave-from-class="opacity-100 translate-y-0"
-                  leave-to-class="opacity-0 -translate-y-1"
-                >
-                  <div
-                    v-if="officialCategoryDropdownOpen"
-                    class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-20 overflow-hidden"
-                  >
-                    <div
-                      v-for="opt in categoryOptions"
-                      :key="opt"
-                      class="flex items-center px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 transition-colors"
-                      @click.stop="toggleCategory(opt)"
-                    >
-                      <div
-                        class="w-4 h-4 border-2 rounded-sm mr-2.5 flex items-center justify-center shrink-0 transition-colors"
-                        :class="
-                          officialEditForm.categories.includes(opt)
-                            ? 'bg-[#00b4b6] border-[#00b4b6]'
-                            : 'border-gray-300'
-                        "
-                      >
-                        <svg
-                          v-if="officialEditForm.categories.includes(opt)"
-                          class="w-3 h-3 text-white"
-                          fill="none"
-                          viewBox="0 0 12 12"
-                          stroke="currentColor"
-                          stroke-width="2.5"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M2 6l3 3 5-5"
-                          />
-                        </svg>
-                      </div>
-                      <span
-                        :class="
-                          officialEditForm.categories.includes(opt)
-                            ? 'text-[#00b4b6]'
-                            : 'text-gray-700'
-                        "
-                      >
-                        {{ opt }}
-                      </span>
-                    </div>
-                  </div>
-                </Transition>
-              </div>
+              <select
+                v-model="officialEditForm.category"
+                class="w-full px-3 py-1.5 border border-gray-200 rounded-[8px] text-sm text-gray-600 focus:outline-none focus:border-[#00b4b6] cursor-pointer transition-colors"
+              >
+                <option value="">请选择分类</option>
+                <option v-for="cat in flatCategoryList" :key="cat.id" :value="cat.name">
+                  {{ cat.name }}
+                </option>
+              </select>
             </div>
 
             <!-- 缩略图 -->
@@ -933,6 +844,189 @@ import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 const { ensureLoaded: ensureUserPermsLoaded, hasModelOp } = useUserPermissions()
 void ensureUserPermsLoaded()
 
+// 使用插件提供的 $dtpFetch
+const { $dtpFetch } = useNuxtApp()
+
+// 格式化文件大小
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 M'
+  const mb = bytes / (1024 * 1024)
+  return `${mb.toFixed(2)} M`
+}
+
+// 分类树数据
+const categoryTreeData = ref<any[]>([])
+
+// 扁平化的分类列表（用于筛选器和编辑弹窗）
+const flatCategoryList = computed(() => {
+  const result: Array<{ name: string; id: number }> = []
+  
+  // 递归遍历分类树
+  const flatten = (nodes: any[], parentName?: string) => {
+    if (!nodes || !Array.isArray(nodes)) return
+    for (const node of nodes) {
+      // 只收集有 parentId 的子节点
+      if (node.parentId && node.name) {
+        // 显示为 "父级/子级" 格式
+        const fullName = parentName ? `${parentName}/${node.name}` : node.name
+        result.push({ name: fullName, id: node.id })
+      }
+      // 使用 child 字段（不是 children）
+      if (node.child && node.child.length > 0) {
+        // 传递当前节点名称作为父级名称
+        const currentParentName = node.name || parentName
+        flatten(node.child, currentParentName)
+      }
+    }
+  }
+  
+  flatten(categoryTreeData.value)
+  return result
+})
+
+// 获取分类树数据
+const fetchCategoryTree = async () => {
+  try {
+    const data = await $dtpFetch('/api/v1/daas/category/my/tree', {
+      method: 'POST',
+      body: {
+        categoryType: 'model'
+      }
+    })
+    
+    console.log('分类树接口返回:', data)
+    
+    // 解析分类树数据
+    const responseData = data as any
+    if (responseData && responseData.result && responseData.result.nodes) {
+      categoryTreeData.value = responseData.result.nodes
+    }
+  } catch (error) {
+    console.error('获取分类树数据失败:', error)
+  }
+}
+
+// 用户模型列表数据
+const userModelsData = ref<any[]>([])
+const userLoading = ref(false)
+
+// 获取用户模型列表
+const fetchUserModels = async () => {
+  userLoading.value = true
+  try {
+    const data = await $dtpFetch('/api/v1/daas/asset/model/personal/list', {
+      method: 'POST',
+      body: {
+        keyword: searchQuery.value || '',
+        publishedSet: [true, false],
+        hierarchySet: [true, false],
+        pageNumber: currentPage.value,
+        pageSize: currentPageSize.value
+      }
+    })
+    
+    console.log('用户模型列表接口返回:', data)
+    
+    // 解析用户模型数据
+    const responseData = data as any
+    if (responseData && responseData.result) {
+      // 如果有 data 字段，解析数据
+      if (responseData.result.data) {
+        userModelsData.value = Array.isArray(responseData.result.data) 
+          ? responseData.result.data 
+          : (responseData.result.data.records || responseData.result.data.list || [])
+        
+        // 更新总记录数
+        userTotalRecords.value = responseData.result.total || userModelsData.value.length
+      } else {
+        // 没有数据时清空
+        userModelsData.value = []
+        userTotalRecords.value = 0
+      }
+    }
+  } catch (error) {
+    console.error('获取用户模型列表失败:', error)
+    userModelsData.value = []
+    userTotalRecords.value = 0
+  } finally {
+    userLoading.value = false
+  }
+}
+
+// 官方模型列表数据
+const officialModelsData = ref<any[]>([])
+const officialLoading = ref(false)
+
+// 获取官方模型列表
+const fetchOfficialModels = async () => {
+  officialLoading.value = true
+  try {
+    // 根据上架状态筛选条件构建 publishedSet
+    let publishedSet: boolean[]
+    if (publishStatusFilter.value === '已上架') {
+      publishedSet = [true]
+    } else if (publishStatusFilter.value === '已下架') {
+      publishedSet = [false]
+    } else {
+      publishedSet = [true, false]  // 默认显示全部
+    }
+    
+    // 根据分类筛选条件构建 categoryIdSet
+    let categoryIdSet: number[] = []
+    if (categoryFilter.value) {
+      // 从 flatCategoryList 中查找对应的分类 ID
+      const matchedCategory = flatCategoryList.value.find(cat => cat.name === categoryFilter.value)
+      if (matchedCategory) {
+        categoryIdSet = [matchedCategory.id]
+      }
+    }
+    
+    const data = await $dtpFetch('/api/v1/daas/asset/model/official/list', {
+      method: 'POST',
+      body: {
+        keyword: searchQuery.value || '',
+        publishedSet: publishedSet,
+        categoryIdSet: categoryIdSet,
+        pageNumber: currentPage.value,
+        pageSize: currentPageSize.value
+      }
+    })
+    
+    console.log('官方模型列表接口返回:', data)
+    
+    // 解析官方模型数据
+    const responseData = data as any
+    if (responseData && responseData.result) {
+      // 如果有 data 字段，解析数据
+      if (responseData.result.data && Array.isArray(responseData.result.data)) {
+        officialModelsData.value = responseData.result.data.map((item: any) => ({
+          id: String(item.id),
+          name: item.assetName || '',
+          nameEn: item.assetNameEn || '',
+          seedId: item.seedId || '',
+          category: item.category ? JSON.stringify(item.category) : '[]',
+          system: item.platform || '',
+          dataVersion: item.assetVersion || '',
+          assetSize: formatFileSize(item.size),
+          publishTime: item.publishedAt || '',
+          status: item.published ? '已上架' : '已下架',
+          industryTag: item.industryTags ? JSON.stringify(item.industryTags) : '[]'
+        }))
+        // 更新总记录数
+        officialTotalRecords.value = responseData.result.total || officialModelsData.value.length
+      } else {
+        // 没有 data 字段时，表示没有数据
+        officialModelsData.value = []
+        officialTotalRecords.value = 0
+      }
+    }
+  } catch (error) {
+    console.error('获取官方模型列表失败:', error)
+  } finally {
+    officialLoading.value = false
+  }
+}
+
 interface UserModel {
   id: string
   name: string
@@ -949,6 +1043,7 @@ interface UserModel {
 interface OfficialModel {
   id: string
   name: string
+  nameEn: string
   seedId: string
   category: string
   system: string
@@ -1047,20 +1142,12 @@ const onThumbnailChange = (e: Event) => {
 }
 
 // ---------- 官方模型编辑 Modal ----------
-const categoryOptions = [
-  '植物/乔木',
-  '角色/人类',
-  '建筑/构件',
-  '设备/机械',
-  '场景/环境',
-  '其他'
-]
 
 const officialEditModalVisible = ref(false)
 const officialEditForm = reactive({
   name: '',
   nameEn: '',
-  categories: [] as string[]
+  category: ''
 })
 const officialEditErrors = reactive({ name: '', nameEn: '' })
 const officialThumbnailInput = ref<HTMLInputElement | null>(null)
@@ -1070,13 +1157,13 @@ const officialCategoryDropdownOpen = ref(false)
 
 const openOfficialEditModal = (model: OfficialModel) => {
   officialEditForm.name = model.name
-  officialEditForm.nameEn = ''
-  // 解析 category 字符串，如 '["植物/乔木"]'
+  officialEditForm.nameEn = model.nameEn || ''
+  // 解析 category 字符串，如 '["植物/乔木"]'，取第一个作为单选值
   try {
     const parsed = JSON.parse(model.category)
-    officialEditForm.categories = Array.isArray(parsed) ? parsed : []
+    officialEditForm.category = Array.isArray(parsed) && parsed.length > 0 ? parsed[0] : ''
   } catch {
-    officialEditForm.categories = []
+    officialEditForm.category = ''
   }
   officialEditErrors.name = ''
   officialEditErrors.nameEn = ''
@@ -1103,19 +1190,6 @@ const handleOfficialEditConfirm = () => {
   closeOfficialEditModal()
 }
 
-const toggleCategory = (opt: string) => {
-  const idx = officialEditForm.categories.indexOf(opt)
-  if (idx === -1) {
-    officialEditForm.categories.push(opt)
-  } else {
-    officialEditForm.categories.splice(idx, 1)
-  }
-}
-const removeCategory = (opt: string) => {
-  const idx = officialEditForm.categories.indexOf(opt)
-  if (idx !== -1) officialEditForm.categories.splice(idx, 1)
-}
-
 const onOfficialThumbnailChange = (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -1127,10 +1201,16 @@ const onOfficialThumbnailChange = (e: Event) => {
 }
 
 // 点击外部关闭分类下拉
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', () => {
     officialCategoryDropdownOpen.value = false
   })
+  
+  // 组件挂载时自动加载用户模型数据
+  await fetchUserModels()
+  
+  // 获取分类树数据
+  await fetchCategoryTree()
 })
 
 const activeTab = ref<'user' | 'official'>('user')
@@ -1142,171 +1222,105 @@ const componentDataFilter = ref('')
 const publishStatusFilter = ref('')
 const categoryFilter = ref('')
 
-const mockUserModels: UserModel[] = [
-  {
-    id: '1',
-    name: 'TK.fbx',
-    seedId: '07a607a9ac5941bdc867f02e67312c85',
-    system: 'win',
-    productType: 'WDP消费(UE5.5)',
-    originalFormat: 'fbx',
-    assetSize: '0.19 M',
-    componentData: '有',
-    generationTime: '2026-04-02 10:03:45',
-    status: '已上架'
-  },
-  {
-    id: '2',
-    name: 'dx.fbx',
-    seedId: '6468b35404b46a51fb234e0f132380d5',
-    system: 'win',
-    productType: 'WDP消费(UE5.5)',
-    originalFormat: 'fbx',
-    assetSize: '8.90 M',
-    componentData: '有',
-    generationTime: '2026-04-02 09:28:06',
-    status: '已上架'
-  },
-  {
-    id: '3',
-    name: '202603301.fbx',
-    seedId: '6aaba3f6ec1733db0a764eb6b72016cf',
-    system: 'win',
-    productType: 'WDP消费(UE5.5)',
-    originalFormat: 'fbx',
-    assetSize: '65.03 M',
-    componentData: '有',
-    generationTime: '2026-04-02 09:11:15',
-    status: '已上架'
-  },
-  {
-    id: '4',
-    name: 'point.glb',
-    seedId: '4d85c76bfafad63f942bf504dba0f195',
-    system: 'win',
-    productType: 'WDP消费(UE5.5)',
-    originalFormat: 'glb',
-    assetSize: '0.02 M',
-    componentData: '有',
-    generationTime: '2026-04-01 12:03:15',
-    status: '已上架'
-  },
-  {
-    id: '5',
-    name: 'fix_terrain_0325.fbx',
-    seedId: '61e27dcb3fbda1dd29d19bc39a70e6bb',
-    system: 'win',
-    productType: 'WDP消费(UE5.5)',
-    originalFormat: 'fbx',
-    assetSize: '62.18 M',
-    componentData: '有',
-    generationTime: '2026-03-31 17:35:15',
-    status: '已上架'
-  },
-  {
-    id: '6',
-    name: '主厂房外形.fbx',
-    seedId: '3d3f1e93420d1498d7480c14cadc0e93',
-    system: 'win',
-    productType: 'WDP消费(UE5.5)',
-    originalFormat: 'fbx',
-    assetSize: '0.90 M',
-    componentData: '有',
-    generationTime: '2026-03-31 16:06:45',
-    status: '已上架'
-  },
-  {
-    id: '7',
-    name: '房屋7.zip',
-    seedId: 'cdc0398da185024f41cae08b6171554d',
-    system: 'win',
-    productType: 'WDP消费(UE5.5)',
-    originalFormat: 'obj',
-    assetSize: '0.19 M',
-    componentData: '有',
-    generationTime: '2026-03-31 15:29:10',
-    status: '已上架'
-  }
-]
+// 监听筛选条件变化，自动重新加载数据
+let isSwitchingTab = false
 
-const mockOfficialModels: OfficialModel[] = [
-  {
-    id: 'o1',
-    name: '黄葛树01',
-    seedId: '654a4da916557ef217401cf6b901ec29',
-    category: '["植物/乔木"]',
-    system: 'win',
-    dataVersion: '0.0.2',
-    assetSize: '31.89 M',
-    publishTime: '2026-04-01 18:29:41',
-    status: '已上架',
-    industryTag: '["静态模型"]'
-  },
-  {
-    id: 'o2',
-    name: '丛生金桂01',
-    seedId: '6eb3fd77bea25e1a1c75743a6bde3fd2',
-    category: '["植物/乔木"]',
-    system: 'win',
-    dataVersion: '0.0.2',
-    assetSize: '29.33 M',
-    publishTime: '2026-04-01 18:29:41',
-    status: '已上架',
-    industryTag: '["静态模型"]'
-  },
-  {
-    id: 'o3',
-    name: '丛生金桂02',
-    seedId: '32cb367bc2cb41622baecb49ac37563e',
-    category: '["植物/乔木"]',
-    system: 'win',
-    dataVersion: '0.0.2',
-    assetSize: '26.17 M',
-    publishTime: '2026-04-01 18:29:27',
-    status: '已上架',
-    industryTag: '["静态模型"]'
-  },
-  {
-    id: 'o4',
-    name: '安保人员02',
-    seedId: 'dcf3ee20d1797e819bb518280c23fdd5',
-    category: '["角色/人类"]',
-    system: 'win',
-    dataVersion: '0.0.1',
-    assetSize: '10.71 M',
-    publishTime: '2026-03-30 11:20:46',
-    status: '已上架',
-    industryTag: '["静态模型"]'
-  },
-  {
-    id: 'o5',
-    name: '安保人员01',
-    seedId: '07a7f60f1fb47b8d418268fe1a3f352f',
-    category: '["角色/人类"]',
-    system: 'win',
-    dataVersion: '0.0.1',
-    assetSize: '26.09 M',
-    publishTime: '2026-03-30 11:20:46',
-    status: '已上架',
-    industryTag: '["静态模型"]'
-  },
-  {
-    id: 'o6',
-    name: '安保人员03',
-    seedId: '8acdf407b2b098eed741095c0379393d',
-    category: '["角色/人类"]',
-    system: 'win',
-    dataVersion: '0.0.1',
-    assetSize: '26.24 M',
-    publishTime: '2026-03-30 11:20:46',
-    status: '已上架',
-    industryTag: '["静态模型"]'
+watch(
+  [searchQuery, statusFilter, componentDataFilter, publishStatusFilter, categoryFilter],
+  async () => {
+    // 如果是切换 tab 导致的清空，不触发重新加载
+    if (isSwitchingTab) return
+    
+    // 重置到第一页
+    currentPage.value = 1
+    
+    // 根据当前 tab 重新加载数据
+    if (activeTab.value === 'user') {
+      await fetchUserModels()
+    } else {
+      await fetchOfficialModels()
+    }
   }
-]
-
-const currentData = computed(() =>
-  activeTab.value === 'user' ? mockUserModels : mockOfficialModels
 )
+
+// 分页状态
+const currentPage = ref(1)
+const currentPageSize = ref(20)
+const userTotalRecords = ref(0)
+const officialTotalRecords = ref(0)
+
+// 计算总记录数
+const totalRecords = computed(() => {
+  return activeTab.value === 'user' ? userTotalRecords.value : officialTotalRecords.value
+})
+
+// 计算总页数
+const totalPages = computed(() => {
+  return Math.ceil(totalRecords.value / currentPageSize.value)
+})
+
+// 计算起始记录
+const startRecord = computed(() => {
+  if (totalRecords.value === 0) return 0
+  return (currentPage.value - 1) * currentPageSize.value + 1
+})
+
+// 计算结束记录
+const endRecord = computed(() => {
+  return Math.min(currentPage.value * currentPageSize.value, totalRecords.value)
+})
+
+// 计算可见的页码
+const visiblePages = computed(() => {
+  const pages: (number | string)[] = []
+  const total = totalPages.value
+  const current = currentPage.value
+  
+  if (total <= 7) {
+    // 总页数小于等于7，显示所有页码
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    // 总页数大于7，显示省略号
+    if (current <= 4) {
+      // 当前页在前面
+      for (let i = 1; i <= 5; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 3) {
+      // 当前页在后面
+      pages.push(1)
+      pages.push('...')
+      for (let i = total - 4; i <= total; i++) {
+        pages.push(i)
+      }
+    } else {
+      // 当前页在中间
+      pages.push(1)
+      pages.push('...')
+      for (let i = current - 1; i <= current + 1; i++) {
+        pages.push(i)
+      }
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+  
+  return pages
+})
+
+const currentData = computed(() => {
+  if (activeTab.value === 'user') {
+    // 使用API返回的用户模型数据（真实数据，没有就显示空）
+    return userModelsData.value
+  } else {
+    // 使用API返回的官方模型数据（真实数据，没有就显示空）
+    return officialModelsData.value
+  }
+})
 
 const filteredModels = computed(() => {
   let result = currentData.value as (UserModel | OfficialModel)[]
@@ -1346,7 +1360,10 @@ const toggleSelectAll = () => {
 }
 
 // 切换 tab 时清空选中和筛选条件
-const switchTab = (tab: 'user' | 'official') => {
+const switchTab = async (tab: 'user' | 'official') => {
+  // 设置标志，防止 watch 重复触发
+  isSwitchingTab = true
+  
   activeTab.value = tab
   selectedIds.value = new Set()
   searchQuery.value = ''
@@ -1354,5 +1371,43 @@ const switchTab = (tab: 'user' | 'official') => {
   componentDataFilter.value = ''
   publishStatusFilter.value = ''
   categoryFilter.value = ''
+  currentPage.value = 1
+  
+  // 切换到用户模型时调用API
+  if (tab === 'user') {
+    await fetchUserModels()
+  }
+  // 切换到官方模型时调用API
+  else if (tab === 'official') {
+    await fetchOfficialModels()
+  }
+  
+  // 重置标志
+  setTimeout(() => {
+    isSwitchingTab = false
+  }, 100)
+}
+
+// 切换页码
+const changePage = async (page: number) => {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+  
+  if (activeTab.value === 'user') {
+    await fetchUserModels()
+  } else {
+    await fetchOfficialModels()
+  }
+}
+
+// 改变每页显示数量
+const onPageSizeChange = async () => {
+  currentPage.value = 1
+  
+  if (activeTab.value === 'user') {
+    await fetchUserModels()
+  } else {
+    await fetchOfficialModels()
+  }
 }
 </script>

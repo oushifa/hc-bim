@@ -33,6 +33,9 @@ export default defineNuxtPlugin(() => {
   }
 
   // Create a dedicated fetch instance for DTP API
+  // TODO: 后续改为从环境变量或动态获取
+  const DTP_JWT_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZWFtSWQiOiJUZWFtXzQ5NDYwXzFmNGU4MiIsInByb2ZpbGVJZCI6IjAxOWUwMDNlLTNmYjItN2VlNy1iODE5LWM2NjM5YmRjZWI0NiIsIm1hc3RlcklkIjoiNDk0NjAiLCJ3ZHBJZCI6IjQ5NDYwIiwicm9sZXMiOlsiRGV2ZWxvcGVyIl0sIm1vYmlsZSI6IjE3MzM4NDA0NjYwIiwiaW5uZXIiOmZhbHNlLCJlbWFpbCI6bnVsbCwibmFtZSI6IueUqOaIt0VaemVHOGExIiwib2F1dGhTZXNzaW9uSWQiOiIwMTllMDFhMDE0YTk3YmIyYTk2M2ZlODM2ZjQyYTIxMSIsImNsaWVudFR5cGUiOiJXRFA1X0NMT1VEIiwiaWF0IjoxNzc4MTQzNzI4LCJleHAiOjE3NzgyMzAxMjgsImlzcyI6Ind3dy41MWFlcy5jb20iLCJzdWIiOiI1MVdPUkxEIn0.GvJCGK3aaL_K4Fs5MD_0F5TdAJAYJwEfJ43WxeZ6yic'
+  
   const dtpFetch = $fetch.create({
     baseURL: dtpApiBase.toString(),
     onRequest({ request, options }) {
@@ -43,10 +46,9 @@ export default defineNuxtPlugin(() => {
         headers.set('Content-Type', 'application/json')
       }
       
-      // Add authentication token if available
-      const token = authToken.value || null
-      if (token && !headers.has('Authorization')) {
-        headers.set('Authorization', `Bearer ${token}`)
+      // 使用写死的 JWT token（临时方案）
+      if (!headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${DTP_JWT_TOKEN}`)
       }
       
       options.headers = headers
