@@ -85,6 +85,7 @@ import { useMounted } from '@vueuse/core'
 import { graphql } from '~/lib/common/generated/gql'
 import type { AuthLoginWithEmailBlock_PendingWorkspaceCollaboratorFragment } from '~/lib/common/generated/gql/graphql'
 import { useLog } from '~~/composables/useLog'
+import { homeRoute } from '~/lib/common/helpers/route'
 
 type FormValues = { email: string; password: string }
 
@@ -110,7 +111,7 @@ const emailRules = [isPhone]
 const passwordRules = [isRequired]
 
 const isMounted = useMounted()
-const { loginWithEmail } = useAuthManager()
+const { loginWithEmail, loginWithToken } = useAuthManager()
 const { triggerNotification } = useGlobalToast()
 const { track, flush } = useLog()
 
@@ -123,13 +124,104 @@ const shouldForceInviteEmail = computed(
 const onSubmit = handleSubmit(async ({ email, password }) => {
   try {
     loading.value = true
+    
+    // 1. 先调用原有的登录接口
     await loginWithEmail({
       email,
       password,
       challenge: props.challenge
     })
+    
+    // 2. 同时调用第三方登录接口获取DTP token（失败不影响主登录流程）
+    try {
+      // 使用写死的mobile和username
+      const mobile = "18170559496"
+      const username = "hjl"
+      
+      // 动态导入crypto-js进行AES加密
+      const CryptoJS = await import('crypto-js')
+      const AES_KEY = 'Ze/0w7rnQg7jznntRcuxGQ=='
+      
+      // 构建要加密的数据
+      const data = JSON.stringify({
+        mobile,
+        username
+      })
+      
+      // 使用AES-ECB-PKCS7加密（按照文档示例代码）
+      const dataParsed = CryptoJS.enc.Utf8.parse(data)
+      const keyParsed = CryptoJS.enc.Utf8.parse(AES_KEY)
+      
+      const encrypted = CryptoJS.AES.encrypt(dataParsed, keyParsed, {
+        mode: CryptoJS.mode.ECB,
+        padding: CryptoJS.pad.Pkcs7
+      })
+      
+      const bimpToken = encrypted.toString()
+      
+      // 通过代理调用第三方登录接口
+      const loginUrl = '/api/proxy/dtp-login'
+      const response = await fetch(loginUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          token: bimpToken,
+          grant_type: 'bimp-token'
+        })
+      })
+
+      if (response.ok) {
+        const responseData = await response.json()
+        
+        // 检查返回结果
+        if (responseData.success && responseData.code === 200) {
+          // 从 results.tokens 数组中获取 token
+          const dtpToken = responseData.results?.tokens?.[0] as string | undefined
+          
+          if (dtpToken) {
+            // 保存DTP token到localStorage，供DTP API使用
+            localStorage.setItem('dtp-token', dtpToken)
+            console.log('DTP token saved successfully')
+          }
+        }
+      }
+    } catch (dtpError) {
+      // DTP登录失败不影响主登录流程
+      console.warn('DTP login failed, but main login succeeded:', dtpError)
+    }
+    
+    // 记录登录成功日志
+    track({
+      what: {
+        action: 'auth.login.attempt',
+        targetType: 'auth',
+        targetId: 'email-password'
+      },
+      result: {
+        status: 'success'
+      },
+      metadata: {
+        source: 'auth.login.form'
+      }
+    })
   } catch (e) {
     const err = ensureError(e)
+    track({
+      what: {
+        action: 'auth.login.attempt',
+        targetType: 'auth',
+        targetId: 'email-password'
+      },
+      result: {
+        status: 'fail'
+      },
+      metadata: {
+        source: 'auth.login.form'
+      }
+    })
+    
     triggerNotification({
       type: ToastNotificationType.Danger,
       title: '登录失败',

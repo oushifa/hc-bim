@@ -32,10 +32,37 @@ export default defineNuxtPlugin(() => {
     }
   }
 
+  // 缓存的DTP token
+  let cachedDtpToken: string | null = null
+  let tokenExpiryTime: number = 0
+
+  // 获取DTP token（带缓存）
+  const getDtpToken = async (): Promise<string | null> => {
+    try {
+      // 检查缓存的token是否仍然有效（提前5分钟过期）
+      if (cachedDtpToken && Date.now() < tokenExpiryTime - 5 * 60 * 1000) {
+        return cachedDtpToken
+      }
+
+      // 从localStorage获取DTP token（登录时保存的）
+      const storedToken = typeof window !== 'undefined' ? localStorage.getItem('dtp-token') : null
+      if (storedToken) {
+        cachedDtpToken = storedToken
+        tokenExpiryTime = Date.now() + 24 * 60 * 60 * 1000 // 24小时
+        return storedToken
+      }
+      
+      return null
+    } catch (error) {
+      console.error('Error getting DTP token:', error)
+      return null
+    }
+  }
+
+  // 初始化时获取token
+  getDtpToken().catch(err => console.error('Failed to initialize DTP token:', err))
+
   // Create a dedicated fetch instance for DTP API
-  // TODO: 后续改为从环境变量或动态获取
-  const DTP_JWT_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZWFtSWQiOiJUZWFtXzQ5NDYwXzFmNGU4MiIsInByb2ZpbGVJZCI6IjAxOWUwMDNlLTNmYjItN2VlNy1iODE5LWM2NjM5YmRjZWI0NiIsIm1hc3RlcklkIjoiNDk0NjAiLCJ3ZHBJZCI6IjQ5NDYwIiwicm9sZXMiOlsiRGV2ZWxvcGVyIl0sIm1vYmlsZSI6IjE3MzM4NDA0NjYwIiwiaW5uZXIiOmZhbHNlLCJlbWFpbCI6bnVsbCwibmFtZSI6IueUqOaIt0VaemVHOGExIiwib2F1dGhTZXNzaW9uSWQiOiIwMTllMDI5M2U0NjY3OTkzYmYwMGYzNDY0MjgyZjBhNSIsImNsaWVudFR5cGUiOiJXRFA1X0NMT1VEIiwiaWF0IjoxNzc4MTU5NzA3LCJleHAiOjE3NzgyNDYxMDcsImlzcyI6Ind3dy41MWFlcy5jb20iLCJzdWIiOiI1MVdPUkxEIn0.bbpY0cxYwewd6IjbkkJypWESJcS3ZK4jDKXT43DLo-Q'
-  
   const dtpFetch = $fetch.create({
     baseURL: dtpApiBase.toString(),
     onRequest({ request, options }) {
@@ -46,9 +73,9 @@ export default defineNuxtPlugin(() => {
         headers.set('Content-Type', 'application/json')
       }
       
-      // 使用写死的 JWT token（临时方案）
-      if (!headers.has('Authorization')) {
-        headers.set('Authorization', `Bearer ${DTP_JWT_TOKEN}`)
+      // 使用缓存的token
+      if (!headers.has('Authorization') && cachedDtpToken) {
+        headers.set('Authorization', `Bearer ${cachedDtpToken}`)
       }
       
       options.headers = headers
@@ -59,6 +86,12 @@ export default defineNuxtPlugin(() => {
     onResponseError({ response }) {
       // Handle error if needed
       console.error('DTP API Error:', response.status, response.statusText)
+      
+      // 如果是401错误，清除缓存并尝试重新获取token
+      if (response.status === 401) {
+        cachedDtpToken = null
+        getDtpToken().catch(err => console.error('Failed to refresh DTP token:', err))
+      }
     }
   })
 
