@@ -134,18 +134,16 @@ const onSubmit = handleSubmit(async ({ email, password }) => {
     
     // 2. 同时调用第三方登录接口获取DTP token（失败不影响主登录流程）
     try {
-      // 使用写死的mobile和username
-      const mobile = "18170559496"
-      const username = "hjl"
+      // 使用用户输入的手机号
+      const mobile = email
       
       // 动态导入crypto-js进行AES加密
       const CryptoJS = await import('crypto-js')
       const AES_KEY = 'Ze/0w7rnQg7jznntRcuxGQ=='
       
-      // 构建要加密的数据
+      // 构建要加密的数据（只加密mobile）
       const data = JSON.stringify({
-        mobile,
-        username
+        mobile
       })
       
       // 使用AES-ECB-PKCS7加密（按照文档示例代码）

@@ -144,41 +144,33 @@ const runTokenLogin = async () => {
 
   state.value = LoginState.TokenChecking
   
-  // 新的第三方登录接口
-  const loginUrl = 'http://10.66.8.188:30080/service/v1/login/third-party'
   const requestHeaders = new Headers()
   requestHeaders.append('Content-Type', 'application/json')
 
   const requestBody = JSON.stringify({
-    token  // 这里传入的是 bimp-token
+    token
   })
+  const loginUrl = new URL('/auth/sso/token-login', apiOrigin).toString()
 
   try {
-    const response = await fetch(loginUrl, {
+    const ssoResponse = await fetch(loginUrl, {
       method: 'POST',
       headers: requestHeaders,
       body: requestBody,
       redirect: 'follow'
-    })
+    }).then((response) => response.json())
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const responseData = await response.json()
-    const wdpToken = responseData.token as string | undefined
-    
-    if (!wdpToken) {
+    const spToken = ssoResponse.token as string | undefined
+    if (!spToken) {
       state.value = LoginState.Invalid
-      errorDetails.value = responseData.message || '第三方登录失败，未返回有效token'
+      errorDetails.value = ssoResponse.err || ssoResponse.message || 'token 登录失败'
       return
     }
 
     state.value = LoginState.SigningIn
 
-    // 使用返回的 wdp-token 进行登录
     await loginWithToken({
-      token: wdpToken,
+      token: spToken,
       skipRedirect: false
     })
     state.value = LoginState.Success

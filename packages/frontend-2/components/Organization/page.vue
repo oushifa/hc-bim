@@ -964,7 +964,26 @@ const submitCreateMember = async () => {
       }
     })
 
-    // Step 2: 通过手机号搜索用户得到 userId
+    // Step 2: 同时调用第三方注册接口
+    try {
+      const thirdPartyRegisterUrl = '/api/proxy/dtp-register'
+      await fetch(thirdPartyRegisterUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username: name,
+          mobile: phone
+        })
+      })
+      console.log('第三方注册成功')
+    } catch (thirdPartyError) {
+      // 第三方注册失败不影响主流程
+      console.warn('第三方注册失败，但主注册成功:', thirdPartyError)
+    }
+
+    // Step 3: 通过手机号搜索用户得到 userId
     const searchResp = await apolloClient.query({
       query: memberSearchUsersQuery,
       variables: { query: phone, limit: 5, cursor: null },
@@ -982,7 +1001,7 @@ const submitCreateMember = async () => {
       return
     }
 
-    // Step 3: 将用户加入当前部门
+    // Step 4: 将用户加入当前部门
     await addDepartmentMemberMutate({
       departmentId,
       userIds: [matched.id],
