@@ -726,7 +726,7 @@
                 缩略图
               </label>
               <div
-                class="relative w-full h-36 border-2 border-dashed border-gray-200 rounded-[10px] overflow-hidden cursor-pointer hover:border-[#00b4b6] transition-colors group"
+                class="relative w-36 h-36 border-2 border-dashed border-gray-200 rounded-[10px] overflow-hidden cursor-pointer hover:border-[#00b4b6] transition-colors group"
                 @click="officialThumbnailInput?.click()"
               >
                 <img
@@ -788,14 +788,23 @@
             <button
               class="px-5 py-2 text-sm border border-gray-200 rounded-[8px] text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
               @click="closeOfficialEditModal"
+              :disabled="officialEditLoading"
             >
               取消
             </button>
             <button
-              class="px-5 py-2 text-sm bg-[#00b4b6] text-white rounded-[8px] hover:bg-[#009a9c] transition-colors cursor-pointer"
+              class="px-5 py-2 text-sm bg-[#00b4b6] text-white rounded-[8px] hover:bg-[#009a9c] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               @click="handleOfficialEditConfirm"
+              :disabled="officialEditLoading"
             >
-              确定
+              <span v-if="officialEditLoading" class="flex items-center">
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                提交中...
+              </span>
+              <span v-else>确定</span>
             </button>
           </div>
         </div>
@@ -962,14 +971,14 @@
           </div>
 
           <!-- Footer -->
-          <div class="flex justify-end px-6 py-4 border-t border-gray-100">
+          <!-- <div class="flex justify-end px-6 py-4 border-t border-gray-100">
             <button
               class="px-5 py-2 text-sm bg-[#00b4b6] text-white rounded-[8px] hover:bg-[#009a9c] transition-colors cursor-pointer"
               @click="closeVersionModal"
             >
               关闭
             </button>
-          </div>
+          </div> -->
         </div>
       </Transition>
     </div>
@@ -1169,11 +1178,13 @@ const fetchOfficialModels = async () => {
       if (responseData.result.data && Array.isArray(responseData.result.data)) {
         officialModelsData.value = responseData.result.data.map((item: any) => ({
           id: String(item.id),
+          assetId: item.assetId || '', // 保存原始assetId（字符串类型）
           name: item.assetName || '',
           nameEn: item.assetNameEn || '',
           seedId: item.seedId || '',
           stageProduct: item.stageProduct || '',
           category: item.category ? JSON.stringify(item.category) : '[]',
+          categoryIdSet: item.categoryIdSet && Array.isArray(item.categoryIdSet) ? item.categoryIdSet : [], // 保存原始categoryIdSet
           system: item.platform || '',
           dataVersion: item.assetVersion || '',
           assetSize: formatFileSize(item.size),
@@ -1211,11 +1222,13 @@ interface UserModel {
 
 interface OfficialModel {
   id: string
+  assetId: string // 原始assetId，用于编辑接口
   name: string
   nameEn: string
   seedId: string
   stageProduct: string
-  category: string
+  category: string // JSON字符串
+  categoryIdSet: number[] // 原始分类ID数组
   system: string
   dataVersion: string
   assetSize: string
@@ -1315,10 +1328,14 @@ const onThumbnailChange = (e: Event) => {
 
 const officialEditModalVisible = ref(false)
 const officialEditForm = reactive({
+  assetId: '', // 保存assetId（字符串类型）
   name: '',
   nameEn: '',
-  category: ''
+  category: '',
+  categoryIdSet: [] as number[], // 保存categoryIdSet
+  thumbnailUrl: '' // 保存上传后的缩略图URL
 })
+const officialEditLoading = ref(false) // 编辑提交loading状态
 const officialEditErrors = reactive({ name: '', nameEn: '' })
 const officialThumbnailInput = ref<HTMLInputElement | null>(null)
 const officialThumbnailPreview = ref<string>('')
@@ -1326,8 +1343,10 @@ const officialLightboxVisible = ref(false)
 const officialCategoryDropdownOpen = ref(false)
 
 const openOfficialEditModal = (model: OfficialModel) => {
+  officialEditForm.assetId = model.assetId
   officialEditForm.name = model.name
   officialEditForm.nameEn = model.nameEn || ''
+  officialEditForm.categoryIdSet = model.categoryIdSet || []
   // 解析 category 字符串，如 '植物/乔木'，取第一个作为单选值
   try {
     const parsed = JSON.parse(model.category)
@@ -1335,6 +1354,7 @@ const openOfficialEditModal = (model: OfficialModel) => {
   } catch {
     officialEditForm.category = flatCategoryList.value[0]?.name || ''
   }
+  officialEditForm.thumbnailUrl = '' // 清空缩略图URL
   officialEditErrors.name = ''
   officialEditErrors.nameEn = ''
   officialThumbnailPreview.value = ''
@@ -1345,7 +1365,7 @@ const closeOfficialEditModal = () => {
   officialEditModalVisible.value = false
   officialCategoryDropdownOpen.value = false
 }
-const handleOfficialEditConfirm = () => {
+const handleOfficialEditConfirm = async () => {
   let valid = true
   if (!officialEditForm.name.trim()) {
     officialEditErrors.name = '请输入名称'
@@ -1356,18 +1376,74 @@ const handleOfficialEditConfirm = () => {
     valid = false
   }
   if (!valid) return
-  // TODO: 调用编辑接口
-  closeOfficialEditModal()
+  
+  // 调用编辑接口
+  officialEditLoading.value = true
+  try {
+    // 从分类名称查找对应的ID
+    let categoryIdSet = officialEditForm.categoryIdSet
+    if (officialEditForm.category) {
+      const matchedCategory = flatCategoryList.value.find(cat => cat.name === officialEditForm.category)
+      if (matchedCategory) {
+        categoryIdSet = [matchedCategory.id]
+      }
+    }
+    
+    await $dtpFetch('/v1/daas/asset/model/update', {
+      method: 'POST',
+      body: {
+        assetId: officialEditForm.assetId,
+        assetName: officialEditForm.name,
+        assetNameEn: officialEditForm.nameEn,
+        categoryIdSet: categoryIdSet,
+        thumbnails: officialEditForm.thumbnailUrl ? [{ uri: officialEditForm.thumbnailUrl }] : []
+      }
+    })
+    
+    // 关闭弹窗
+    closeOfficialEditModal()
+    
+    // 刷新列表
+    await fetchOfficialModels()
+  } catch (error) {
+    console.error('编辑官方模型失败:', error)
+  } finally {
+    officialEditLoading.value = false
+  }
 }
 
-const onOfficialThumbnailChange = (e: Event) => {
+const onOfficialThumbnailChange = async (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
+  
+  // 先显示预览
   const reader = new FileReader()
   reader.onload = (ev) => {
     officialThumbnailPreview.value = ev.target?.result as string
   }
   reader.readAsDataURL(file)
+  
+  // 调用上传接口
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const result = await $dtpFetch('/v1/daas/thumbnail/upload', {
+      method: 'POST',
+      body: formData
+    })
+    
+    console.log('缩略图上传结果:', result)
+    
+    // 保存上传后的URL
+    const responseData = result as any
+    if (responseData && responseData.result && responseData.result.url) {
+      officialEditForm.thumbnailUrl = responseData.result.url
+      console.log('缩略图URL已保存:', officialEditForm.thumbnailUrl)
+    }
+  } catch (error) {
+    console.error('缩略图上传失败:', error)
+  }
 }
 
 // ---------- 版本管理 Modal ----------

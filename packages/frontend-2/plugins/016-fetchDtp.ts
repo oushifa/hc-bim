@@ -69,7 +69,8 @@ export default defineNuxtPlugin(() => {
       const headers = new Headers(options.headers as HeadersInit | undefined)
       
       // Set Content-Type if not already set
-      if (!headers.has('Content-Type')) {
+      // 但如果 body 是 FormData，不要设置 Content-Type，让浏览器自动设置 multipart/form-data 边界
+      if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
         headers.set('Content-Type', 'application/json')
       }
       
