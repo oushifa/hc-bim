@@ -165,7 +165,7 @@ services:
       NUXT_PUBLIC_API_ORIGIN: 'http://47.100.77.97:64482'
       NUXT_PUBLIC_BASE_URL: 'http://47.100.77.97:64482'
       NUXT_PUBLIC_BACKEND_API_ORIGIN: 'http://speckle-server:3000'
-      NUXT_PUBLIC_DTP_API_ORIGIN: 'http://10.66.8.185:30080/ui'
+      NUXT_PUBLIC_DTP_API_ORIGIN: 'http://10.66.8.185:30080/service'
       NUXT_PUBLIC_LOG_LEVEL: 'warn'
       NUXT_REDIS_URL: 'redis://redis'
       LOG_LEVEL: 'info'

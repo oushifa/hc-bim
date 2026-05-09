@@ -205,6 +205,21 @@
             </tr>
           </thead>
           <tbody>
+            <!-- Loading 状态 -->
+            <tr v-if="(activeTab === 'user' && userLoading) || (activeTab === 'official' && officialLoading)">
+              <td
+                :colspan="activeTab === 'user' ? 9 : 9"
+                class="py-16 text-center"
+              >
+                <svg class="animate-spin h-8 w-8 text-[#00b4b6] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </td>
+            </tr>
+            
+            <!-- 数据行 -->
+            <template v-else>
             <tr
               v-for="model in filteredModels"
               :key="model.id"
@@ -300,7 +315,7 @@
                   </button>
                 </template>
                 <template v-else>
-                  <button class="text-[#00b4b6] hover:underline cursor-pointer">
+                  <button class="text-[#00b4b6] hover:underline cursor-pointer" @click="openVersionModal(model as OfficialModel)">
                     版本管理
                   </button>
                   <button
@@ -313,7 +328,7 @@
                 </template>
               </td>
             </tr>
-            <tr v-if="filteredModels.length === 0">
+            <tr v-if="filteredModels.length === 0 && !((activeTab === 'user' && userLoading) || (activeTab === 'official' && officialLoading))">
               <td
                 :colspan="activeTab === 'user' ? 9 : 9"
                 class="py-16 text-center text-gray-400 text-sm"
@@ -321,6 +336,7 @@
                 暂无孪生模型数据
               </td>
             </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -844,6 +860,120 @@
       />
     </div>
   </Transition>
+
+  <!-- 版本管理 Modal -->
+  <Transition
+    enter-active-class="transition-all duration-200"
+    enter-from-class="opacity-0"
+    enter-to-class="opacity-100"
+    leave-active-class="transition-all duration-150"
+    leave-from-class="opacity-100"
+    leave-to-class="opacity-0"
+  >
+    <div
+      v-if="versionModalVisible"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
+      @click.self="closeVersionModal"
+    >
+      <Transition
+        enter-active-class="transition-all duration-200"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition-all duration-150"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+      >
+        <div
+          v-if="versionModalVisible"
+          class="bg-white rounded-[16px] shadow-2xl w-[900px] max-w-[90vw] max-h-[90vh] overflow-hidden flex flex-col"
+        >
+          <!-- Header -->
+          <div
+            class="flex items-center justify-between px-6 py-4 border-b border-gray-100"
+          >
+            <h3 class="text-base font-semibold text-gray-800">版本管理</h3>
+            <button
+              class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              @click="closeVersionModal"
+            >
+              <XMarkIcon class="w-5 h-5" />
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="flex-1 overflow-auto px-6 py-4">
+            <!-- Loading 状态 -->
+            <div v-if="versionLoading" class="flex items-center justify-center py-16">
+              <svg class="animate-spin h-8 w-8 text-[#00b4b6]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+            
+            <!-- 表格内容 -->
+            <table v-else class="w-full text-left border-collapse">
+              <thead class="bg-[#f8f9fa] sticky top-0 z-10">
+                <tr class="border-b border-gray-100 text-sm text-gray-600 font-medium">
+                  <th class="py-3 px-4">模型名称</th>
+                  <th class="py-3 px-4">数据版本</th>
+                  <th class="py-3 px-4">分类</th>
+                  <th class="py-3 px-4">上架时间</th>
+                  <th class="py-3 px-4">文件大小</th>
+                  <th class="py-3 px-4">上架状态</th>
+                  <th class="py-3 px-4">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="version in versionData"
+                  :key="version.id"
+                  class="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                >
+                  <td class="py-3 px-4 text-sm text-gray-800">{{ version.name }}</td>
+                  <td class="py-3 px-4 text-sm text-gray-600">{{ version.version }}</td>
+                  <td class="py-3 px-4 text-sm text-gray-600">{{ version.category }}</td>
+                  <td class="py-3 px-4 text-sm text-gray-600">{{ version.publishTime }}</td>
+                  <td class="py-3 px-4 text-sm text-gray-600">{{ version.fileSize }}</td>
+                  <td class="py-3 px-4 text-sm text-gray-600">{{ version.status }}</td>
+                  <td class="py-3 px-4 text-sm space-x-2">
+                    <button 
+                      v-if="version.status === '已上架'"
+                      class="text-[#00b4b6] hover:underline cursor-pointer"
+                      @click="handleVersionToggle(version)"
+                    >
+                      下架
+                    </button>
+                    <button 
+                      v-else
+                      class="text-[#00b4b6] hover:underline cursor-pointer"
+                      @click="handleVersionToggle(version)"
+                    >
+                      上架
+                    </button>
+                  </td>
+                </tr>
+                <tr v-if="versionData.length === 0">
+                  <td colspan="7" class="py-16 text-center text-gray-400 text-sm">
+                    暂无版本数据
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Footer -->
+          <div class="flex justify-end px-6 py-4 border-t border-gray-100">
+            <button
+              class="px-5 py-2 text-sm bg-[#00b4b6] text-white rounded-[8px] hover:bg-[#009a9c] transition-colors cursor-pointer"
+              @click="closeVersionModal"
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      </Transition>
+    </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -902,7 +1032,7 @@ const flatCategoryList = computed(() => {
 // 获取分类树数据
 const fetchCategoryTree = async () => {
   try {
-    const data = await $dtpFetch('/api/v1/daas/category/my/tree', {
+    const data = await $dtpFetch('/v1/daas/category/my/tree', {
       method: 'POST',
       body: {
         categoryType: 'model'
@@ -929,7 +1059,7 @@ const userLoading = ref(false)
 const fetchUserModels = async () => {
   userLoading.value = true
   try {
-    const data = await $dtpFetch('/api/v1/daas/asset/model/personal/list', {
+    const data = await $dtpFetch('/v1/daas/asset/model/personal/list', {
       method: 'POST',
       body: {
         keyword: searchQuery.value || '',
@@ -996,7 +1126,7 @@ const fetchOfficialModels = async () => {
       }
     }
     
-    const data = await $dtpFetch('/api/v1/daas/asset/model/official/list', {
+    const data = await $dtpFetch('/v1/daas/asset/model/official/list', {
       method: 'POST',
       body: {
         keyword: searchQuery.value || '',
@@ -1019,6 +1149,7 @@ const fetchOfficialModels = async () => {
           name: item.assetName || '',
           nameEn: item.assetNameEn || '',
           seedId: item.seedId || '',
+          stageProduct: item.stageProduct || '',
           category: item.category ? JSON.stringify(item.category) : '[]',
           system: item.platform || '',
           dataVersion: item.assetVersion || '',
@@ -1060,6 +1191,7 @@ interface OfficialModel {
   name: string
   nameEn: string
   seedId: string
+  stageProduct: string
   category: string
   system: string
   dataVersion: string
@@ -1213,6 +1345,98 @@ const onOfficialThumbnailChange = (e: Event) => {
     officialThumbnailPreview.value = ev.target?.result as string
   }
   reader.readAsDataURL(file)
+}
+
+// ---------- 版本管理 Modal ----------
+const versionModalVisible = ref(false)
+const versionLoading = ref(false)
+const versionData = ref<any[]>([])
+const currentVersionModel = ref<OfficialModel | null>(null)
+
+const openVersionModal = async (model: OfficialModel) => {
+  currentVersionModel.value = model
+  versionModalVisible.value = true
+  versionLoading.value = true
+  
+  // 调用接口获取版本数据
+  try {
+    const data = await $dtpFetch('/v1/daas/asset/model/list', {
+      method: 'POST',
+      body: {
+        seedIdSet: [model.seedId],
+        stageProduct: [model.stageProduct || ''],
+        pageNumber: 1,
+        pageSize: 20
+      }
+    })
+    
+    console.log('版本列表接口返回:', data)
+    
+    // 解析返回数据
+    const responseData = data as any
+    if (responseData && responseData.result) {
+      if (responseData.result.data && Array.isArray(responseData.result.data)) {
+        versionData.value = responseData.result.data.map((item: any) => ({
+          id: item.id || '',
+          assetId: item.assetId || item.id || '',
+          name: item.assetName || item.name || '',
+          version: item.assetVersion || item.version || '',
+          category: item.category ? JSON.stringify(item.category) : '',
+          publishTime: item.publishedAt || item.publishTime || '',
+          fileSize: formatFileSize(item.size || 0),
+          status: item.published ? '已上架' : '已下架'
+        }))
+      } else {
+        versionData.value = []
+      }
+    }
+  } catch (error) {
+    console.error('获取版本列表失败:', error)
+    versionData.value = []
+  } finally {
+    versionLoading.value = false
+  }
+}
+
+const closeVersionModal = () => {
+  versionModalVisible.value = false
+  versionLoading.value = false
+  versionData.value = []
+  currentVersionModel.value = null
+}
+
+const handleVersionToggle = async (version: any) => {
+  const isPublishing = version.status === '已下架'
+  const action = isPublishing ? '上架' : '下架'
+  
+  try {
+    // 调用上架/下架接口
+    await $dtpFetch('/v1/daas/asset/publish', {
+      method: 'PUT',
+      body: {
+        assetId: version.assetId,
+        published: isPublishing
+      }
+    })
+    
+    console.log(`${action}成功:`, version)
+    
+    // 更新本地状态
+    version.status = isPublishing ? '已上架' : '已下架'
+    
+    // 重新加载版本列表数据
+    if (currentVersionModel.value) {
+      await openVersionModal(currentVersionModel.value)
+    }
+    
+    // 更新官方模型列表中的状态
+    const modelInList = officialModelsData.value.find(m => m.id === currentVersionModel.value?.id)
+    if (modelInList) {
+      modelInList.status = version.status
+    }
+  } catch (error) {
+    console.error(`${action}失败:`, error)
+  }
 }
 
 // 点击外部关闭分类下拉
