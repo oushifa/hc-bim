@@ -166,7 +166,6 @@ const onSubmit = handleSubmit(async ({ email, password }) => {
         },
         body: JSON.stringify({ 
           token: bimpToken,
-          grant_type: 'bimp-token'
         })
       })
 

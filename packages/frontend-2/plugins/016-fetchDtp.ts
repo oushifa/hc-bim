@@ -65,7 +65,7 @@ export default defineNuxtPlugin(() => {
   // Create a dedicated fetch instance for DTP API
   const dtpFetch = $fetch.create({
     baseURL: dtpApiBase.toString(),
-    onRequest({ request, options }) {
+    async onRequest({ request, options }) {
       const headers = new Headers(options.headers as HeadersInit | undefined)
       
       // Set Content-Type if not already set
@@ -73,9 +73,12 @@ export default defineNuxtPlugin(() => {
         headers.set('Content-Type', 'application/json')
       }
       
-      // 使用缓存的token
-      if (!headers.has('Authorization') && cachedDtpToken) {
-        headers.set('Authorization', `Bearer ${cachedDtpToken}`)
+      // 每次请求时都尝试获取最新的token
+      if (!headers.has('Authorization')) {
+        const token = await getDtpToken()
+        if (token) {
+          headers.set('Authorization', `Bearer ${token}`)
+        }
       }
       
       options.headers = headers
