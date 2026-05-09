@@ -480,7 +480,8 @@ const ALL_MENU_PERMS = [
   { id: '/organization', name: '组织管理' },
   { id: '/permissions', name: '权限管理' },
   { id: '/logs', name: '日志管理' },
-  { id: '/models', name: '模型库' }
+  { id: '/models', name: '模型库' },
+  { id: '/twin-scene', name: '3D孪生场景编辑' }
 ]
 
 const ALL_MODEL_PERMS = [

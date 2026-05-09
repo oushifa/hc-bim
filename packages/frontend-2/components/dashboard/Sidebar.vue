@@ -105,30 +105,21 @@
                   </LayoutSidebarMenuGroupItem>
                 </NuxtLink>
 
-                <!-- 3D孪生场景编辑（带子菜单）- 暂时隐藏 -->
-                <div v-if="false && showWorkspaceLinks" class="relative">
+                <!-- 3D孪生场景编辑（工作组切换 + 子菜单，内容区后续 iframe） -->
+                <div v-if="showWorkspaceLinks && hasMenu('/twin-scene')" class="relative">
                   <button
-                    class="w-full text-left px-2.5 py-3.5 mb-2 rounded-[8px] flex items-center transition-colors"
+                    type="button"
+                    class="w-full text-left px-2.5 py-4 mb-2 rounded-[8px] flex items-center transition-colors"
                     :class="[
-                      isActive(twinSceneRoute) ||
-                      isActive(twinSceneCasesRoute()) ||
-                      isActive(twinSceneMembersRoute()) ||
-                      isActive(twinSceneSettingsRoute())
+                      isTwinSceneSectionActive
                         ? 'bg-[#e6f7f8] text-[#00b4b6]'
                         : 'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                     ]"
                     @click="toggleTwinSceneMenu"
                   >
                     <Squares2X2Icon
-                      class="size-4 flex-shrink-0 mr-2.5"
-                      :class="
-                        isActive(twinSceneRoute) ||
-                        isActive(twinSceneCasesRoute()) ||
-                        isActive(twinSceneMembersRoute()) ||
-                        isActive(twinSceneSettingsRoute())
-                          ? 'text-[#00b4b6]'
-                          : 'text-gray-400'
-                      "
+                      class="size-6 flex-shrink-0 mr-2.5 pl-2"
+                      :class="isTwinSceneSectionActive ? 'text-[#00b4b6]' : 'text-gray-400'"
                     />
                     <span class="flex-1 text-sm font-medium">3D孪生场景编辑</span>
                     <ChevronRightIcon
@@ -139,26 +130,78 @@
                     />
                   </button>
 
-                  <!-- 子菜单 -->
                   <div
                     v-show="showTwinSceneMenu"
-                    class="ml-6 mt-1 mb-1 space-y-1 border-l-2 border-gray-200 overflow-hidden transition-all duration-300 ease-in-out"
+                    class="ml-6 mt-1.5 mb-1.5 space-y-1.5 border-l-2 border-gray-200 overflow-hidden transition-all duration-300 ease-in-out"
                   >
+                    <!-- 当前工作组 + 切换 / 添加 -->
+                    <div
+                      class="flex items-center justify-between gap-2 pl-3.5 pr-2 py-2.5 rounded-[6px] text-sm text-gray-600"
+                    >
+                      <span class="truncate flex-1 min-w-0 font-medium">{{
+                        activeTwinWorkgroupLabel
+                      }}</span>
+                      <div ref="twinWorkgroupDropdownRef" class="relative shrink-0">
+                        <button
+                          type="button"
+                          title="切换工作组"
+                          class="p-1 bg-white border border-gray-200 rounded-[6px] text-gray-500 hover:text-[#00b4b6] hover:border-[#00b4b6] transition-colors flex items-center justify-center"
+                          @click.stop="toggleTwinWorkgroupDropdown"
+                        >
+                          <ArrowsRightLeftIcon class="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <Teleport to="body">
+                      <div
+                        v-show="twinWorkgroupDropdownOpen"
+                        ref="twinWorkgroupDropdownPanelRef"
+                        class="fixed w-44 bg-white border border-gray-100 rounded-[8px] shadow-xl overflow-hidden py-1 z-[600]"
+                        :style="twinWorkgroupDropdownStyle"
+                      >
+                        <button
+                          v-for="wg in twinWorkgroups"
+                          :key="wg.id"
+                          type="button"
+                          class="w-full text-left px-3 py-2 text-sm transition-colors"
+                          :class="
+                            activeTwinWorkgroupId === wg.id
+                              ? 'bg-[#e6f7f8] text-[#00b4b6]'
+                              : 'text-gray-600 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                          "
+                          @click="selectTwinWorkgroup(wg.id)"
+                        >
+                          {{ wg.name }}
+                        </button>
+                        <div class="h-px bg-gray-100 my-1" />
+                        <button
+                          v-if="canAddTwinWorkgroup"
+                          type="button"
+                          class="w-full text-left px-3 py-2 text-sm text-[#00b4b6] hover:bg-[#f5f7fa] transition-colors flex items-center gap-1"
+                          @click="openAddTwinWorkgroupModal"
+                        >
+                          <PlusIcon class="w-3.5 h-3.5" />
+                          <span>添加工作组</span>
+                        </button>
+                      </div>
+                    </Teleport>
+
                     <NuxtLink
-                      :to="twinSceneCasesRoute()"
-                      class="block py-2 pr-2 rounded-[6px] transition-colors"
+                      :to="twinSceneCasesRoute(activeTwinWorkgroupId)"
+                      class="block py-2.5 pr-2 rounded-[6px] transition-colors"
                       :class="
-                        isActive(twinSceneCasesRoute())
+                        isTwinSceneLinkActive(twinSceneCasesRoute(activeTwinWorkgroupId))
                           ? 'bg-[#e6f7f8]'
                           : 'hover:bg-[#f5f7fa]'
                       "
                       @click="isOpenMobile = false"
                     >
-                      <div class="flex items-center pl-3.5">
+                      <div class="flex items-center pl-6">
                         <div
                           class="w-3 h-0.5 rounded-r flex-shrink-0 mr-2"
                           :class="
-                            isActive(twinSceneCasesRoute())
+                            isTwinSceneLinkActive(twinSceneCasesRoute(activeTwinWorkgroupId))
                               ? 'bg-[#00b4b6]'
                               : 'bg-gray-300'
                           "
@@ -166,7 +209,7 @@
                         <span
                           class="text-sm transition-colors"
                           :class="
-                            isActive(twinSceneCasesRoute())
+                            isTwinSceneLinkActive(twinSceneCasesRoute(activeTwinWorkgroupId))
                               ? 'text-[#00b4b6] font-medium'
                               : 'text-gray-500 hover:text-[#00b4b6]'
                           "
@@ -176,20 +219,22 @@
                       </div>
                     </NuxtLink>
                     <NuxtLink
-                      :to="twinSceneMembersRoute()"
-                      class="block py-2 pr-2 rounded-[6px] transition-colors"
+                      :to="twinSceneMembersRoute(activeTwinWorkgroupId)"
+                      class="block py-2.5 pr-2 rounded-[6px] transition-colors"
                       :class="
-                        isActive(twinSceneMembersRoute())
+                        isTwinSceneLinkActive(twinSceneMembersRoute(activeTwinWorkgroupId))
                           ? 'bg-[#e6f7f8]'
                           : 'hover:bg-[#f5f7fa]'
                       "
                       @click="isOpenMobile = false"
                     >
-                      <div class="flex items-center pl-3.5">
+                      <div class="flex items-center pl-6">
                         <div
                           class="w-3 h-0.5 rounded-r flex-shrink-0 mr-2"
                           :class="
-                            isActive(twinSceneMembersRoute())
+                            isTwinSceneLinkActive(
+                              twinSceneMembersRoute(activeTwinWorkgroupId)
+                            )
                               ? 'bg-[#00b4b6]'
                               : 'bg-gray-300'
                           "
@@ -197,7 +242,9 @@
                         <span
                           class="text-sm transition-colors"
                           :class="
-                            isActive(twinSceneMembersRoute())
+                            isTwinSceneLinkActive(
+                              twinSceneMembersRoute(activeTwinWorkgroupId)
+                            )
                               ? 'text-[#00b4b6] font-medium'
                               : 'text-gray-500 hover:text-[#00b4b6]'
                           "
@@ -207,20 +254,22 @@
                       </div>
                     </NuxtLink>
                     <NuxtLink
-                      :to="twinSceneSettingsRoute()"
-                      class="block py-2 pr-2 rounded-[6px] transition-colors"
+                      :to="twinSceneSettingsRoute(activeTwinWorkgroupId)"
+                      class="block py-2.5 pr-2 rounded-[6px] transition-colors"
                       :class="
-                        isActive(twinSceneSettingsRoute())
+                        isTwinSceneLinkActive(twinSceneSettingsRoute(activeTwinWorkgroupId))
                           ? 'bg-[#e6f7f8]'
                           : 'hover:bg-[#f5f7fa]'
                       "
                       @click="isOpenMobile = false"
                     >
-                      <div class="flex items-center pl-3.5">
+                      <div class="flex items-center pl-6">
                         <div
                           class="w-3 h-0.5 rounded-r flex-shrink-0 mr-2"
                           :class="
-                            isActive(twinSceneSettingsRoute())
+                            isTwinSceneLinkActive(
+                              twinSceneSettingsRoute(activeTwinWorkgroupId)
+                            )
                               ? 'bg-[#00b4b6]'
                               : 'bg-gray-300'
                           "
@@ -228,7 +277,9 @@
                         <span
                           class="text-sm transition-colors"
                           :class="
-                            isActive(twinSceneSettingsRoute())
+                            isTwinSceneLinkActive(
+                              twinSceneSettingsRoute(activeTwinWorkgroupId)
+                            )
                               ? 'text-[#00b4b6] font-medium'
                               : 'text-gray-500 hover:text-[#00b4b6]'
                           "
@@ -627,6 +678,49 @@
             <DashboardSpeckleConPromo />
           </template>
         </LayoutSidebar>
+
+        <LayoutDialog
+          v-model:open="addTwinWorkgroupOpen"
+          max-width="sm"
+          title="创建组"
+        >
+          <div class="space-y-6 pt-2">
+            <div class="flex items-center gap-4">
+              <label class="w-16 shrink-0 text-sm text-gray-500">组名称</label>
+              <div class="flex-1 relative">
+                <input
+                  v-model="newTwinWorkgroupName"
+                  type="text"
+                  maxlength="10"
+                  placeholder="请输入组名称"
+                  class="w-full bg-gray-50 border border-transparent rounded-[8px] p-2.5 pr-14 text-sm text-[#333] focus:outline-none focus:ring-0 focus:border-[#00b4b6] focus:bg-white"
+                  @keydown.enter.prevent="confirmAddTwinWorkgroup"
+                />
+                <span
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none"
+                >
+                  {{ newTwinWorkgroupName.length }} / 10
+                </span>
+              </div>
+            </div>
+            <div class="mt-8 flex justify-end gap-3">
+              <button
+                type="button"
+                class="px-6 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-200 rounded-[8px] hover:bg-gray-50 transition-colors"
+                @click="addTwinWorkgroupOpen = false"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                class="px-8 py-2 bg-[#00b4b6] text-white rounded-[8px] text-sm font-medium hover:bg-[#009fa1] transition-colors"
+                @click="confirmAddTwinWorkgroup"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </LayoutDialog>
       </div>
     </template>
   </div>
@@ -634,6 +728,7 @@
 <script setup lang="ts">
 import {
   FormButton,
+  LayoutDialog,
   LayoutSidebar,
   LayoutSidebarMenu,
   LayoutSidebarMenuGroup,
@@ -644,7 +739,6 @@ import {
   modelsRoute,
   lightModelsRoute,
   twinModelsRoute,
-  twinSceneRoute,
   twinSceneCasesRoute,
   twinSceneMembersRoute,
   twinSceneSettingsRoute,
@@ -658,7 +752,13 @@ import {
   permissionsRoute,
   logsRoute
 } from '~/lib/common/helpers/route'
-import { ChevronRightIcon, Squares2X2Icon } from '@heroicons/vue/24/outline'
+import {
+  ArrowsRightLeftIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  Squares2X2Icon
+} from '@heroicons/vue/24/outline'
+import { onClickOutside, useEventListener } from '@vueuse/core'
 import { useRoute } from 'vue-router'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
@@ -694,7 +794,13 @@ const sidebarPermissionsQuery = graphql(`
 `)
 
 const { isLoggedIn } = useActiveUser()
+const { activeUser } = useActiveUser()
 const { ensureLoaded: ensureUserPermsLoaded, hasMenu } = useUserPermissions()
+
+// 判断当前用户是否有权限添加工作组（只有手机号为17338404660的用户可以看到）
+const canAddTwinWorkgroup = computed(() => {
+  return activeUser.value?.email === '17338404660'
+})
 // First-load user perms when sidebar renders (SSR + CSR), so menus are gated
 // from the first paint. A no-op if already cached in the shared useState.
 if (import.meta.server) {
@@ -740,18 +846,227 @@ const showModelMenu = computed(() => {
 })
 
 const showTwinSceneMenu = computed(() => {
-  // 如果用户手动设置了展开状态，使用手动设置的值
   if (isTwinSceneMenuExpanded.value !== null) {
     return isTwinSceneMenuExpanded.value
   }
-  // 否则根据路由自动判断
+  return route.path.startsWith('/twin-scene')
+})
+
+const isTwinSceneSectionActive = computed(() => route.path.startsWith('/twin-scene'))
+
+type TwinWorkgroup = { id: string; name: string }
+
+const twinWorkgroups = useState<TwinWorkgroup[]>('twinSceneWorkgroups', () => [])
+
+const activeTwinWorkgroupId = useState<string>(
+  'twinSceneActiveWorkgroupId',
+  () => ''
+)
+
+// 获取工作组列表
+const fetchWorkgroupList = async () => {
+  try {
+    const { $dtpFetch } = useNuxtApp()
+    const data = await $dtpFetch('/v1/team/unit/list', {
+      method: 'GET'
+    })
+    
+    const responseData = data as any
+    if (responseData && responseData.success && responseData.results && Array.isArray(responseData.results)) {
+      // 将接口返回的数据转换为 TwinWorkgroup 格式
+      const workgroups: TwinWorkgroup[] = []
+      
+      for (const unit of responseData.results) {
+        if (unit.teamList && Array.isArray(unit.teamList)) {
+          for (const team of unit.teamList) {
+            workgroups.push({
+              id: team.teamId,
+              name: team.name
+            })
+          }
+        }
+      }
+      
+      twinWorkgroups.value = workgroups
+    }
+  } catch (error) {
+    console.error('获取工作组列表失败:', error)
+  }
+}
+
+// 获取当前工作组信息
+const fetchCurrentWorkgroupInfo = async () => {
+  try {
+    const { $dtpFetch } = useNuxtApp()
+    const data = await $dtpFetch('/v1/team/workingTeam/info', {
+      method: 'GET'
+    })
+    
+    const responseData = data as any
+    if (responseData && responseData.success && responseData.results) {
+      const { teamId, teamName } = responseData.results
+      
+      // 设置当前工作组
+      if (teamId) {
+        activeTwinWorkgroupId.value = teamId
+      }
+    }
+  } catch (error) {
+    console.error('获取当前工作组信息失败:', error)
+  }
+}
+
+const routeTwinWorkgroupId = computed(() => {
+  const m = route.path.match(/^\/twin-scene\/([^/]+)/)
+  return m?.[1] ?? null
+})
+
+watch(
+  routeTwinWorkgroupId,
+  (id) => {
+    if (id && twinWorkgroups.value.some((w) => w.id === id)) {
+      activeTwinWorkgroupId.value = id
+    }
+  },
+  { immediate: true }
+)
+
+const activeTwinWorkgroupLabel = computed(() => {
   return (
-    isActive(twinSceneRoute) ||
-    isActive(twinSceneCasesRoute()) ||
-    isActive(twinSceneMembersRoute()) ||
-    isActive(twinSceneSettingsRoute())
+    twinWorkgroups.value.find((w) => w.id === activeTwinWorkgroupId.value)?.name ??
+    '孪生工作组'
   )
 })
+
+const twinWorkgroupDropdownRef = ref<HTMLElement | null>(null)
+const twinWorkgroupDropdownPanelRef = ref<HTMLElement | null>(null)
+const twinWorkgroupDropdownOpen = ref(false)
+const twinWorkgroupDropdownStyle = ref<Record<string, string>>({
+  top: '0px',
+  left: '0px'
+})
+const TWIN_WG_DROPDOWN_W_PX = 176
+
+const updateTwinWorkgroupDropdownPosition = () => {
+  const el = twinWorkgroupDropdownRef.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  twinWorkgroupDropdownStyle.value = {
+    top: `${rect.bottom + 4}px`,
+    left: `${rect.right - TWIN_WG_DROPDOWN_W_PX}px`
+  }
+}
+
+onClickOutside(
+  twinWorkgroupDropdownRef,
+  () => {
+    twinWorkgroupDropdownOpen.value = false
+  },
+  { ignore: [twinWorkgroupDropdownPanelRef] }
+)
+
+if (import.meta.client) {
+  useEventListener(
+    document,
+    'scroll',
+    () => {
+      if (twinWorkgroupDropdownOpen.value) updateTwinWorkgroupDropdownPosition()
+    },
+    { capture: true }
+  )
+  useEventListener(window, 'resize', () => {
+    if (twinWorkgroupDropdownOpen.value) updateTwinWorkgroupDropdownPosition()
+  })
+}
+
+const addTwinWorkgroupOpen = ref(false)
+const newTwinWorkgroupName = ref('')
+
+const toggleTwinWorkgroupDropdown = async () => {
+  twinWorkgroupDropdownOpen.value = !twinWorkgroupDropdownOpen.value
+  if (twinWorkgroupDropdownOpen.value) {
+    await nextTick()
+    updateTwinWorkgroupDropdownPosition()
+  }
+}
+
+const selectTwinWorkgroup = async (wgId: string) => {
+  try {
+    const { $dtpFetch } = useNuxtApp()
+    
+    // 调用切换工作组接口
+    await $dtpFetch('/v1/team/switch', {
+      method: 'PUT',
+      body: {
+        teamId: wgId
+      }
+    })
+    
+    // 切换成功后更新本地状态
+    activeTwinWorkgroupId.value = wgId
+    twinWorkgroupDropdownOpen.value = false
+    
+    // 更新路由
+    const sub = route.path.match(/\/twin-scene\/[^/]+\/(cases|members|settings)/)
+    if (sub?.[1]) {
+      void navigateTo(`/twin-scene/${wgId}/${sub[1]}`)
+    } else if (route.path.startsWith('/twin-scene')) {
+      void navigateTo(twinSceneCasesRoute(wgId))
+    }
+  } catch (error) {
+    console.error('切换工作组失败:', error)
+    // 可选：显示错误提示
+  }
+}
+
+const openAddTwinWorkgroupModal = () => {
+  twinWorkgroupDropdownOpen.value = false
+  newTwinWorkgroupName.value = ''
+  addTwinWorkgroupOpen.value = true
+}
+
+const confirmAddTwinWorkgroup = async () => {
+  const name = newTwinWorkgroupName.value.trim().slice(0, 10)
+  if (!name) return
+  
+  try {
+    const { $dtpFetch } = useNuxtApp()
+    
+    // 调用创建组接口
+    const data = await $dtpFetch('/v1/team/create', {
+      method: 'POST',
+      body: {
+        teamName: name
+      }
+    })
+    
+    const responseData = data as any
+    if (responseData && responseData.success && responseData.results) {
+      // 从返回结果中获取 teamId
+      const teamId = responseData.results.teamId
+      
+      // 重新获取工作组列表
+      await fetchWorkgroupList()
+      
+      // 设置新创建的组为当前组
+      if (teamId) {
+        activeTwinWorkgroupId.value = teamId
+      }
+      
+      addTwinWorkgroupOpen.value = false
+      
+      // 跳转到新组的页面
+      if (teamId) {
+        void navigateTo(twinSceneCasesRoute(teamId))
+      }
+    }
+  } catch (error) {
+    console.error('创建工作组失败:', error)
+    // 可选：显示错误提示
+  }
+}
+
+const isTwinSceneLinkActive = (path: string) => route.path === path
 
 // 点击模型管理按钮时切换展开状态
 const toggleModelMenu = () => {
@@ -771,6 +1086,16 @@ watch(
     isTwinSceneMenuExpanded.value = null
   }
 )
+
+// 组件挂载时获取工作组信息
+if (import.meta.client) {
+  onMounted(async () => {
+    // 先获取当前工作组信息
+    await fetchCurrentWorkgroupInfo()
+    // 再获取工作组列表
+    await fetchWorkgroupList()
+  })
+}
 
 const showSpeckleCon25Promo = computed(() => {
   if (hasDismissedSpeckleCon25Banner.value) return false

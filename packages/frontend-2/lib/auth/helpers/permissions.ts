@@ -7,7 +7,8 @@ export const ALL_MENU_PERMS = [
   '/organization',
   '/permissions',
   '/logs',
-  '/models'
+  '/models',
+  '/twin-scene'
 ] as const
 
 export const ALL_MODEL_PERMS = [
@@ -38,7 +39,8 @@ export const PROTECTED_MENU_PREFIXES = [
   '/permissions',
   '/logs',
   '/organization',
-  '/models'
+  '/models',
+  '/twin-scene'
 ] as const
 
 /**
