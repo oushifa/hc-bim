@@ -1039,8 +1039,6 @@ const fetchCategoryTree = async () => {
       }
     })
     
-    console.log('分类树接口返回:', data)
-    
     // 解析分类树数据
     const responseData = data as any
     if (responseData && responseData.result && responseData.result.nodes) {
@@ -1054,6 +1052,34 @@ const fetchCategoryTree = async () => {
 // 用户模型列表数据
 const userModelsData = ref<any[]>([])
 const userLoading = ref(false)
+const teamIds = ref<string[]>([])
+
+// 获取团队列表
+const fetchTeamList = async () => {
+  try {
+    const data = await $dtpFetch('/v1/team/unit/list', {
+      method: 'GET'
+    })
+    
+    const responseData = data as any
+    if (responseData && responseData.success && responseData.results) {
+      // 收集所有的 teamId
+      const allTeamIds: string[] = []
+      responseData.results.forEach((unit: any) => {
+        if (unit.teamList && Array.isArray(unit.teamList)) {
+          unit.teamList.forEach((team: any) => {
+            if (team.teamId) {
+              allTeamIds.push(team.teamId)
+            }
+          })
+        }
+      })
+      teamIds.value = allTeamIds
+    }
+  } catch (error) {
+    console.error('获取团队列表失败:', error)
+  }
+}
 
 // 获取用户模型列表
 const fetchUserModels = async () => {
@@ -1065,12 +1091,11 @@ const fetchUserModels = async () => {
         keyword: searchQuery.value || '',
         publishedSet: [true, false],
         hierarchySet: [true, false],
+        teamId: teamIds.value,
         pageNumber: currentPage.value,
         pageSize: currentPageSize.value
       }
     })
-    
-    console.log('用户模型列表接口返回:', data)
     
     // 解析用户模型数据
     const responseData = data as any
@@ -1136,8 +1161,6 @@ const fetchOfficialModels = async () => {
         pageSize: currentPageSize.value
       }
     })
-    
-    console.log('官方模型列表接口返回:', data)
     
     // 解析官方模型数据
     const responseData = data as any
@@ -1370,8 +1393,6 @@ const openVersionModal = async (model: OfficialModel) => {
       }
     })
     
-    console.log('版本列表接口返回:', data)
-    
     // 解析返回数据
     const responseData = data as any
     if (responseData && responseData.result) {
@@ -1419,8 +1440,6 @@ const handleVersionToggle = async (version: any) => {
       }
     })
     
-    console.log(`${action}成功:`, version)
-    
     // 更新本地状态
     version.status = isPublishing ? '已上架' : '已下架'
     
@@ -1445,11 +1464,11 @@ onMounted(async () => {
     officialCategoryDropdownOpen.value = false
   })
   
+  // 先获取团队列表
+  await fetchTeamList()
+  
   // 组件挂载时自动加载用户模型数据
   await fetchUserModels()
-  
-  // 获取分类树数据
-  await fetchCategoryTree()
 })
 
 const activeTab = ref<'user' | 'official'>('user')
@@ -1618,6 +1637,10 @@ const switchTab = async (tab: 'user' | 'official') => {
   }
   // 切换到官方模型时调用API
   else if (tab === 'official') {
+    // 获取分类树数据
+    if (categoryTreeData.value.length === 0) {
+      await fetchCategoryTree()
+    }
     await fetchOfficialModels()
   }
   
