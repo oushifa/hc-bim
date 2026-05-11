@@ -5,7 +5,7 @@
         <span>模型构件树</span>
       </template>
       <template #actions>
-        <FormButton class="bg-primary/10 text-primary" @click="saveTreeToNode">
+        <FormButton class="bg-[#e6f7f8] text-[#00b4b6]" @click="saveTreeToNode">
           保存节点
         </FormButton>
       </template>

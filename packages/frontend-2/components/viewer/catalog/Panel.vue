@@ -101,7 +101,7 @@
                 >
                   <button 
                     type="button"
-                    class="p-1 rounded-sm text-foreground-2 hover:text-primary hover:bg-primary-muted transition-colors"
+                    class="p-1 rounded-sm text-foreground-2 hover:text-[#00b4b6] hover:bg-[#e6f7f8] transition-colors"
                     title="添加子节点"
                     :disabled="isSaving"
                     @click.stop="openCreateChildNodeDialog(node.key)"

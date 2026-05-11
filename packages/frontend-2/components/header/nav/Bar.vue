@@ -12,7 +12,7 @@
       >
         <div class="hidden lg:block lg:w-44 shrink-0" />
         <div class="flex items-center truncate gap-6">
-          <!-- <FormButton color="outline" class="!border-transparent bg-[#f5f7fa] !text-[#666] hover:!text-primary hover:!bg-white">
+          <!-- <FormButton color="outline" class="!border-transparent bg-[#f5f7fa] !text-[#666] hover:!text-[#00b4b6] hover:!bg-white">
             BIM赋能
           </FormButton> -->
           <!-- <ClientOnly>

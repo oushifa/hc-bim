@@ -6,7 +6,7 @@
     >
       <div class="flex items-center space-x-4">
         <button
-          class="flex items-center space-x-1 text-primary bg-primary/10 hover:bg-[#00b4b6] hover:text-white px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors"
+          class="flex items-center space-x-1 text-[#00b4b6] bg-[#e6f7f8] hover:bg-[#00b4b6] hover:text-white px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors"
           @click="goBack"
         >
           <ArrowLeftIcon class="w-4 h-4" />
@@ -29,7 +29,7 @@
           <span>在3D中查看全部</span>
         </button>
         <button
-          class="flex items-center space-x-1 bg-white/80 backdrop-blur-md border border-gray-200 text-gray-600 hover:text-primary hover:border-primary px-3 py-1.5 rounded text-sm font-medium transition-colors"
+          class="flex items-center space-x-1 bg-white/80 backdrop-blur-md border border-gray-200 text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6] px-3 py-1.5 rounded text-sm font-medium transition-colors"
           @click="showImportModal = true"
         >
           <InboxIcon class="w-4 h-4" />
@@ -37,7 +37,7 @@
         </button>
         <button
           v-if="hasModelOp('canUpload')"
-          class="flex items-center space-x-1 bg-primary/10 text-primary hover:bg-[#00b4b6] hover:text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
+          class="flex items-center space-x-1 bg-[#e6f7f8] text-[#00b4b6] hover:bg-[#00b4b6] hover:text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
           :disabled="!uploadProject"
           :class="{ 'opacity-60 cursor-not-allowed': !uploadProject }"
           @click="triggerUploadPicker"
@@ -62,7 +62,7 @@
             :style="{ paddingLeft: `${row.level * 12 + 8}px` }"
             :class="
               isSelected(row.id)
-                ? 'bg-primary/10 text-primary font-medium'
+                ? 'bg-[#e6f7f8] text-[#00b4b6] font-medium'
                 : 'text-gray-600 hover:bg-gray-100'
             "
           >
@@ -82,19 +82,19 @@
               <FolderIcon
                 :class="[
                   'w-4 h-4 shrink-0',
-                  isSelected(row.id) ? 'text-primary' : 'text-gray-400'
+                  isSelected(row.id) ? 'text-[#00b4b6]' : 'text-gray-400'
                 ]"
               />
               <button
                 class="truncate text-left flex-1"
-                :class="isSelected(row.id) ? 'text-primary' : 'text-gray-600'"
+                :class="isSelected(row.id) ? 'text-[#00b4b6]' : 'text-gray-600'"
                 @click="setActiveDir(row.id)"
               >
                 {{ row.name }}
               </button>
             </div>
             <button
-              class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-primary"
+              class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-[#00b4b6]"
               title="添加子目录"
               @click.stop="openAddDirModal(row.id)"
             >
@@ -123,7 +123,7 @@
                 v-model="searchQuery"
                 type="text"
                 placeholder="搜索模型..."
-                class="w-64 bg-[#f5f7fa] border border-transparent rounded-[8px] py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-primary focus:bg-white/80 text-[#333] transition-all"
+                class="w-64 bg-[#f5f7fa] border border-transparent rounded-[8px] py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white/80 text-[#333] transition-all"
               />
             </div>
           </div>
@@ -244,21 +244,21 @@
                     >
                       <button
                         title="查看"
-                        class="p-1.5 text-primary hover:bg-primary/10 rounded"
+                        class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
                         @click.stop="openModel(model)"
                       >
                         <EyeIcon class="h-4 w-4" />
                       </button>
                       <button
                         title="历史版本管理"
-                        class="p-1.5 text-primary hover:bg-primary/10 rounded"
+                        class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
                       >
                         <ClockIcon class="h-4 w-4" />
                       </button>
                       <button
                         v-if="hasModelOp('canDownload')"
                         title="数据下载及导出"
-                        class="p-1.5 text-primary hover:bg-primary/10 rounded"
+                        class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
                       >
                         <ArrowDownTrayIcon class="h-4 w-4" />
                       </button>
@@ -325,7 +325,7 @@
             v-model="newDirName"
             type="text"
             placeholder="请输入目录名称"
-            class="w-full bg-white/80 backdrop-blur-md border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-[#00b4b6] text-[#333]"
+            class="w-full bg-white/80 backdrop-blur-md border border-gray-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:border-[#00b4b6] focus:ring-1 focus:ring-[#00b4b6] text-[#333]"
             @keyup.enter="addDirectory"
           />
         </div>

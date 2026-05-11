@@ -100,7 +100,7 @@
     <div
       v-if="activePanel !== 'none' && !isEmbedEnabled"
       ref="resizeHandle"
-      class="absolute h-full w-4 transition border-l hover:border-l-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30"
+      class="absolute h-full w-4 transition border-l hover:border-l-[2px] border-outline-2 hover:border-[#00b4b6] hidden lg:flex items-center cursor-ew-resize z-30"
       :style="`left:${width + 52}px;`"
       @mousedown="startResizing"
     />
@@ -148,7 +148,7 @@
       <!-- Resize handle for panel extension -->
       <div
         ref="panelExtensionResizeHandle"
-        class="absolute h-full max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] w-4 transition border-r hover:border-r-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30 right-0"
+        class="absolute h-full max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] w-4 transition border-r hover:border-r-[2px] border-outline-2 hover:border-[#00b4b6] hidden lg:flex items-center cursor-ew-resize z-30 right-0"
         @mousedown="startPanelExtensionResizing"
       />
       <PortalTarget name="panel-extension"></PortalTarget>

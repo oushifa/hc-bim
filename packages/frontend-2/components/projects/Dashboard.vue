@@ -18,7 +18,7 @@
         <button 
           v-if="canClickCreate"
           @click="onClickCreate"
-          class="flex items-center space-x-2 bg-primary/10 text-primary hover:bg-[#00b4b6] hover:text-white px-4 py-2 rounded-[8px] text-sm font-medium transition-colors border border-primary/20"
+          class="flex items-center space-x-2 bg-[#e6f7f8] text-[#00b4b6] hover:bg-[#00b4b6] hover:text-white px-4 py-2 rounded-[8px] text-sm font-medium transition-colors border border-[#00b4b6]/20"
         >
           <PlusIcon class="h-4 w-4" />
           <span>新建项目</span>
