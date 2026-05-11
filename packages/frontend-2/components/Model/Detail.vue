@@ -9,8 +9,8 @@
           :class="[
             'w-full flex justify-center items-center h-[54px] rounded-[8px] transition-colors',
             activeTab === 'model'
-              ? 'bg-[#e6f7f8] text-[#00b4b6]'
-              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+              ? 'bg-primary/10 text-primary'
+              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-primary'
           ]"
           @click="activeTab = 'model'"
           title="模型构件属性查看"
@@ -21,8 +21,8 @@
           :class="[
             'w-full flex justify-center items-center h-[54px] rounded-[8px] transition-colors',
             activeTab === 'filter'
-              ? 'bg-[#e6f7f8] text-[#00b4b6]'
-              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+              ? 'bg-primary/10 text-primary'
+              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-primary'
           ]"
           @click="activeTab = 'filter'"
           title="属性筛选"
@@ -33,8 +33,8 @@
           :class="[
             'w-full flex justify-center items-center h-[54px] rounded-[8px] transition-colors',
             activeTab === 'comment'
-              ? 'bg-[#e6f7f8] text-[#00b4b6]'
-              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+              ? 'bg-primary/10 text-primary'
+              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-primary'
           ]"
           @click="activeTab = 'comment'"
           title="评论添加"
@@ -45,8 +45,8 @@
           :class="[
             'w-full flex justify-center items-center h-[54px] rounded-[8px] transition-colors',
             activeTab === 'directory'
-              ? 'bg-[#e6f7f8] text-[#00b4b6]'
-              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+              ? 'bg-primary/10 text-primary'
+              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-primary'
           ]"
           @click="activeTab = 'directory'"
           title="目录组织"
@@ -57,8 +57,8 @@
           :class="[
             'w-full flex justify-center items-center h-[54px] rounded-[8px] transition-colors',
             activeTab === 'perspective'
-              ? 'bg-[#e6f7f8] text-[#00b4b6]'
-              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+              ? 'bg-primary/10 text-primary'
+              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-primary'
           ]"
           @click="activeTab = 'perspective'"
           title="视角管理"
@@ -69,8 +69,8 @@
           :class="[
             'w-full flex justify-center items-center h-[54px] rounded-[8px] transition-colors',
             activeTab === 'compare'
-              ? 'bg-[#e6f7f8] text-[#00b4b6]'
-              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+              ? 'bg-primary/10 text-primary'
+              : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-primary'
           ]"
           @click="activeTab = 'compare'"
           title="二三维对比"
@@ -88,8 +88,8 @@
       <div class="h-12 border-b border-gray-200 flex items-center justify-between px-4">
         <span class="font-medium text-gray-800">模型</span>
         <div class="flex space-x-2 text-gray-500">
-          <button class="hover:text-[#00b4b6]"><ClockIcon class="w-4 h-4" /></button>
-          <button class="hover:text-[#00b4b6]"><PlusIcon class="w-4 h-4" /></button>
+          <button class="hover:text-primary"><ClockIcon class="w-4 h-4" /></button>
+          <button class="hover:text-primary"><PlusIcon class="w-4 h-4" /></button>
         </div>
       </div>
       <div class="flex-1 overflow-y-auto p-2 text-sm">
@@ -172,7 +172,7 @@
             <input
               type="text"
               placeholder="搜索属性..."
-              class="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-[#00b4b6]"
+              class="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-primary"
             />
           </div>
         </div>
@@ -269,7 +269,7 @@
         >
           <div class="flex border-b border-gray-100 bg-gray-50">
             <button
-              class="px-4 py-2 text-sm font-medium text-[#00b4b6] border-b-2 border-[#00b4b6] bg-white/80 backdrop-blur-md"
+              class="px-4 py-2 text-sm font-medium text-primary border-b-2 border-primary bg-white/80 backdrop-blur-md"
             >
               目录1
             </button>
@@ -278,14 +278,14 @@
             >
               目录2
             </button>
-            <button class="px-2 py-2 text-gray-400 hover:text-[#00b4b6]">
+            <button class="px-2 py-2 text-gray-400 hover:text-primary">
               <PlusIcon class="w-4 h-4" />
             </button>
           </div>
           <div class="p-2 flex justify-between items-center border-b border-gray-100">
             <span class="text-xs text-gray-500">自定义层级</span>
             <button
-              class="text-xs text-[#00b4b6] flex items-center hover:bg-[#e6f7f8] px-2 py-1 rounded"
+              class="text-xs text-primary flex items-center hover:bg-primary/10 px-2 py-1 rounded"
             >
               <PlusIcon class="w-3 h-3 mr-1" />
               新建节点
@@ -319,7 +319,7 @@
           >
             <span class="text-xs font-medium text-gray-600">模型构件结构树</span>
             <button
-              class="text-xs text-[#00b4b6] flex items-center hover:bg-[#e6f7f8] px-2 py-1 rounded"
+              class="text-xs text-primary flex items-center hover:bg-primary/10 px-2 py-1 rounded"
             >
               <DocumentIcon class="w-3 h-3 mr-1" />
               保存视角
@@ -353,7 +353,7 @@
       <div class="h-12 border-b border-gray-200 flex items-center justify-between px-4">
         <span class="font-medium text-gray-800">视角管理</span>
         <button
-          class="text-sm text-[#00b4b6] flex items-center hover:bg-[#e6f7f8] px-2 py-1 rounded transition-colors"
+          class="text-sm text-primary flex items-center hover:bg-primary/10 px-2 py-1 rounded transition-colors"
         >
           <PlusIcon class="w-4 h-4 mr-1" />
           添加视图
@@ -361,7 +361,7 @@
       </div>
       <div class="flex-1 overflow-y-auto p-4 space-y-4">
         <div
-          class="border border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:border-[#00b4b6] transition-colors group"
+          class="border border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:border-primary transition-colors group"
         >
           <div class="aspect-video bg-gray-100 relative">
             <div
@@ -380,7 +380,7 @@
           </div>
         </div>
         <div
-          class="border border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:border-[#00b4b6] transition-colors group"
+          class="border border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:border-primary transition-colors group"
         >
           <div class="aspect-video bg-gray-100 relative">
             <div
@@ -416,20 +416,20 @@
       </div>
       <div class="flex-1 overflow-y-auto p-4 space-y-3">
         <div
-          class="p-3 border border-gray-200 rounded-lg hover:border-[#00b4b6] cursor-pointer transition-colors group"
+          class="p-3 border border-gray-200 rounded-lg hover:border-primary cursor-pointer transition-colors group"
         >
           <div
-            class="text-sm font-medium text-gray-800 mb-1 group-hover:text-[#00b4b6]"
+            class="text-sm font-medium text-gray-800 mb-1 group-hover:text-primary"
           >
             一层平面图对比
           </div>
           <div class="text-xs text-gray-500">包含剖切盒设置</div>
         </div>
         <div
-          class="p-3 border border-gray-200 rounded-lg hover:border-[#00b4b6] cursor-pointer transition-colors group"
+          class="p-3 border border-gray-200 rounded-lg hover:border-primary cursor-pointer transition-colors group"
         >
           <div
-            class="text-sm font-medium text-gray-800 mb-1 group-hover:text-[#00b4b6]"
+            class="text-sm font-medium text-gray-800 mb-1 group-hover:text-primary"
           >
             机电管线对比
           </div>
@@ -552,12 +552,12 @@
       <!-- Top Right Controls -->
       <div class="absolute top-4 right-4 flex flex-col space-y-2 z-10">
         <button
-          class="w-8 h-8 bg-white/80 backdrop-blur-md rounded shadow flex items-center justify-center text-gray-600 hover:text-[#00b4b6]"
+          class="w-8 h-8 bg-white/80 backdrop-blur-md rounded shadow flex items-center justify-center text-gray-600 hover:text-primary"
         >
           <ArrowsPointingOutIcon class="w-4 h-4" />
         </button>
         <button
-          class="w-8 h-8 bg-white/80 backdrop-blur-md rounded shadow flex items-center justify-center text-gray-600 hover:text-[#00b4b6]"
+          class="w-8 h-8 bg-white/80 backdrop-blur-md rounded shadow flex items-center justify-center text-gray-600 hover:text-primary"
         >
           <VideoCameraIcon class="w-4 h-4" />
         </button>
@@ -567,13 +567,13 @@
       <div
         class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-md rounded-lg shadow-lg px-4 py-2 flex items-center space-x-6 z-10"
       >
-        <button class="text-gray-600 hover:text-[#00b4b6] flex flex-col items-center">
+        <button class="text-gray-600 hover:text-primary flex flex-col items-center">
           <Square3Stack3DIcon class="w-5 h-5" />
         </button>
-        <button class="text-gray-600 hover:text-[#00b4b6] flex flex-col items-center">
+        <button class="text-gray-600 hover:text-primary flex flex-col items-center">
           <EyeDropperIcon class="w-5 h-5" />
         </button>
-        <button class="text-gray-600 hover:text-[#00b4b6] flex flex-col items-center">
+        <button class="text-gray-600 hover:text-primary flex flex-col items-center">
           <SunIcon class="w-5 h-5" />
         </button>
       </div>
@@ -587,11 +587,11 @@
       <div class="h-12 border-b border-gray-200 flex items-center justify-between px-4">
         <span class="font-medium text-gray-800">已选择</span>
         <div class="flex space-x-3 text-gray-500">
-          <button class="hover:text-[#00b4b6]"><EyeIcon class="w-4 h-4" /></button>
-          <button class="hover:text-[#00b4b6]">
+          <button class="hover:text-primary"><EyeIcon class="w-4 h-4" /></button>
+          <button class="hover:text-primary">
             <AdjustmentsHorizontalIcon class="w-4 h-4" />
           </button>
-          <button class="hover:text-[#00b4b6]">
+          <button class="hover:text-primary">
             <EllipsisHorizontalIcon class="w-4 h-4" />
           </button>
         </div>
@@ -675,13 +675,13 @@
             <input
               type="text"
               placeholder="属性名"
-              class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-[#00b4b6]"
+              class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-primary"
               v-model="newAttrName"
             />
             <input
               type="text"
               placeholder="属性值"
-              class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-[#00b4b6]"
+              class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-primary"
               v-model="newAttrValue"
             />
             <button

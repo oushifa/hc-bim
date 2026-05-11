@@ -7,7 +7,7 @@
     </template>
     <template #actions>
       <div class="flex items-center gap-0.5">
-        <div v-tippy="canCreateViewOrGroup?.errorMessage" class="flex items-center">
+        <div v-tippy="canCreateViewOrGroup?.errorMessage" class="flex items-center gap-1">
           <FormButton
             v-tippy="getTooltipProps('创建目录')"
             size="sm"
@@ -15,7 +15,18 @@
             :icon-left="Plus"
             hide-text
             name="addCatalog"
+            :disabled="isSaving"
             @click="openCreateCatalogDialog"
+          />
+          <FormButton
+            v-tippy="getTooltipProps('删除当前目录')"
+            size="sm"
+            color="danger"
+            :icon-left="Trash"
+            hide-text
+            name="deleteCatalog"
+            :disabled="!activeCatalogId || isSaving"
+            @click="onDeleteCatalog"
           />
         </div>
       </div>
@@ -46,19 +57,19 @@
       <div class="flex-grow overflow-auto">
         <LayoutTabsHorizontal
           v-model:active-item="activeCatalogItem"
-          :items="mockCatalog"
+          :items="catalogs"
         ></LayoutTabsHorizontal>
       </div>
       <div class="flex-shrink-0">
         <FormButton
-          v-tippy="getTooltipProps('创建节点')"
+          v-tippy="getTooltipProps('创建根节点')"
           size="sm"
           color="subtle"
           :icon-left="Plus"
           hide-text
-          name="addNode"
-          :disabled="!selectedTreeNodeId"
-          @click="openCreateNodeDialog"
+          name="addRootNode"
+          :disabled="isSaving"
+          @click="openCreateRootNodeDialog"
         />
       </div>
     </div>
@@ -80,7 +91,36 @@
             v-model:selected-keys="selectedTreeKeys"
             :tree-data="activeTreeData"
             default-expand-all
-          />
+          >
+            <template #title="{ node, selected }">
+              <div class="flex items-center justify-between w-full h-full pr-1">
+                <span class="truncate" :title="node.title">{{ node.title }}</span>
+                <div 
+                  class="flex items-center gap-0.5 transition-opacity duration-150 opacity-0 group-hover:opacity-100"
+                  :class="{ 'opacity-100': selected }"
+                >
+                  <button 
+                    type="button"
+                    class="p-1 rounded-sm text-foreground-2 hover:text-primary hover:bg-primary-muted transition-colors"
+                    title="添加子节点"
+                    :disabled="isSaving"
+                    @click.stop="openCreateChildNodeDialog(node.key)"
+                  >
+                    <Plus class="w-3.5 h-3.5" />
+                  </button>
+                  <button 
+                    type="button"
+                    class="p-1 rounded-sm text-foreground-2 hover:text-danger hover:bg-danger-muted transition-colors"
+                    title="删除节点"
+                    :disabled="isSaving"
+                    @click.stop="onDeleteSpecificNode(node.key)"
+                  >
+                    <Trash class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </template>
+          </LayoutTree>
         </div>
       </div>
       <div
@@ -128,15 +168,19 @@
   </ViewerLayoutSidePanel>
 </template>
 <script setup lang="ts">
-import { Plus, X } from 'lucide-vue-next'
+import { Plus, X, Trash } from 'lucide-vue-next'
 import { graphql } from '~/lib/common/generated/gql'
 import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
 import { useDebouncedTextInput } from '@speckle/ui-components'
 import { useKeepAliveScrollState } from '~/lib/common/composables/dom'
 import { useFilterUtilities } from '~/lib/viewer/composables/filtering/filtering'
+import { useGlobalToast } from '~/lib/common/composables/toast'
 import type { LayoutDialogButton, LayoutPageTabItem } from '@speckle/ui-components'
 import { LayoutTabsHorizontal } from '#components'
 import CatalogModel from './CatalogModel.vue'
+import { useViewerCatalogs, type ViewerCatalogNode } from '~/lib/viewer/composables/catalog'
+import { mapApplicationIdsToIds } from '~/lib/viewer/helpers/catalogHelpers'
+import { useFilteringDataStore } from '~~/lib/viewer/composables/filtering/dataStore'
 
 graphql(`
   fragment ViewerSavedViewsPanel_Project on Project {
@@ -165,12 +209,18 @@ const {
 } = useInjectedViewerState()
 const { on, bind, value: search } = useDebouncedTextInput()
 const { isolateObjects, hideObjects, resetHiddenAndIsolations } = useFilterUtilities()
+const { fetchCatalogs, createCatalog, updateCatalog, deleteCatalog } = useViewerCatalogs()
+const { triggerNotification } = useGlobalToast()
+const dataStore = useFilteringDataStore()
+const projectId = computed(() => project.value?.id)
+
+const isSaving = ref(false)
 
 type RawCatalogNode = {
   title: string
   id: string
-  isolatedObjectIds?: string[]
-  hiddenObjectIds?: string[]
+  isolatedApplicationIds?: string[]
+  hiddenApplicationIds?: string[]
   childrens?: RawCatalogNode[]
 }
 
@@ -181,76 +231,49 @@ type CatalogTreeNode = {
 }
 
 type CatalogTabItem = LayoutPageTabItem & {
-  isolatedObjectIds?: string[]
-  hiddenObjectIds?: string[]
   childrens?: RawCatalogNode[]
 }
 
-const mockCatalog = ref<CatalogTabItem[]>([
-  {
-    title: '目录1',
-    id: '1',
-    isolatedObjectIds: [],
-    hiddenObjectIds: [],
-    childrens: [
-      {
-        title: '根节点1',
-        id: '1-1',
-        isolatedObjectIds: [],
-        hiddenObjectIds: [],
-        childrens: [
-          {
-            title: '子节点11',
-            id: '1-1-1',
-            isolatedObjectIds: [],
-            hiddenObjectIds: []
-          }
-        ]
-      }
-    ]
-  },
-  {
-    title: '目录2',
-    id: '2',
-    isolatedObjectIds: [],
-    hiddenObjectIds: [],
-    childrens: [
-      {
-        title: '根节点2',
-        id: '2-1',
-        isolatedObjectIds: [],
-        hiddenObjectIds: [],
-        childrens: [
-          {
-            title: '子节点21',
-            id: '2-1-1',
-            isolatedObjectIds: [],
-            hiddenObjectIds: []
-          }
-        ]
-      }
-    ]
-  }
-])
+const catalogs = ref<CatalogTabItem[]>([])
+const activeCatalogItem = ref<any>(undefined)
 
-const saveToNode = ({
-  isolatedObjectIds,
-  hiddenObjectIds
+onMounted(async () => {
+  if (projectId.value) {
+    try {
+      const fetched = await fetchCatalogs(projectId.value)
+      catalogs.value = fetched.map((c) => ({
+        title: c.title,
+        id: c.id,
+        childrens: c.treeData as RawCatalogNode[]
+      }))
+      if (catalogs.value.length > 0) {
+        activeCatalogItem.value = catalogs.value[0]
+      }
+    } catch (e) {
+      console.error('Failed to load catalogs', e)
+    }
+  }
+})
+
+const saveToNode = async ({
+  isolatedApplicationIds,
+  hiddenApplicationIds
 }: {
-  isolatedObjectIds: string[]
-  hiddenObjectIds: string[]
+  isolatedApplicationIds: string[]
+  hiddenApplicationIds: string[]
 }) => {
   const targetNodeId = selectedTreeNodeId.value
   const currentCatalogId = activeCatalogId.value
-  if (!targetNodeId || !currentCatalogId) return
+  if (!targetNodeId || !currentCatalogId || !projectId.value || isSaving.value) return
 
-  const catalogIndex = mockCatalog.value.findIndex(
+  const catalogIndex = catalogs.value.findIndex(
     (item) => item.id === currentCatalogId
   )
   if (catalogIndex < 0) return
 
-  const currentCatalog = mockCatalog.value[catalogIndex]
-  const existingChildren = currentCatalog.childrens || []
+  isSaving.value = true
+  const currentCatalog = catalogs.value[catalogIndex]
+  const existingChildren = Array.isArray(currentCatalog.childrens) ? currentCatalog.childrens : []
   const updateNodeById = (
     nodes: RawCatalogNode[],
     nodeId: string
@@ -261,8 +284,8 @@ const saveToNode = ({
         updated = true
         return {
           ...node,
-          isolatedObjectIds,
-          hiddenObjectIds
+          isolatedApplicationIds,
+          hiddenApplicationIds
         }
       }
 
@@ -283,29 +306,51 @@ const saveToNode = ({
   }
 
   const result = updateNodeById(existingChildren, targetNodeId)
-  if (!result.updated) return
-
-  const updatedCatalog: CatalogTabItem = {
-    ...currentCatalog,
-    childrens: result.updatedNodes
+  if (!result.updated) {
+    isSaving.value = false
+    return
   }
 
-  const nextCatalogs = [...mockCatalog.value]
-  nextCatalogs.splice(catalogIndex, 1, updatedCatalog)
-  mockCatalog.value = nextCatalogs
-  activeCatalogItem.value = updatedCatalog
+  try {
+    await updateCatalog(projectId.value, currentCatalogId, {
+      treeData: result.updatedNodes as ViewerCatalogNode[]
+    })
+
+    const updatedCatalog: CatalogTabItem = {
+      ...currentCatalog,
+      childrens: result.updatedNodes
+    }
+
+    const nextCatalogs = [...catalogs.value]
+    nextCatalogs.splice(catalogIndex, 1, updatedCatalog)
+    catalogs.value = nextCatalogs
+    activeCatalogItem.value = updatedCatalog
+    triggerNotification({
+      type: 'success',
+      title: '视图状态保存成功'
+    })
+  } catch (e: any) {
+    console.error('Failed to update catalog node', e)
+    triggerNotification({
+      type: 'error',
+      title: '保存失败',
+      description: e.message || '网络连接错误'
+    })
+  } finally {
+    isSaving.value = false
+  }
 }
 
-const activeCatalogItem = ref<CatalogTabItem>(mockCatalog.value[0])
 const activeCatalogId = computed(
-  () => activeCatalogItem.value?.id || mockCatalog.value[0]?.id
+  () => activeCatalogItem.value?.id || catalogs.value[0]?.id
 )
 
 const mapCatalogChildrenToTreeNodes = (nodes: RawCatalogNode[]): CatalogTreeNode[] => {
+  if (!Array.isArray(nodes)) return []
   return nodes.map((node) => ({
     key: node.id,
     title: node.title,
-    children: node.childrens?.length
+    children: Array.isArray(node.childrens) && node.childrens.length
       ? mapCatalogChildrenToTreeNodes(node.childrens)
       : undefined
   }))
@@ -313,7 +358,7 @@ const mapCatalogChildrenToTreeNodes = (nodes: RawCatalogNode[]): CatalogTreeNode
 
 const activeTreeData = computed<CatalogTreeNode[]>(() => {
   const children =
-    mockCatalog.value.find((item) => item.id === activeCatalogId.value)?.childrens || []
+    catalogs.value.find((item) => item.id === activeCatalogId.value)?.childrens || []
   return mapCatalogChildrenToTreeNodes(children)
 })
 
@@ -344,8 +389,10 @@ const findNodeById = (
 const applyNodeFilters = (node: RawCatalogNode) => {
   resetHiddenAndIsolations()
   nextTick(() => {
-    isolateObjects(node.isolatedObjectIds || [], { replace: true })
-    hideObjects(node.hiddenObjectIds || [], { replace: true })
+    const isolatedObjectIds = mapApplicationIdsToIds(node.isolatedApplicationIds || [], dataStore)
+    const hiddenObjectIds = mapApplicationIdsToIds(node.hiddenApplicationIds || [], dataStore)
+    isolateObjects(isolatedObjectIds, { replace: true })
+    hideObjects(hiddenObjectIds, { replace: true })
   })
 }
 
@@ -353,7 +400,7 @@ watch(selectedTreeNodeId, (nodeId) => {
   const currentCatalogId = activeCatalogId.value
   if (!nodeId || !currentCatalogId) return
 
-  const currentCatalog = mockCatalog.value.find((item) => item.id === currentCatalogId)
+  const currentCatalog = catalogs.value.find((item) => item.id === currentCatalogId)
   const selectedNode = findNodeById(currentCatalog?.childrens || [], nodeId)
   if (!selectedNode) return
 
@@ -405,44 +452,68 @@ const openCreateCatalogDialog = () => {
   showCreateCatalogDialog.value = true
 }
 
-const openCreateNodeDialog = () => {
-  if (!selectedTreeNodeId.value) return
+const targetParentNodeId = ref<string | undefined>(undefined)
+
+const openCreateRootNodeDialog = () => {
+  targetParentNodeId.value = undefined
   newNodeName.value = ''
   showCreateNodeDialog.value = true
 }
 
-const onAddCatalog = () => {
-  const title = newCatalogName.value.trim()
-  if (!title) return
-
-  const nextCatalog: CatalogTabItem = {
-    id: `catalog-${Date.now()}`,
-    title,
-    childrens: []
-  }
-
-  mockCatalog.value = [...mockCatalog.value, nextCatalog]
-  activeCatalogItem.value = nextCatalog
-  showCreateCatalogDialog.value = false
+const openCreateChildNodeDialog = (parentId: string) => {
+  targetParentNodeId.value = parentId
+  newNodeName.value = ''
+  showCreateNodeDialog.value = true
 }
 
-const onAddNode = () => {
-  const title = newNodeName.value.trim()
-  if (!title) return
+const onAddCatalog = async () => {
+  const title = newCatalogName.value.trim()
+  if (!title || !projectId.value || isSaving.value) return
 
-  const targetNodeId = selectedTreeNodeId.value
-  if (!targetNodeId) return
+  try {
+    isSaving.value = true
+    const newCatalog = await createCatalog(projectId.value, title, [])
+    const nextCatalog: CatalogTabItem = {
+      id: newCatalog.id,
+      title: newCatalog.title,
+      childrens: []
+    }
+
+    catalogs.value = [...catalogs.value, nextCatalog]
+    activeCatalogItem.value = nextCatalog
+    showCreateCatalogDialog.value = false
+    triggerNotification({
+      type: 'success',
+      title: '目录创建成功'
+    })
+  } catch (e: any) {
+    console.error('Failed to create catalog', e)
+    triggerNotification({
+      type: 'error',
+      title: '目录创建失败',
+      description: e.message || '请检查网络连接'
+    })
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const onAddNode = async () => {
+  const title = newNodeName.value.trim()
+  if (!title || !projectId.value || isSaving.value) return
 
   const currentCatalogId = activeCatalogId.value
   if (!currentCatalogId) return
 
-  const catalogIndex = mockCatalog.value.findIndex(
+  const catalogIndex = catalogs.value.findIndex(
     (item) => item.id === currentCatalogId
   )
   if (catalogIndex < 0) return
 
-  const currentCatalog = mockCatalog.value[catalogIndex]
-  const existingChildren = currentCatalog.childrens || []
+  isSaving.value = true
+
+  const currentCatalog = catalogs.value[catalogIndex]
+  const existingChildren = Array.isArray(currentCatalog.childrens) ? currentCatalog.childrens : []
 
   const nextNode: RawCatalogNode = {
     id: `${currentCatalogId}-node-${Date.now()}`,
@@ -450,54 +521,206 @@ const onAddNode = () => {
     childrens: []
   }
 
-  const insertNodeUnderTarget = (
-    nodes: RawCatalogNode[],
-    parentId: string,
-    node: RawCatalogNode
-  ): { updatedNodes: RawCatalogNode[]; inserted: boolean } => {
-    let inserted = false
-    const updatedNodes = nodes.map((item) => {
-      if (item.id === parentId) {
+  const targetNodeId = targetParentNodeId.value
+  let updatedNodes: RawCatalogNode[]
+
+  if (!targetNodeId) {
+    // Add as root node
+    updatedNodes = [...existingChildren, nextNode]
+  } else {
+    // Add as child node of targetNodeId
+    const insertNodeUnderTarget = (
+      nodes: RawCatalogNode[],
+      parentId: string,
+      node: RawCatalogNode
+    ): { updatedNodes: RawCatalogNode[]; inserted: boolean } => {
+      let inserted = false
+      const mappedNodes = nodes.map((item) => {
+        if (item.id === parentId) {
+          inserted = true
+          return {
+            ...item,
+            childrens: [...(item.childrens || []), node]
+          }
+        }
+
+        const children = item.childrens || []
+        if (!children.length) return item
+
+        const childResult = insertNodeUnderTarget(children, parentId, node)
+        if (!childResult.inserted) return item
+
         inserted = true
         return {
           ...item,
-          childrens: [...(item.childrens || []), node]
+          childrens: childResult.updatedNodes
         }
-      }
+      })
 
-      const children = item.childrens || []
-      if (!children.length) return item
+      return { updatedNodes: mappedNodes, inserted }
+    }
 
-      const childResult = insertNodeUnderTarget(children, parentId, node)
-      if (!childResult.inserted) return item
+    const insertionResult = insertNodeUnderTarget(
+      existingChildren,
+      targetNodeId,
+      nextNode
+    )
+    
+    if (!insertionResult.inserted) return
+    updatedNodes = insertionResult.updatedNodes
+  }
 
-      inserted = true
-      return {
-        ...item,
-        childrens: childResult.updatedNodes
-      }
+  try {
+    await updateCatalog(projectId.value, currentCatalogId, {
+      treeData: updatedNodes as ViewerCatalogNode[]
     })
 
-    return { updatedNodes, inserted }
-  }
+    const updatedCatalog: CatalogTabItem = {
+      ...currentCatalog,
+      childrens: updatedNodes
+    }
 
-  const insertionResult = insertNodeUnderTarget(
-    existingChildren,
-    targetNodeId,
-    nextNode
+    const nextCatalogs = [...catalogs.value]
+    nextCatalogs.splice(catalogIndex, 1, updatedCatalog)
+    catalogs.value = nextCatalogs
+    activeCatalogItem.value = updatedCatalog
+    showCreateNodeDialog.value = false
+    
+    // Automatically select the new node or expand parents
+    selectedTreeKeys.value = [nextNode.id]
+    
+    triggerNotification({
+      type: 'success',
+      title: '节点创建成功'
+    })
+  } catch (e: any) {
+    console.error('Failed to add catalog node', e)
+    triggerNotification({
+      type: 'error',
+      title: '节点创建失败',
+      description: e.message || '网络或服务器错误'
+    })
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const onDeleteCatalog = async () => {
+  const currentCatalogId = activeCatalogId.value
+  if (!currentCatalogId || !projectId.value || isSaving.value) return
+
+  if (!window.confirm('确认要删除当前目录吗？此操作不可撤销。')) return
+
+  try {
+    isSaving.value = true
+    await deleteCatalog(projectId.value, currentCatalogId)
+
+    catalogs.value = catalogs.value.filter((c) => c.id !== currentCatalogId)
+    if (catalogs.value.length > 0) {
+      activeCatalogItem.value = catalogs.value[0]
+    } else {
+      activeCatalogItem.value = undefined
+    }
+
+    triggerNotification({
+      type: 'success',
+      title: '目录已删除'
+    })
+  } catch (e: any) {
+    console.error('Failed to delete catalog', e)
+    triggerNotification({
+      type: 'error',
+      title: '删除目录失败',
+      description: e.message || '网络或服务器错误'
+    })
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const onDeleteSpecificNode = async (nodeId: string) => {
+  const currentCatalogId = activeCatalogId.value
+  if (!currentCatalogId || !nodeId || !projectId.value || isSaving.value) return
+
+  if (!window.confirm('确认要删除选中的节点及其所有子节点吗？此操作不可撤销。')) return
+
+  const catalogIndex = catalogs.value.findIndex(
+    (item) => item.id === currentCatalogId
   )
-  if (!insertionResult.inserted) return
+  if (catalogIndex < 0) return
 
-  const updatedCatalog: CatalogTabItem = {
-    ...currentCatalog,
-    childrens: insertionResult.updatedNodes
+  isSaving.value = true
+
+  const currentCatalog = catalogs.value[catalogIndex]
+  const existingChildren = Array.isArray(currentCatalog.childrens)
+    ? currentCatalog.childrens
+    : []
+
+  const removeNodeById = (
+    nodes: RawCatalogNode[],
+    idToRemove: string
+  ): { updatedNodes: RawCatalogNode[]; removed: boolean } => {
+    let removed = false
+    const updatedNodes = nodes
+      .filter((n) => {
+        if (n.id === idToRemove) {
+          removed = true
+          return false
+        }
+        return true
+      })
+      .map((n) => {
+        if (!n.childrens || !n.childrens.length) return n
+        const childResult = removeNodeById(n.childrens, idToRemove)
+        if (childResult.removed) {
+          removed = true
+          return { ...n, childrens: childResult.updatedNodes }
+        }
+        return n
+      })
+
+    return { updatedNodes, removed }
   }
 
-  const nextCatalogs = [...mockCatalog.value]
-  nextCatalogs.splice(catalogIndex, 1, updatedCatalog)
-  mockCatalog.value = nextCatalogs
-  activeCatalogItem.value = updatedCatalog
-  showCreateNodeDialog.value = false
+  const result = removeNodeById(existingChildren, nodeId)
+  if (!result.removed) {
+    isSaving.value = false
+    return
+  }
+
+  try {
+    await updateCatalog(projectId.value, currentCatalogId, {
+      treeData: result.updatedNodes as ViewerCatalogNode[]
+    })
+
+    const updatedCatalog: CatalogTabItem = {
+      ...currentCatalog,
+      childrens: result.updatedNodes
+    }
+
+    const nextCatalogs = [...catalogs.value]
+    nextCatalogs.splice(catalogIndex, 1, updatedCatalog)
+    catalogs.value = nextCatalogs
+    activeCatalogItem.value = updatedCatalog
+
+    if (selectedTreeNodeId.value === nodeId) {
+      selectedTreeKeys.value = []
+    }
+
+    triggerNotification({
+      type: 'success',
+      title: '节点已删除'
+    })
+  } catch (e: any) {
+    console.error('Failed to delete catalog node', e)
+    triggerNotification({
+      type: 'error',
+      title: '删除节点失败',
+      description: e.message || '网络或服务器错误'
+    })
+  } finally {
+    isSaving.value = false
+  }
 }
 
 const setSearchMode = (val: boolean) => {

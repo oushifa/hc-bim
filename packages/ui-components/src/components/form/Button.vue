@@ -143,8 +143,8 @@ const bgAndBorderClasses = computed(() => {
       'hover:bg-danger-darker disabled:hover:bg-danger focus-visible:border-foundation'
     ],
     primary: [
-      'bg-primary border-outline-1 text-foreground-on-primary font-semibold',
-      'hover:bg-primary-focus disabled:hover:bg-primary focus-visible:border-foundation'
+      'bg-brand-muted border-transparent text-brand font-semibold',
+      'hover:opacity-80 disabled:hover:opacity-100 focus-visible:border-brand'
     ]
   }
 

@@ -8,7 +8,7 @@ export const ViewsType = {
 export type ViewsType = StringEnumValues<typeof ViewsType>
 
 export const viewsTypeLabels: Record<ViewsType, string> = {
-  [ViewsType.All]: '全部实图',
+  [ViewsType.All]: '全部视图',
   [ViewsType.Mine]: '我的视图'
 }
 

@@ -5,7 +5,7 @@
         <span>模型构件树</span>
       </template>
       <template #actions>
-        <FormButton class="bg-[#e6f7f8] text-[#00b4b6]" @click="saveTreeToNode">
+        <FormButton class="bg-primary/10 text-primary" @click="saveTreeToNode">
           保存节点
         </FormButton>
       </template>
@@ -419,10 +419,17 @@ watch(
   },
   { immediate: true }
 )
+import { mapIdsToApplicationIds } from '~~/lib/viewer/helpers/catalogHelpers'
+import { useFilteringDataStore } from '~~/lib/viewer/composables/filtering/dataStore'
+
+const dataStore = useFilteringDataStore()
+
 const saveTreeToNode = () => {
+  const isolatedApplicationIds = mapIdsToApplicationIds(filters.isolatedObjectIds.value, dataStore)
+  const hiddenApplicationIds = mapIdsToApplicationIds(filters.hiddenObjectIds.value, dataStore)
   emit('onSave', {
-    isolatedObjectIds: filters.isolatedObjectIds.value,
-    hiddenObjectIds: filters.hiddenObjectIds.value
+    isolatedApplicationIds,
+    hiddenApplicationIds
   })
 }
 </script>

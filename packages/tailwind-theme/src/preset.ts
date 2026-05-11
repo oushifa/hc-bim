@@ -52,6 +52,10 @@ const config: Config = {
           focus: 'var(--primary-focus)',
           muted: 'var(--primary-muted)'
         },
+        brand: {
+          DEFAULT: 'var(--brand)',
+          muted: 'var(--brand-muted)'
+        },
         outline: {
           1: 'var(--outline-1)',
           2: 'var(--outline-2)',

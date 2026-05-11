@@ -30,10 +30,10 @@ const buttonClasses = computed(() => {
   const disabledClasses = props.disabled ? 'opacity-50' : ''
 
   const stateClasses = props.active
-    ? 'bg-[#e6f7f8] text-[#00b4b6] dark:text-foreground-on-primary'
+    ? 'bg-primary/10 text-primary dark:text-foreground-on-primary'
     : `bg-foundation ${props.secondary ? 'text-foreground-3' : 'text-foreground'} ${
         !props.disabled
-          ? 'md:hover:bg-[#e6f7f8] md:hover:text-[#00b4b6] md:focus-visible:border-foundation'
+          ? 'md:hover:bg-primary/10 md:hover:text-primary md:focus-visible:border-foundation'
           : ''
       }`
 

@@ -24,7 +24,7 @@
             <input
               v-model="formData.name"
               type="text"
-              class="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-xl focus:outline-none focus:border-[#00b4b6] focus:bg-white transition-all text-gray-700"
+              class="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-xl focus:outline-none focus:border-primary focus:bg-white transition-all text-gray-700"
               placeholder="输入项目名称"
             />
           </div>

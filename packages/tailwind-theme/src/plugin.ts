@@ -30,6 +30,9 @@ export const lightThemeVariables = {
   '--primary-focus': '#0057E5',
   /* muted primary color */
   '--primary-muted': '#EDEDED',
+  /* brand/accent color based on user request */
+  '--brand': '#00B4B6',
+  '--brand-muted': '#E6F7F8',
 
   /* outline variations */
   '--outline-1': '#276FE5',
@@ -96,6 +99,9 @@ export const darkThemeVariables = {
   '--primary-focus': '#0057E5',
   /* muted primary color */
   '--primary-muted': '#292B39',
+  /* brand/accent color based on user request */
+  '--brand': '#00B4B6',
+  '--brand-muted': '#002D2E',
 
   /* outline variations */
   '--outline-1': '#276FE5',

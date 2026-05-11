@@ -2,7 +2,7 @@
   <form method="post" class="space-y-8" @submit="onSubmit">
     <!-- Username -->
     <div
-      class="relative border-b border-gray-200 pb-2 focus-within:border-[#00b4b6] transition-colors"
+      class="relative border-b border-gray-200 pb-2 focus-within:border-primary transition-colors"
     >
       <div class="absolute inset-y-0 left-0 flex items-center pointer-events-none pb-2">
         <svg
@@ -33,7 +33,7 @@
 
     <!-- Password -->
     <div
-      class="relative border-b border-gray-200 pb-2 focus-within:border-[#00b4b6] transition-colors"
+      class="relative border-b border-gray-200 pb-2 focus-within:border-primary transition-colors"
     >
       <div class="absolute inset-y-0 left-0 flex items-center pointer-events-none pb-2">
         <svg

@@ -18,7 +18,7 @@
       <div class="flex-1 flex items-center justify-center p-12 mt-16">
         <div class="w-full max-w-[380px]">
           <div class="text-center mb-10">
-            <h2 class="text-2xl font-medium text-[#00b4b6] tracking-widest">
+            <h2 class="text-2xl font-medium text-primary tracking-widest">
               用户登录
             </h2>
           </div>

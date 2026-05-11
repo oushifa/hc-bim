@@ -2,11 +2,11 @@
   <div class="h-full">
     <!-- Header -->
     <div class="pt-3 pb-3 flex items-center justify-between bg-gray-50">
-      <!-- <ClipboardDocumentListIcon class="h-5 w-5 text-[#00b4b6]" /> -->
+      <!-- <ClipboardDocumentListIcon class="h-5 w-5 text-primary" /> -->
       <h2 class="text-heading pl-5">日志管理</h2>
       <button
         :disabled="isLoading"
-        class="flex items-center space-x-1 bg-white/80 backdrop-blur-md border border-gray-200 text-gray-600 hover:text-[#00b4b6] hover:border-[#00b4b6] px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors mr-5"
+        class="flex items-center space-x-1 bg-white/80 backdrop-blur-md border border-gray-200 text-gray-600 hover:text-primary hover:border-primary px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors mr-5"
         @click="refreshLogs"
       >
         <ArrowPathIcon class="w-4 h-4" :class="{ 'animate-spin': isLoading }" />
@@ -31,7 +31,7 @@
             class="px-4 py-1.5 rounded-[8px] text-sm font-medium transition-colors"
             :class="
               activeTab === 'model'
-                ? 'bg-white text-[#00b4b6] shadow-sm'
+                ? 'bg-white text-primary shadow-sm'
                 : 'text-gray-500 hover:text-[#333]'
             "
             @click="activeTab = 'model'"
@@ -42,7 +42,7 @@
             class="px-4 py-1.5 rounded-[8px] text-sm font-medium transition-colors"
             :class="
               activeTab === 'login'
-                ? 'bg-white text-[#00b4b6] shadow-sm'
+                ? 'bg-white text-primary shadow-sm'
                 : 'text-gray-500 hover:text-[#333]'
             "
             @click="activeTab = 'login'"
@@ -63,11 +63,11 @@
               v-model="searchQuery"
               type="text"
               placeholder="搜索操作人/内容..."
-              class="w-56 bg-[#f5f7fa] border border-transparent rounded-[8px] py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white text-[#333] transition-all"
+              class="w-56 bg-[#f5f7fa] border border-transparent rounded-[8px] py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-primary focus:bg-white text-[#333] transition-all"
             />
           </div>
           <button
-            class="p-2 bg-white border border-gray-200 rounded-[8px] text-gray-500 hover:text-[#00b4b6] hover:border-[#00b4b6] transition-colors"
+            class="p-2 bg-white border border-gray-200 rounded-[8px] text-gray-500 hover:text-primary hover:border-primary transition-colors"
             title="筛选"
           >
             <FunnelIcon class="w-4 h-4" />
@@ -106,7 +106,7 @@
                 <td class="py-3.5 pl-6 text-gray-500">{{ log.time }}</td>
                 <td class="py-3.5 font-medium">{{ log.user }}</td>
                 <td class="py-3.5">
-                  <span class="text-[#00b4b6]">{{ log.action }}</span>
+                  <span class="text-primary">{{ log.action }}</span>
                 </td>
                 <td class="py-3.5 text-gray-600">{{ log.target }}</td>
                 <td class="py-3.5 text-gray-500">

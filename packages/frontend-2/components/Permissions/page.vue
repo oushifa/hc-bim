@@ -33,7 +33,7 @@
             class="group w-full flex items-center justify-between px-3 py-2 rounded-[8px] text-sm transition-colors cursor-pointer"
             :class="
               activeRoleId === role.id
-                ? 'bg-[#e6f7f8] text-[#00b4b6] font-medium'
+                ? 'bg-primary/10 text-primary font-medium'
                 : 'text-gray-600 hover:bg-gray-100'
             "
             @click="activeRoleId = role.id"
@@ -41,7 +41,7 @@
             <div class="flex items-center space-x-2 truncate pr-1">
               <ShieldCheckIcon
                 class="w-4 h-4 shrink-0"
-                :class="activeRoleId === role.id ? 'text-[#00b4b6]' : 'text-gray-400'"
+                :class="activeRoleId === role.id ? 'text-primary' : 'text-gray-400'"
               />
               <span class="truncate">{{ role.name }}</span>
             </div>
@@ -54,14 +54,14 @@
               "
             >
               <button
-                class="p-1 rounded-[6px] text-gray-400 hover:text-[#00b4b6] hover:bg-white/80 transition-colors"
+                class="p-1 rounded-[6px] text-gray-400 hover:text-primary hover:bg-white/80 transition-colors"
                 title="编辑角色"
                 @click.stop="openEditRoleModal(role)"
               >
                 <PencilIcon class="w-3.5 h-3.5" />
               </button>
               <button
-                class="p-1 rounded-[6px] text-gray-400 hover:text-[#00b4b6] hover:bg-white/80 transition-colors"
+                class="p-1 rounded-[6px] text-gray-400 hover:text-primary hover:bg-white/80 transition-colors"
                 title="设置默认权限"
                 @click.stop="openEditRolePermsModal(role)"
               >
@@ -89,7 +89,7 @@
           class="h-14 px-5 border-t border-b border-gray-100 flex items-center justify-between shrink-0 bg-white"
         >
           <div class="flex items-center space-x-2">
-            <!-- <UserGroupIcon class="w-5 h-5 text-[#00b4b6]" /> -->
+            <!-- <UserGroupIcon class="w-5 h-5 text-primary" /> -->
             <span class="font-medium text-sm text-[#333]">
               {{ activeRole ? activeRole.name + ' - 用户列表' : '请选择角色' }}
             </span>
@@ -148,7 +148,7 @@
                   </td>
                   <td class="py-3 px-4 text-sm text-right space-x-3 whitespace-nowrap">
                     <button
-                      class="text-[#00b4b6] hover:text-[#009fa1] font-medium transition-colors"
+                      class="text-primary hover:text-[#009fa1] font-medium transition-colors"
                       @click="openEditUserPermsModal(user)"
                     >
                       修改
@@ -219,8 +219,8 @@
                     class="flex items-center space-x-3 p-3 rounded-[8px] border cursor-pointer transition-colors"
                     :class="
                       modalMenuPerms.includes(perm.id)
-                        ? 'border-[#00b4b6] bg-[#e6f7f8]'
-                        : 'border-gray-200 hover:border-[#00b4b6] bg-white'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-gray-200 hover:border-primary bg-white'
                     "
                     @click="toggleMenuPerm(perm.id)"
                   >
@@ -228,7 +228,7 @@
                       class="w-4 h-4 rounded border flex items-center justify-center shrink-0"
                       :class="
                         modalMenuPerms.includes(perm.id)
-                          ? 'bg-[#00b4b6] border-[#00b4b6]'
+                          ? 'bg-[#00b4b6] border-primary'
                           : 'border-gray-300'
                       "
                     >
@@ -258,8 +258,8 @@
                     class="flex items-center space-x-3 p-3 rounded-[8px] border cursor-pointer transition-colors"
                     :class="
                       modalModelPerms.includes(perm.id)
-                        ? 'border-[#00b4b6] bg-[#e6f7f8]'
-                        : 'border-gray-200 hover:border-[#00b4b6] bg-white'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-gray-200 hover:border-primary bg-white'
                     "
                     @click="toggleModelPerm(perm.id)"
                   >
@@ -267,7 +267,7 @@
                       class="w-4 h-4 rounded border flex items-center justify-center shrink-0"
                       :class="
                         modalModelPerms.includes(perm.id)
-                          ? 'bg-[#00b4b6] border-[#00b4b6]'
+                          ? 'bg-[#00b4b6] border-primary'
                           : 'border-gray-300'
                       "
                     >
@@ -333,7 +333,7 @@
                 v-model="roleModal.name"
                 type="text"
                 placeholder="输入角色名称"
-                class="w-full px-3 py-2 border border-gray-300 rounded-[8px] text-sm focus:outline-none focus:border-[#00b4b6] transition-all"
+                class="w-full px-3 py-2 border border-gray-300 rounded-[8px] text-sm focus:outline-none focus:border-primary transition-all"
                 @keydown.enter="saveRole"
               />
             </div>
@@ -404,7 +404,7 @@
                       class="w-4 h-4 rounded border flex items-center justify-center mr-3 shrink-0"
                       :class="
                         selectedOrgUsers.includes(user.id)
-                          ? 'bg-[#00b4b6] border-[#00b4b6]'
+                          ? 'bg-[#00b4b6] border-primary'
                           : 'border-gray-300'
                       "
                       @click="toggleOrgUserSelect(user.id)"
@@ -432,7 +432,7 @@
             >
               <span class="text-sm text-gray-500">
                 已选择
-                <span class="font-semibold text-[#00b4b6]">
+                <span class="font-semibold text-primary">
                   {{ selectedOrgUsers.length }}
                 </span>
                 名用户

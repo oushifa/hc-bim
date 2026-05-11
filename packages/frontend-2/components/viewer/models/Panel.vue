@@ -114,7 +114,7 @@
           <IllustrationEmptystateModels />
           <span class="text-body-xs text-foreground-2">暂无模型，可添加模型。</span>
           <FormButton
-            class="!bg-[#00b4b6] !border-[#00b4b6] !text-white hover:!bg-[#009fa1] hover:!border-[#009fa1]"
+            class="!bg-[#00b4b6] !border-primary !text-white hover:!bg-[#009fa1] hover:!border-[#009fa1]"
             @click="showAddModel = true"
           >
             添加模型

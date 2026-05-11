@@ -22,7 +22,7 @@
           <!-- 有效期限设置 -->
           <div class="space-y-3">
             <label class="text-sm font-medium text-gray-600 flex items-center">
-              <CalendarIcon class="w-4 h-4 mr-2 text-[#00b4b6]" />
+              <CalendarIcon class="w-4 h-4 mr-2 text-primary" />
               设置有效期限
             </label>
             <div class="grid grid-cols-3 gap-3">
@@ -45,7 +45,7 @@
           <!-- 分享链接 -->
           <div class="space-y-3">
             <label class="text-sm font-medium text-gray-600 flex items-center">
-              <LinkIcon class="w-4 h-4 mr-2 text-[#00b4b6]" />
+              <LinkIcon class="w-4 h-4 mr-2 text-primary" />
               分享链接
             </label>
             <div class="flex space-x-2">

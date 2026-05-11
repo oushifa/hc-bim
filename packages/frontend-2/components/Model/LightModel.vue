@@ -14,7 +14,7 @@
             type="text"
             placeholder="搜索模型..."
             class="w-48 border rounded-[8px] py-1.5 pl-3 pr-8 text-sm focus:outline-none focus:ring-0 text-[#333] transition-all"
-            :class="searchQuery ? 'border-[#00b4b6] bg-white' : 'border-transparent bg-gray-50'"
+            :class="searchQuery ? 'border-primary bg-white' : 'border-transparent bg-gray-50'"
           />
           <MagnifyingGlassIcon class="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
         </div>
@@ -23,18 +23,18 @@
         <div class="relative w-32" ref="memberSelectRef">
           <div
             class="w-full px-3 py-1.5 border rounded-[8px] text-sm flex items-center justify-between cursor-pointer transition-colors text-gray-600"
-            :class="memberFilter !== 'all' ? 'border-[#00b4b6] bg-white' : 'border-transparent bg-gray-50'"
+            :class="memberFilter !== 'all' ? 'border-primary bg-white' : 'border-transparent bg-gray-50'"
             @click="memberOpen = !memberOpen"
           >
             <span class="truncate">{{ memberOptions.find(o => o.value === memberFilter)?.label }}</span>
             <ChevronDownIcon :class="['w-4 h-4 text-gray-400 transition-transform', memberOpen ? 'rotate-180' : '']" />
           </div>
-          <div v-if="memberOpen" class="absolute top-full left-0 mt-1 w-full bg-white border border-[#00b4b6] rounded-[8px] shadow-lg z-50 overflow-hidden py-1">
+          <div v-if="memberOpen" class="absolute top-full left-0 mt-1 w-full bg-white border border-primary rounded-[8px] shadow-lg z-50 overflow-hidden py-1">
             <div
               v-for="opt in memberOptions"
               :key="opt.value"
               class="px-3 py-2 text-sm cursor-pointer transition-colors"
-              :class="memberFilter === opt.value ? 'bg-[#00b4b6] text-white' : 'text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6]'"
+              :class="memberFilter === opt.value ? 'bg-[#00b4b6] text-white' : 'text-gray-600 hover:bg-primary/10 hover:text-primary'"
               @click="memberFilter = opt.value; memberOpen = false"
             >{{ opt.label }}</div>
           </div>
@@ -44,18 +44,18 @@
         <div class="relative w-32" ref="sourceSelectRef">
           <div
             class="w-full px-3 py-1.5 border rounded-[8px] text-sm flex items-center justify-between cursor-pointer transition-colors text-gray-600"
-            :class="sourceFilter !== 'all' ? 'border-[#00b4b6] bg-white' : 'border-transparent bg-gray-50'"
+            :class="sourceFilter !== 'all' ? 'border-primary bg-white' : 'border-transparent bg-gray-50'"
             @click="sourceOpen = !sourceOpen"
           >
             <span class="truncate">{{ sourceOptions.find(o => o.value === sourceFilter)?.label }}</span>
             <ChevronDownIcon :class="['w-4 h-4 text-gray-400 transition-transform', sourceOpen ? 'rotate-180' : '']" />
           </div>
-          <div v-if="sourceOpen" class="absolute top-full left-0 mt-1 w-full bg-white border border-[#00b4b6] rounded-[8px] shadow-lg z-50 overflow-hidden py-1">
+          <div v-if="sourceOpen" class="absolute top-full left-0 mt-1 w-full bg-white border border-primary rounded-[8px] shadow-lg z-50 overflow-hidden py-1">
             <div
               v-for="opt in sourceOptions"
               :key="opt.value"
               class="px-3 py-2 text-sm cursor-pointer transition-colors"
-              :class="sourceFilter === opt.value ? 'bg-[#00b4b6] text-white' : 'text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6]'"
+              :class="sourceFilter === opt.value ? 'bg-[#00b4b6] text-white' : 'text-gray-600 hover:bg-primary/10 hover:text-primary'"
               @click="sourceFilter = opt.value; sourceOpen = false"
             >{{ opt.label }}</div>
           </div>
@@ -123,14 +123,14 @@
                   <div class="absolute right-8 top-10 w-40 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-20 overflow-hidden text-left">
                     <button
                       v-if="hasModelOp('canDownload')"
-                      class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-[#00b4b6] transition-colors"
+                      class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-primary transition-colors"
                       @click.stop="activeActionMenu = null"
                     >
                       <ArrowDownTrayIcon class="w-3.5 h-3.5" />
                       <span>导出模型数据</span>
                     </button>
                     <button
-                      class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-[#00b4b6] transition-colors"
+                      class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-primary transition-colors"
                       @click.stop="activeActionMenu = null"
                     >
                       <ShareIcon class="w-3.5 h-3.5" />
@@ -138,14 +138,14 @@
                     </button>
                     <button
                       v-if="hasModelOp('canEdit')"
-                      class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-[#00b4b6] transition-colors"
+                      class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-primary transition-colors"
                       @click.stop="activeActionMenu = null"
                     >
                       <PencilIcon class="w-3.5 h-3.5" />
                       <span>重命名</span>
                     </button>
                     <button
-                      class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-[#00b4b6] transition-colors"
+                      class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-primary transition-colors"
                       @click.stop="activeActionMenu = null"
                     >
                       <ClockIcon class="w-3.5 h-3.5" />

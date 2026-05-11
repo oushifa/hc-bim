@@ -10,7 +10,7 @@
           class="px-4 py-2 text-sm font-medium transition-colors relative"
           :class="
             activeTab === 'user'
-              ? 'text-[#00b4b6]'
+              ? 'text-primary'
               : 'text-gray-500 hover:text-gray-700'
           "
           @click="switchTab('user')"
@@ -25,7 +25,7 @@
           class="px-4 py-2 text-sm font-medium transition-colors relative"
           :class="
             activeTab === 'official'
-              ? 'text-[#00b4b6]'
+              ? 'text-primary'
               : 'text-gray-500 hover:text-gray-700'
           "
           @click="switchTab('official')"
@@ -50,7 +50,7 @@
             class="w-48 px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none focus:ring-0 transition-colors"
             :class="
               searchQuery
-                ? 'border-[#00b4b6] bg-white'
+                ? 'border-primary bg-white'
                 : 'border-transparent bg-gray-50'
             "
           />
@@ -62,10 +62,10 @@
             <span class="text-sm text-gray-600 whitespace-nowrap">状态：</span>
             <select
               v-model="statusFilter"
-              class="w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none focus:border-[#00b4b6] cursor-pointer transition-colors"
+              class="w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none focus:border-primary cursor-pointer transition-colors"
               :class="
                 statusFilter
-                  ? 'border-[#00b4b6] bg-white'
+                  ? 'border-primary bg-white'
                   : 'border-transparent bg-gray-50'
               "
             >
@@ -78,10 +78,10 @@
             <span class="text-sm text-gray-600 whitespace-nowrap">构件数据：</span>
             <select
               v-model="componentDataFilter"
-              class="w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none focus:border-[#00b4b6] cursor-pointer transition-colors"
+              class="w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none focus:border-primary cursor-pointer transition-colors"
               :class="
                 componentDataFilter
-                  ? 'border-[#00b4b6] bg-white'
+                  ? 'border-primary bg-white'
                   : 'border-transparent bg-gray-50'
               "
             >
@@ -98,10 +98,10 @@
             <span class="text-sm text-gray-600 whitespace-nowrap">上架状态：</span>
             <select
               v-model="publishStatusFilter"
-              class="w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none focus:border-[#00b4b6] cursor-pointer transition-colors"
+              class="w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none focus:border-primary cursor-pointer transition-colors"
               :class="
                 publishStatusFilter
-                  ? 'border-[#00b4b6] bg-white'
+                  ? 'border-primary bg-white'
                   : 'border-transparent bg-gray-50'
               "
             >
@@ -114,10 +114,10 @@
             <span class="text-sm text-gray-600 whitespace-nowrap">分类：</span>
             <select
               v-model="categoryFilter"
-              class="w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none focus:border-[#00b4b6] cursor-pointer transition-colors"
+              class="w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none focus:border-primary cursor-pointer transition-colors"
               :class="
                 categoryFilter
-                  ? 'border-[#00b4b6] bg-white'
+                  ? 'border-primary bg-white'
                   : 'border-transparent bg-gray-50'
               "
             >
@@ -133,7 +133,7 @@
           <button
             v-if="activeTab === 'user'"
             :disabled="selectedIds.size === 0"
-            class="px-4 py-1.5 border border-gray-200 rounded-[8px] text-sm text-gray-600 hover:text-[#00b4b6] hover:border-[#00b4b6] transition-colors bg-white/80 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed"
+            class="px-4 py-1.5 border border-gray-200 rounded-[8px] text-sm text-gray-600 hover:text-primary hover:border-primary transition-colors bg-white/80 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed"
             @click="showOffshelfPopover('batch', $event)"
           >
             批量下架
@@ -156,10 +156,10 @@
                   class="w-4 h-4 border-2 rounded-sm cursor-pointer flex items-center justify-center mx-auto transition-colors"
                   :class="
                     isAllSelected
-                      ? 'bg-[#00b4b6] border-[#00b4b6]'
+                      ? 'bg-[#00b4b6] border-primary'
                       : isIndeterminate
-                      ? 'bg-[#00b4b6] border-[#00b4b6]'
-                      : 'border-gray-300 hover:border-[#00b4b6]'
+                      ? 'bg-[#00b4b6] border-primary'
+                      : 'border-gray-300 hover:border-primary'
                   "
                   @click="toggleSelectAll"
                 >
@@ -211,7 +211,7 @@
                 :colspan="activeTab === 'user' ? 9 : 9"
                 class="py-16 text-center"
               >
-                <svg class="animate-spin h-8 w-8 text-[#00b4b6] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg class="animate-spin h-8 w-8 text-primary mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -231,8 +231,8 @@
                   class="w-4 h-4 border-2 rounded-sm cursor-pointer flex items-center justify-center mx-auto transition-colors"
                   :class="
                     selectedIds.has(model.id)
-                      ? 'bg-[#00b4b6] border-[#00b4b6]'
-                      : 'border-gray-300 hover:border-[#00b4b6]'
+                      ? 'bg-[#00b4b6] border-primary'
+                      : 'border-gray-300 hover:border-primary'
                   "
                   @click="toggleSelect(model.id)"
                 >
@@ -300,7 +300,7 @@
                 <template v-if="activeTab === 'user'">
                   <div v-if="hasModelOp('canFile')" class="relative inline-block">
                     <button
-                      class="text-[#00b4b6] hover:underline cursor-pointer"
+                      class="text-primary hover:underline cursor-pointer"
                       @click="showOffshelfPopover(model.id, $event)"
                     >
                       下架
@@ -308,19 +308,19 @@
                   </div>
                   <button
                     v-if="hasModelOp('canEdit')"
-                    class="text-[#00b4b6] hover:underline"
+                    class="text-primary hover:underline"
                     @click="openEditModal(model as UserModel)"
                   >
                     编辑
                   </button>
                 </template>
                 <template v-else>
-                  <button class="text-[#00b4b6] hover:underline cursor-pointer" @click="openVersionModal(model as OfficialModel)">
+                  <button class="text-primary hover:underline cursor-pointer" @click="openVersionModal(model as OfficialModel)">
                     版本管理
                   </button>
                   <button
                     v-if="hasModelOp('canEdit')"
-                    class="text-[#00b4b6] hover:underline cursor-pointer"
+                    class="text-primary hover:underline cursor-pointer"
                     @click="openOfficialEditModal(model as OfficialModel)"
                   >
                     编辑
@@ -352,7 +352,7 @@
           <div class="flex items-center space-x-1">
             <!-- 上一页 -->
             <button
-              class="p-1 border border-gray-200 rounded-[8px] text-gray-400 hover:text-[#00b4b6] hover:border-[#00b4b6] disabled:opacity-50 disabled:cursor-not-allowed"
+              class="p-1 border border-gray-200 rounded-[8px] text-gray-400 hover:text-primary hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="currentPage <= 1"
               @click="changePage(currentPage - 1)"
             >
@@ -369,10 +369,10 @@
               </button>
               <button
                 v-else
-                class="w-8 h-8 flex items-center justify-center border rounded hover:border-[#00b4b6] hover:text-[#00b4b6] transition-colors"
+                class="w-8 h-8 flex items-center justify-center border rounded hover:border-primary hover:text-primary transition-colors"
                 :class="
                   page === currentPage
-                    ? 'border-[#00b4b6] text-[#00b4b6] bg-[#e6f7f8]'
+                    ? 'border-primary text-primary bg-primary/10'
                     : 'border-gray-200 text-gray-600'
                 "
                 @click="changePage(page as number)"
@@ -383,7 +383,7 @@
             
             <!-- 下一页 -->
             <button
-              class="p-1 border border-gray-200 rounded text-gray-600 hover:text-[#00b4b6] hover:border-[#00b4b6] disabled:opacity-50 disabled:cursor-not-allowed"
+              class="p-1 border border-gray-200 rounded text-gray-600 hover:text-primary hover:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="currentPage >= totalPages"
               @click="changePage(currentPage + 1)"
             >
@@ -392,7 +392,7 @@
           </div>
           <select
             v-model="currentPageSize"
-            class="border border-[#00b4b6] rounded-[8px] px-2 py-1 text-sm focus:outline-none focus:border-[#00b4b6] cursor-pointer"
+            class="border border-primary rounded-[8px] px-2 py-1 text-sm focus:outline-none focus:border-primary cursor-pointer"
             @change="onPageSizeChange"
           >
             <option :value="20">20 / page</option>
@@ -511,7 +511,7 @@
                 :class="
                   editNameError
                     ? 'border-red-400 focus:border-red-400'
-                    : 'border-gray-200 focus:border-[#00b4b6]'
+                    : 'border-gray-200 focus:border-primary'
                 "
                 @input="editNameError = ''"
               />
@@ -526,7 +526,7 @@
                 缩略图
               </label>
               <div
-                class="relative w-full h-36 border-2 border-dashed border-gray-200 rounded-[10px] overflow-hidden cursor-pointer hover:border-[#00b4b6] transition-colors group"
+                class="relative w-full h-36 border-2 border-dashed border-gray-200 rounded-[10px] overflow-hidden cursor-pointer hover:border-primary transition-colors group"
                 @click="thumbnailInput?.click()"
               >
                 <img
@@ -538,7 +538,7 @@
                 />
                 <div
                   v-else
-                  class="flex flex-col items-center justify-center h-full space-y-2 text-gray-400 group-hover:text-[#00b4b6] transition-colors"
+                  class="flex flex-col items-center justify-center h-full space-y-2 text-gray-400 group-hover:text-primary transition-colors"
                 >
                   <svg
                     class="w-8 h-8"
@@ -659,7 +659,7 @@
                 :class="
                   officialEditErrors.name
                     ? 'border-red-400 focus:border-red-400'
-                    : 'border-gray-200 focus:border-[#00b4b6]'
+                    : 'border-gray-200 focus:border-primary'
                 "
                 @input="officialEditErrors.name = ''"
               />
@@ -682,7 +682,7 @@
                 :class="
                   officialEditErrors.nameEn
                     ? 'border-red-400 focus:border-red-400'
-                    : 'border-gray-200 focus:border-[#00b4b6]'
+                    : 'border-gray-200 focus:border-primary'
                 "
                 @input="officialEditErrors.nameEn = ''"
               />
@@ -695,7 +695,7 @@
             <div class="relative">
               <label class="block text-sm font-medium text-gray-700 mb-1.5">分类</label>
               <div
-                class="w-full px-3 py-1.5 border border-gray-200 rounded-[8px] text-sm focus:outline-none focus:border-[#00b4b6] cursor-pointer transition-colors flex items-center justify-between"
+                class="w-full px-3 py-1.5 border border-gray-200 rounded-[8px] text-sm focus:outline-none focus:border-primary cursor-pointer transition-colors flex items-center justify-between"
                 :class="officialEditForm.category ? 'text-gray-600' : 'text-gray-400'"
                 @click.stop="officialCategoryDropdownOpen = !officialCategoryDropdownOpen"
               >
@@ -712,7 +712,7 @@
                   v-for="cat in flatCategoryList"
                   :key="cat.id"
                   class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
-                  :class="officialEditForm.category === cat.name ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
+                  :class="officialEditForm.category === cat.name ? 'text-primary bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
                   @click.stop="officialEditForm.category = cat.name; officialCategoryDropdownOpen = false"
                 >
                   {{ cat.name }}
@@ -726,7 +726,7 @@
                 缩略图
               </label>
               <div
-                class="relative w-36 h-36 border-2 border-dashed border-gray-200 rounded-[10px] overflow-hidden cursor-pointer hover:border-[#00b4b6] transition-colors group"
+                class="relative w-36 h-36 border-2 border-dashed border-gray-200 rounded-[10px] overflow-hidden cursor-pointer hover:border-primary transition-colors group"
                 @click="officialThumbnailInput?.click()"
               >
                 <img
@@ -738,7 +738,7 @@
                 />
                 <div
                   v-else
-                  class="flex flex-col items-center justify-center h-full space-y-2 text-gray-400 group-hover:text-[#00b4b6] transition-colors"
+                  class="flex flex-col items-center justify-center h-full space-y-2 text-gray-400 group-hover:text-primary transition-colors"
                 >
                   <svg
                     class="w-8 h-8"
@@ -913,7 +913,7 @@
           <div class="flex-1 overflow-auto px-6 py-4">
             <!-- Loading 状态 -->
             <div v-if="versionLoading" class="flex items-center justify-center py-16">
-              <svg class="animate-spin h-8 w-8 text-[#00b4b6]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg class="animate-spin h-8 w-8 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
@@ -947,14 +947,14 @@
                   <td class="py-3 px-4 text-sm space-x-2">
                     <button 
                       v-if="version.status === '已上架'"
-                      class="text-[#00b4b6] hover:underline cursor-pointer"
+                      class="text-primary hover:underline cursor-pointer"
                       @click="handleVersionToggle(version)"
                     >
                       下架
                     </button>
                     <button 
                       v-else
-                      class="text-[#00b4b6] hover:underline cursor-pointer"
+                      class="text-primary hover:underline cursor-pointer"
                       @click="handleVersionToggle(version)"
                     >
                       上架

@@ -64,16 +64,16 @@
                     :class="[
                       'py-2.5 mb-1 rounded-[8px]',
                       isActive(workbenchRoute) &&
-                        'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
+                        'bg-brand-muted hover:!bg-brand-muted text-brand',
                       !isActive(workbenchRoute) &&
-                        'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                        'text-[#666] hover:bg-[#f5f7fa] hover:text-brand'
                     ]"
                     label="工作台"
                   >
                     <template #icon>
                       <IconHome
                         class="size-4"
-                        :class="isActive(workbenchRoute) ? 'text-[#00b4b6]' : 'text-gray-400'"
+                        :class="isActive(workbenchRoute) ? 'text-brand' : 'text-gray-400'"
                       />
                     </template>
                   </LayoutSidebarMenuGroupItem>
@@ -88,9 +88,9 @@
                     :class="[
                       'py-3.5 mb-2 rounded-[8px] font-medium text-sm text-[#666] pl-3',
                       isActive(projectsRoute) &&
-                        'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
+                        'bg-brand-muted hover:!bg-brand-muted text-brand',
                       !isActive(projectsRoute) &&
-                        'hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                        'hover:bg-[#f5f7fa] hover:text-brand'
                     ]"
                     label="项目管理"
                   >
@@ -98,7 +98,7 @@
                       <IconProjects
                         class="size-6 pl-2"
                         :class="
-                          isActive(projectsRoute) ? 'text-[#00b4b6]' : 'text-gray-400'
+                          isActive(projectsRoute) ? 'text-brand' : 'text-gray-400'
                         "
                       />
                     </template>
@@ -112,20 +112,20 @@
                     class="w-full text-left px-2.5 py-4 mb-2 rounded-[8px] flex items-center transition-colors"
                     :class="[
                       isTwinSceneSectionActive
-                        ? 'bg-[#e6f7f8] text-[#00b4b6]'
-                        : 'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                        ? 'bg-brand-muted text-brand'
+                        : 'text-[#666] hover:bg-[#f5f7fa] hover:text-brand'
                     ]"
                     @click="toggleTwinSceneMenu"
                   >
                     <Squares2X2Icon
                       class="size-6 flex-shrink-0 mr-2.5 pl-2"
-                      :class="isTwinSceneSectionActive ? 'text-[#00b4b6]' : 'text-gray-400'"
+                      :class="isTwinSceneSectionActive ? 'text-brand' : 'text-gray-400'"
                     />
                     <span class="flex-1 text-sm font-medium">3D孪生场景编辑</span>
                     <ChevronRightIcon
                       class="size-4 flex-shrink-0 transition-transform duration-200 ease-in-out"
                       :class="
-                        showTwinSceneMenu ? 'rotate-90 text-[#00b4b6]' : 'text-gray-400'
+                        showTwinSceneMenu ? 'rotate-90 text-brand' : 'text-gray-400'
                       "
                     />
                   </button>
@@ -145,7 +145,7 @@
                         <button
                           type="button"
                           title="切换工作组"
-                          class="p-1 bg-white border border-gray-200 rounded-[6px] text-gray-500 hover:text-[#00b4b6] hover:border-[#00b4b6] transition-colors flex items-center justify-center"
+                          class="p-1 bg-white border border-gray-200 rounded-[6px] text-gray-500 hover:text-brand hover:border-brand transition-colors flex items-center justify-center"
                           @click.stop="toggleTwinWorkgroupDropdown"
                         >
                           <ArrowsRightLeftIcon class="w-3.5 h-3.5" />
@@ -167,8 +167,8 @@
                           class="w-full text-left px-3 py-2 text-sm transition-colors"
                           :class="
                             activeTwinWorkgroupId === wg.id
-                              ? 'bg-[#e6f7f8] text-[#00b4b6]'
-                              : 'text-gray-600 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                              ? 'bg-brand-muted text-brand'
+                              : 'text-gray-600 hover:bg-[#f5f7fa] hover:text-brand'
                           "
                           @click="selectTwinWorkgroup(wg.id)"
                         >
@@ -178,7 +178,7 @@
                         <button
                           v-if="canAddTwinWorkgroup"
                           type="button"
-                          class="w-full text-left px-3 py-2 text-sm text-[#00b4b6] hover:bg-[#f5f7fa] transition-colors flex items-center gap-1"
+                          class="w-full text-left px-3 py-2 text-sm text-brand hover:bg-[#f5f7fa] transition-colors flex items-center gap-1"
                           @click="openAddTwinWorkgroupModal"
                         >
                           <PlusIcon class="w-3.5 h-3.5" />
@@ -192,7 +192,7 @@
                       class="block py-2.5 pr-2 rounded-[6px] transition-colors"
                       :class="
                         isTwinSceneLinkActive(twinSceneCasesRoute(activeTwinWorkgroupId))
-                          ? 'bg-[#e6f7f8]'
+                          ? 'bg-brand-muted'
                           : 'hover:bg-[#f5f7fa]'
                       "
                       @click="isOpenMobile = false"
@@ -210,8 +210,8 @@
                           class="text-sm transition-colors"
                           :class="
                             isTwinSceneLinkActive(twinSceneCasesRoute(activeTwinWorkgroupId))
-                              ? 'text-[#00b4b6] font-medium'
-                              : 'text-gray-500 hover:text-[#00b4b6]'
+                              ? 'text-brand font-medium'
+                              : 'text-gray-500 hover:text-brand'
                           "
                         >
                           组内案例
@@ -223,7 +223,7 @@
                       class="block py-2.5 pr-2 rounded-[6px] transition-colors"
                       :class="
                         isTwinSceneLinkActive(twinSceneMembersRoute(activeTwinWorkgroupId))
-                          ? 'bg-[#e6f7f8]'
+                          ? 'bg-brand-muted'
                           : 'hover:bg-[#f5f7fa]'
                       "
                       @click="isOpenMobile = false"
@@ -245,8 +245,8 @@
                             isTwinSceneLinkActive(
                               twinSceneMembersRoute(activeTwinWorkgroupId)
                             )
-                              ? 'text-[#00b4b6] font-medium'
-                              : 'text-gray-500 hover:text-[#00b4b6]'
+                              ? 'text-brand font-medium'
+                              : 'text-gray-500 hover:text-brand'
                           "
                         >
                           组员管理
@@ -258,7 +258,7 @@
                       class="block py-2.5 pr-2 rounded-[6px] transition-colors"
                       :class="
                         isTwinSceneLinkActive(twinSceneSettingsRoute(activeTwinWorkgroupId))
-                          ? 'bg-[#e6f7f8]'
+                          ? 'bg-brand-muted'
                           : 'hover:bg-[#f5f7fa]'
                       "
                       @click="isOpenMobile = false"
@@ -280,8 +280,8 @@
                             isTwinSceneLinkActive(
                               twinSceneSettingsRoute(activeTwinWorkgroupId)
                             )
-                              ? 'text-[#00b4b6] font-medium'
-                              : 'text-gray-500 hover:text-[#00b4b6]'
+                              ? 'text-brand font-medium'
+                              : 'text-gray-500 hover:text-brand'
                           "
                         >
                           系统管理
@@ -299,8 +299,8 @@
                       isActive(modelsRoute) ||
                       isActive(lightModelsRoute) ||
                       isActive(twinModelsRoute)
-                        ? 'bg-[#e6f7f8] text-[#00b4b6]'
-                        : 'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                        ? 'bg-brand-muted text-brand'
+                        : 'text-[#666] hover:bg-[#f5f7fa] hover:text-brand'
                     ]"
                     @click="toggleModelMenu"
                   >
@@ -310,7 +310,7 @@
                         isActive(modelsRoute) ||
                         isActive(lightModelsRoute) ||
                         isActive(twinModelsRoute)
-                          ? 'text-[#00b4b6]'
+                          ? 'text-brand'
                           : 'text-gray-400'
                       "
                     />
@@ -318,7 +318,7 @@
                     <ChevronRightIcon
                       class="size-4 flex-shrink-0 transition-transform duration-200 ease-in-out"
                       :class="
-                        showModelMenu ? 'rotate-90 text-[#00b4b6]' : 'text-gray-400'
+                        showModelMenu ? 'rotate-90 text-brand' : 'text-gray-400'
                       "
                     />
                   </button>
@@ -333,7 +333,7 @@
                       class="block py-2 pr-2 rounded-[6px] transition-colors"
                       :class="
                         isActive(lightModelsRoute)
-                          ? 'bg-[#e6f7f8]'
+                          ? 'bg-brand-muted'
                           : 'hover:bg-[#f5f7fa]'
                       "
                       @click="isOpenMobile = false"
@@ -349,8 +349,8 @@
                           class="text-sm transition-colors"
                           :class="
                             isActive(lightModelsRoute)
-                              ? 'text-[#00b4b6] font-medium'
-                              : 'text-gray-500 hover:text-[#00b4b6]'
+                              ? 'text-brand font-medium'
+                              : 'text-gray-500 hover:text-brand'
                           "
                         >
                           轻量模型
@@ -362,7 +362,7 @@
                       class="block py-2 pr-2 rounded-[6px] transition-colors"
                       :class="
                         isActive(twinModelsRoute)
-                          ? 'bg-[#e6f7f8]'
+                          ? 'bg-brand-muted'
                           : 'hover:bg-[#f5f7fa]'
                       "
                       @click="isOpenMobile = false"
@@ -378,8 +378,8 @@
                           class="text-sm transition-colors"
                           :class="
                             isActive(twinModelsRoute)
-                              ? 'text-[#00b4b6] font-medium'
-                              : 'text-gray-500 hover:text-[#00b4b6]'
+                              ? 'text-brand font-medium'
+                              : 'text-gray-500 hover:text-brand'
                           "
                         >
                           孪生模型
@@ -398,16 +398,16 @@
                     :class="[
                       'py-2.5 mb-1 rounded-[8px]',
                       isActive(progressRoute) &&
-                        'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
+                        'bg-brand-muted hover:!bg-brand-muted text-brand',
                       !isActive(progressRoute) &&
-                        'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                        'text-[#666] hover:bg-[#f5f7fa] hover:text-brand'
                     ]"
                     label="进度管理"
                   >
                     <template #icon>
                       <IconProcess
                         class="size-4"
-                        :class="isActive(progressRoute) ? 'text-[#00b4b6]' : 'text-gray-400'"
+                        :class="isActive(progressRoute) ? 'text-brand' : 'text-gray-400'"
                       />
                     </template>
                   </LayoutSidebarMenuGroupItem>
@@ -422,9 +422,9 @@
                     :class="[
                       'py-2.5 mb-1 rounded-[8px]',
                       isActive(qualityAcceptanceRoute) &&
-                        'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
+                        'bg-brand-muted hover:!bg-brand-muted text-brand',
                       !isActive(qualityAcceptanceRoute) &&
-                        'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                        'text-[#666] hover:bg-[#f5f7fa] hover:text-brand'
                     ]"
                     label="质量验收"
                   >
@@ -433,7 +433,7 @@
                         class="size-4"
                         :class="
                           isActive(qualityAcceptanceRoute)
-                            ? 'text-[#00b4b6]'
+                            ? 'text-brand'
                             : 'text-gray-400'
                         "
                       />
@@ -450,9 +450,9 @@
                     :class="[
                       'py-2.5 mb-1 rounded-[8px]',
                       isActive(workValuationRoute) &&
-                        'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
+                        'bg-brand-muted hover:!bg-brand-muted text-brand',
                       !isActive(workValuationRoute) &&
-                        'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                        'text-[#666] hover:bg-[#f5f7fa] hover:text-brand'
                     ]"
                     label="验工计价"
                   >
@@ -461,7 +461,7 @@
                         class="size-4"
                         :class="
                           isActive(workValuationRoute)
-                            ? 'text-[#00b4b6]'
+                            ? 'text-brand'
                             : 'text-gray-400'
                         "
                       />
@@ -478,16 +478,16 @@
                     :class="[
                       'py-2.5 mb-1 rounded-[8px]',
                       isActive(archivesRoute) &&
-                        'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
+                        'bg-brand-muted hover:!bg-brand-muted text-brand',
                       !isActive(archivesRoute) &&
-                        'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                        'text-[#666] hover:bg-[#f5f7fa] hover:text-brand'
                     ]"
                     label="档案管理"
                   >
                     <template #icon>
                       <IconFile
                         class="size-4"
-                        :class="isActive(archivesRoute) ? 'text-[#00b4b6]' : 'text-gray-400'"
+                        :class="isActive(archivesRoute) ? 'text-brand' : 'text-gray-400'"
                       />
                     </template>
                   </LayoutSidebarMenuGroupItem>
@@ -502,9 +502,9 @@
                     :class="[
                       'py-3.5 mb-2 rounded-[8px] font-medium text-sm text-[#666] pl-3',
                       isActive(organizationRoute) &&
-                        'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
+                        'bg-brand-muted hover:!bg-brand-muted text-brand',
                       !isActive(organizationRoute) &&
-                        'hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                        'hover:bg-[#f5f7fa] hover:text-brand'
                     ]"
                     label="组织管理"
                   >
@@ -513,7 +513,7 @@
                         class="size-6 pl-2"
                         :class="
                           isActive(organizationRoute)
-                            ? 'text-[#00b4b6]'
+                            ? 'text-brand'
                             : 'text-gray-400'
                         "
                       />
@@ -530,9 +530,9 @@
                     :class="[
                       'py-3.5 mb-2 rounded-[8px] font-medium text-sm text-[#666] pl-3',
                       isActive(permissionsRoute) &&
-                        'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
+                        'bg-brand-muted hover:!bg-brand-muted text-brand',
                       !isActive(permissionsRoute) &&
-                        'hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                        'hover:bg-[#f5f7fa] hover:text-brand'
                     ]"
                     label="权限管理"
                   >
@@ -541,7 +541,7 @@
                         class="size-6 pl-2"
                         :class="
                           isActive(permissionsRoute)
-                            ? 'text-[#00b4b6]'
+                            ? 'text-brand'
                             : 'text-gray-400'
                         "
                       />
@@ -558,8 +558,8 @@
                     :class="[
                       'py-3.5 mb-2 rounded-[8px] font-medium text-sm text-[#666] pl-3',
                       isActive(logsRoute) &&
-                        'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
-                      !isActive(logsRoute) && 'hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
+                        'bg-brand-muted hover:!bg-brand-muted text-brand',
+                      !isActive(logsRoute) && 'hover:bg-[#f5f7fa] hover:text-brand'
                     ]"
                     label="日志管理"
                   >
@@ -567,7 +567,7 @@
                       <IconClipboard
                         class="size-6 pl-2"
                         :class="
-                          isActive(logsRoute) ? 'text-[#00b4b6]' : 'text-gray-400'
+                          isActive(logsRoute) ? 'text-brand' : 'text-gray-400'
                         "
                       />
                     </template>
@@ -693,7 +693,7 @@
                   type="text"
                   maxlength="10"
                   placeholder="请输入组名称"
-                  class="w-full bg-gray-50 border border-transparent rounded-[8px] p-2.5 pr-14 text-sm text-[#333] focus:outline-none focus:ring-0 focus:border-[#00b4b6] focus:bg-white"
+                  class="w-full bg-gray-50 border border-transparent rounded-[8px] p-2.5 pr-14 text-sm text-[#333] focus:outline-none focus:ring-0 focus:border-brand focus:bg-white"
                   @keydown.enter.prevent="confirmAddTwinWorkgroup"
                 />
                 <span
@@ -1170,8 +1170,8 @@ const isActive = (...routes: string[]): boolean => {
   color: #00b4b6 !important;
 }
 
-/* 选中状态（当父元素有 bg-[#e6f7f8] 时）保持主题色 */
-:deep(.group\/item[class*='bg-[#e6f7f8]'] span.truncate) {
+/* 选中状态（当父元素有 bg-brand-muted 时）保持主题色 */
+:deep(.group\/item[class*='bg-brand-muted'] span.truncate) {
   color: #00b4b6 !important;
 }
 </style>
