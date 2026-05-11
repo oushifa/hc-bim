@@ -257,7 +257,13 @@
                   <div
                     class="w-10 h-10 rounded-[8px] bg-gray-100 overflow-hidden shrink-0"
                   >
-                    <CubeIcon class="w-full h-full p-2 text-gray-400" />
+                    <img
+                      v-if="activeTab === 'official' && (model as OfficialModel).thumbnailUrl"
+                      :src="(model as OfficialModel).thumbnailUrl"
+                      :alt="model.name"
+                      class="w-full h-full object-cover"
+                    />
+                    <CubeIcon v-else class="w-full h-full p-2 text-gray-400" />
                   </div>
                   <div class="flex flex-col">
                     <span class="text-sm font-medium text-[#333]">
@@ -1176,22 +1182,31 @@ const fetchOfficialModels = async () => {
     if (responseData && responseData.result) {
       // 如果有 data 字段，解析数据
       if (responseData.result.data && Array.isArray(responseData.result.data)) {
-        officialModelsData.value = responseData.result.data.map((item: any) => ({
-          id: String(item.id),
-          assetId: item.assetId || '', // 保存原始assetId（字符串类型）
-          name: item.assetName || '',
-          nameEn: item.assetNameEn || '',
-          seedId: item.seedId || '',
-          stageProduct: item.stageProduct || '',
-          category: item.category ? JSON.stringify(item.category) : '[]',
-          categoryIdSet: item.categoryIdSet && Array.isArray(item.categoryIdSet) ? item.categoryIdSet : [], // 保存原始categoryIdSet
-          system: item.platform || '',
-          dataVersion: item.assetVersion || '',
-          assetSize: formatFileSize(item.size),
-          publishTime: item.publishedAt || '',
-          status: item.published ? '已上架' : '已下架',
-          industryTag: item.industryTags ? JSON.stringify(item.industryTags) : '[]'
-        }))
+        officialModelsData.value = responseData.result.data.map((item: any) => {
+          // 拼接缩略图URL
+          let thumbnailUrl = ''
+          if (item.thumbnails && Array.isArray(item.thumbnails) && item.thumbnails.length > 0 && item.thumbnails[0].uri) {
+            thumbnailUrl = 'http://10.66.8.185:30080' + item.thumbnails[0].uri
+          }
+                  
+          return {
+            id: String(item.id),
+            assetId: item.assetId || '', // 保存原始assetId(字符串类型)
+            name: item.assetName || '',
+            nameEn: item.assetNameEn || '',
+            seedId: item.seedId || '',
+            stageProduct: item.stageProduct || '',
+            category: item.category ? JSON.stringify(item.category) : '[]',
+            categoryIdSet: item.categoryIdSet && Array.isArray(item.categoryIdSet) ? item.categoryIdSet : [], // 保存原始categoryIdSet
+            system: item.platform || '',
+            dataVersion: item.assetVersion || '',
+            assetSize: formatFileSize(item.size),
+            publishTime: item.publishedAt || '',
+            status: item.published ? '已上架' : '已下架',
+            industryTag: item.industryTags ? JSON.stringify(item.industryTags) : '[]',
+            thumbnailUrl: thumbnailUrl
+          }
+        })
         // 更新总记录数
         officialTotalRecords.value = responseData.result.total || officialModelsData.value.length
       } else {
@@ -1222,7 +1237,7 @@ interface UserModel {
 
 interface OfficialModel {
   id: string
-  assetId: string // 原始assetId，用于编辑接口
+  assetId: string // 原始assetId,用于编辑接口
   name: string
   nameEn: string
   seedId: string
@@ -1235,6 +1250,7 @@ interface OfficialModel {
   publishTime: string
   status: string
   industryTag: string
+  thumbnailUrl: string // 缩略图URL
 }
 
 // ---------- 下架 Popover ----------
@@ -1390,7 +1406,7 @@ const handleOfficialEditConfirm = async () => {
     }
     
     await $dtpFetch('/v1/daas/asset/model/update', {
-      method: 'POST',
+      method: 'PUT',
       body: {
         assetId: officialEditForm.assetId,
         assetName: officialEditForm.name,
