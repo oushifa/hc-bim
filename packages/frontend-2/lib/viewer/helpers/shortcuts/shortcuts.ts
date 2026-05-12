@@ -44,6 +44,13 @@ export const PanelShortcuts = {
     key: 'S',
     action: 'ToggleSavedViews'
   },
+  ToggleAlignments: {
+    name: '对齐视图',
+    description: '切换对齐视图面板',
+    modifiers: [ModifierKeys.Shift],
+    key: 'A',
+    action: 'ToggleAlignments'
+  },
   ToggleViewModes: {
     name: '视图模式',
     description: '切换视图模式面板',

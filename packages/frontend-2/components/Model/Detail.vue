@@ -751,7 +751,7 @@ import {
 } from '@heroicons/vue/24/outline'
 
 interface Model {
-  id: number
+  id: string
   title: string
   updateTime: string
   comments: number

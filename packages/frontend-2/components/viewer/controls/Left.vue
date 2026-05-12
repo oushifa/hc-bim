@@ -80,6 +80,21 @@
         @click="toggleActivePanel('savedViews')"
       ></ViewerControlsButtonToggle>
 
+      <!-- alignment -->
+      <ViewerControlsButtonToggle
+        v-tippy="
+          getTooltipProps(
+            getShortcutDisplayText(shortcuts.ToggleAlignments, { format: 'separate' }),
+            {
+              placement: 'right'
+            }
+          )
+        "
+        :active="activePanel === 'alignments'"
+        :icon="BetweenVerticalStart"
+        @click="toggleActivePanel('alignments')"
+      ></ViewerControlsButtonToggle>
+
       <ViewerControlsButtonToggle
         v-if="allAutomationRuns.length !== 0"
         v-tippy="{
@@ -131,6 +146,7 @@
       />
       <ViewerDataviewerPanel v-if="activePanel === 'devMode'" />
       <ViewerCatalogPanel v-if="activePanel === 'catalog'"></ViewerCatalogPanel>
+      <ViewerAlignmentsPanel v-if="activePanel === 'alignments'" />
       <KeepAlive>
         <ViewerSavedViewsPanel
           v-if="isSavedViewsEnabled && activePanel === 'savedViews'"
@@ -196,7 +212,8 @@ import {
   ListFilter,
   MessageSquareText,
   ArrowLeft,
-  ListTree
+  ListTree,
+  BetweenVerticalStart
 } from 'lucide-vue-next'
 import { useViewerPanelsUtilities } from '~/lib/viewer/composables/setup/panels'
 import type { ActivePanel } from '~/lib/viewer/helpers/sceneExplorer'

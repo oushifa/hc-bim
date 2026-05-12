@@ -224,6 +224,13 @@ const shouldShowNewThread = computed(
     !isEmbedEnabled.value && !state.ui.measurement.enabled.value && canPostComment.value
 )
 
+console.log(
+  'shouldShowNewThread',
+  state.ui.measurement.enabled.value,
+  canPostComment.value,
+  !isEmbedEnabled.value
+)
+
 const allThreadsChronologicalOrder = computed(() => {
   const vals = Object.values(commentThreads.value)
   return vals.sort(

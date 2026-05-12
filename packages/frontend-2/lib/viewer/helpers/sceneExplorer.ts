@@ -46,3 +46,4 @@ export type ActivePanel =
   | 'devMode'
   | 'savedViews'
   | 'catalog'
+  | 'alignments'
