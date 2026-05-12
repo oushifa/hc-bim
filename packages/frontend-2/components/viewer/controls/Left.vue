@@ -1,189 +1,197 @@
 <!-- eslint-disable vuejs-accessibility/no-static-element-interactions -->
 <template>
-  <aside
-    class="absolute left-2 z-50 flex rounded-lg border border-outline-2 bg-foundation px-1 overflow-visible focus-visible:outline-none"
-    :class="[
-      isEmbedEnabled
-        ? 'top-[0.5rem]'
-        : 'top-[0.5rem] lg:top-[0] lg:rounded-none lg:px-2 lg:max-h-[100dvh] lg:border-l-0 lg:border-t-0 lg:border-b-0 lg:h-full lg:left-0',
-      hasActivePanel && 'h-full max-h-[100dvh] rounded-r-none'
-    ]"
-  >
-    <div class="flex flex-col gap-2 py-1" :class="isEmbedEnabled ? '' : 'lg:py-2'">
-      <ViewerControlsButtonToggle
-        v-tippy="
-          getTooltipProps(
-            getShortcutDisplayText(shortcuts.ToggleModels, { format: 'separate' }),
-            {
-              placement: 'right'
-            }
-          )
-        "
-        :active="activePanel === 'models'"
-        :icon="Box"
-        @click="toggleActivePanel('models')"
-      />
-      <ViewerControlsButtonToggle
-        v-tippy="
-          getTooltipProps(
-            getShortcutDisplayText(shortcuts.ToggleFilters, { format: 'separate' }),
-            {
-              placement: 'right'
-            }
-          )
-        "
-        :active="activePanel === 'filters'"
-        :icon="ListFilter"
-        :dot="hasAnyFiltersApplied"
-        @click="toggleActivePanel('filters')"
-      />
-      <ViewerControlsButtonToggle
-        v-tippy="
-          getTooltipProps(
-            getShortcutDisplayText(shortcuts.ToggleDiscussions, { format: 'separate' }),
-            {
-              placement: 'right'
-            }
-          )
-        "
-        :active="activePanel === 'discussions'"
-        :icon="MessageSquareText"
-        @click="toggleActivePanel('discussions')"
-      />
-
-      <ViewerControlsButtonToggle
-        v-tippy="
-          getTooltipProps(
-            getShortcutDisplayText(shortcuts.ToggleCatalog, { format: 'separate' }),
-            {
-              placement: 'right'
-            }
-          )
-        "
-        :active="activePanel === 'catalog'"
-        :icon="ListTree"
-        @click="toggleActivePanel('catalog')"
-      ></ViewerControlsButtonToggle>
-      <!-- Saved views -->
-      <ViewerControlsButtonToggle
-        v-if="isSavedViewsEnabled"
-        v-tippy="
-          getTooltipProps(
-            getShortcutDisplayText(shortcuts.ToggleSavedViews, { format: 'separate' }),
-            {
-              placement: 'right'
-            }
-          )
-        "
-        :active="activePanel === 'savedViews'"
-        :icon="Camera"
-        @click="toggleActivePanel('savedViews')"
-      ></ViewerControlsButtonToggle>
-
-      <!-- alignment -->
-      <ViewerControlsButtonToggle
-        v-tippy="
-          getTooltipProps(
-            getShortcutDisplayText(shortcuts.ToggleAlignments, { format: 'separate' }),
-            {
-              placement: 'right'
-            }
-          )
-        "
-        :active="activePanel === 'alignments'"
-        :icon="BetweenVerticalStart"
-        @click="toggleActivePanel('alignments')"
-      ></ViewerControlsButtonToggle>
-
-      <ViewerControlsButtonToggle
-        v-if="allAutomationRuns.length !== 0"
-        v-tippy="{
-          content: summary.longSummary,
-          placement: 'right'
-        }"
-        :active="activePanel === 'automate'"
-        @click="toggleActivePanel('automate')"
-      >
-        <AutomateRunsTriggerStatusIcon
-          :summary="summary"
-          class="h-5 w-5 md:h-6 md:w-6"
-        />
-      </ViewerControlsButtonToggle>
-    </div>
-
-    <!-- Resize handle -->
-    <div
-      v-if="activePanel !== 'none' && !isEmbedEnabled"
-      ref="resizeHandle"
-      class="absolute h-full w-4 transition border-l hover:border-l-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30"
-      :style="`left:${width + 52}px;`"
-      @mousedown="startResizing"
-    />
-
-    <!-- Scrollable controls container -->
-    <div
-      v-show="activePanel !== 'none'"
-      ref="scrollableControlsContainer"
+  <div class="contents">
+    <aside
+      class="absolute left-2 z-50 flex rounded-lg border border-outline-2 bg-foundation px-1 overflow-visible focus-visible:outline-none"
       :class="[
-        'bg-foundation absolute z-10 left-[calc(2.5rem+1px)] top-[-1px] bottom-[-1px] overflow-hidden border-outline-2 border border-l-0 rounded-lg rounded-tl-none rounded-bl-none ',
-        hasActivePanel ? 'opacity-100' : 'opacity-0',
-        isEmbedEnabled ? '' : 'lg:left-[calc(3rem+1px)] lg:rounded-none'
+        isEmbedEnabled
+          ? 'top-[0.5rem]'
+          : 'top-[0.5rem] lg:top-[0] lg:rounded-none lg:px-2 lg:max-h-[100dvh] lg:border-l-0 lg:border-t-0 lg:border-b-0 lg:h-full lg:left-0',
+        hasActivePanel && 'h-full max-h-[100dvh] rounded-r-none'
       ]"
-      :style="`width: ${widthClass};`"
     >
-      <ViewerModelsPanel
-        v-if="activePanel === 'models'"
-        v-model:sub-view="modelsSubView"
-      />
-      <ViewerFiltersPanel v-if="activePanel === 'filters'" />
-      <ViewerCommentsPanel
-        v-if="resourceItems.length !== 0 && activePanel === 'discussions'"
-      />
-      <AutomateViewerPanel
-        v-if="activePanel === 'automate'"
-        :automation-runs="allAutomationRuns"
-        :summary="summary"
-      />
-      <ViewerDataviewerPanel v-if="activePanel === 'devMode'" />
-      <ViewerCatalogPanel v-if="activePanel === 'catalog'"></ViewerCatalogPanel>
-      <ViewerAlignmentsPanel v-if="activePanel === 'alignments'" />
-      <KeepAlive>
-        <ViewerSavedViewsPanel
-          v-if="isSavedViewsEnabled && activePanel === 'savedViews'"
-          @close="activePanel = 'none'"
+      <div class="flex flex-col gap-2 py-1" :class="isEmbedEnabled ? '' : 'lg:py-2'">
+        <ViewerControlsButtonToggle
+          v-tippy="
+            getTooltipProps(
+              getShortcutDisplayText(shortcuts.ToggleModels, { format: 'separate' }),
+              {
+                placement: 'right'
+              }
+            )
+          "
+          :active="activePanel === 'models'"
+          :icon="Box"
+          @click="toggleActivePanel('models')"
         />
-      </KeepAlive>
-    </div>
+        <ViewerControlsButtonToggle
+          v-tippy="
+            getTooltipProps(
+              getShortcutDisplayText(shortcuts.ToggleFilters, { format: 'separate' }),
+              {
+                placement: 'right'
+              }
+            )
+          "
+          :active="activePanel === 'filters'"
+          :icon="ListFilter"
+          :dot="hasAnyFiltersApplied"
+          @click="toggleActivePanel('filters')"
+        />
+        <ViewerControlsButtonToggle
+          v-tippy="
+            getTooltipProps(
+              getShortcutDisplayText(shortcuts.ToggleDiscussions, {
+                format: 'separate'
+              }),
+              {
+                placement: 'right'
+              }
+            )
+          "
+          :active="activePanel === 'discussions'"
+          :icon="MessageSquareText"
+          @click="toggleActivePanel('discussions')"
+        />
 
-    <!-- Panel Extension - Portal target for additional content -->
-    <div
-      id="panel-extension"
-      class="absolute z-50 left-[calc(100dvw-16rem)] sm:left-72 max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] top-12 bg-foundation rounded-lg overflow-hidden"
-      :style="`left: ${panelExtensionLeft} !important; width: ${panelExtensionWidth}px;`"
-    >
-      <!-- Resize handle for panel extension -->
+        <ViewerControlsButtonToggle
+          v-tippy="
+            getTooltipProps(
+              getShortcutDisplayText(shortcuts.ToggleCatalog, { format: 'separate' }),
+              {
+                placement: 'right'
+              }
+            )
+          "
+          :active="activePanel === 'catalog'"
+          :icon="ListTree"
+          @click="toggleActivePanel('catalog')"
+        ></ViewerControlsButtonToggle>
+        <!-- Saved views -->
+        <ViewerControlsButtonToggle
+          v-if="isSavedViewsEnabled"
+          v-tippy="
+            getTooltipProps(
+              getShortcutDisplayText(shortcuts.ToggleSavedViews, {
+                format: 'separate'
+              }),
+              {
+                placement: 'right'
+              }
+            )
+          "
+          :active="activePanel === 'savedViews'"
+          :icon="Camera"
+          @click="toggleActivePanel('savedViews')"
+        ></ViewerControlsButtonToggle>
+
+        <!-- alignment -->
+        <ViewerControlsButtonToggle
+          v-tippy="
+            getTooltipProps(
+              getShortcutDisplayText(shortcuts.ToggleAlignments, {
+                format: 'separate'
+              }),
+              {
+                placement: 'right'
+              }
+            )
+          "
+          :active="activePanel === 'alignments'"
+          :icon="BetweenVerticalStart"
+          @click="toggleActivePanel('alignments')"
+        ></ViewerControlsButtonToggle>
+
+        <ViewerControlsButtonToggle
+          v-if="allAutomationRuns.length !== 0"
+          v-tippy="{
+            content: summary.longSummary,
+            placement: 'right'
+          }"
+          :active="activePanel === 'automate'"
+          @click="toggleActivePanel('automate')"
+        >
+          <AutomateRunsTriggerStatusIcon
+            :summary="summary"
+            class="h-5 w-5 md:h-6 md:w-6"
+          />
+        </ViewerControlsButtonToggle>
+      </div>
+
+      <!-- Resize handle -->
       <div
-        ref="panelExtensionResizeHandle"
-        class="absolute h-full max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] w-4 transition border-r hover:border-r-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30 right-0"
-        @mousedown="startPanelExtensionResizing"
+        v-if="activePanel !== 'none' && !isEmbedEnabled"
+        ref="resizeHandle"
+        class="absolute h-full w-4 transition border-l hover:border-l-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30"
+        :style="`left:${width + 52}px;`"
+        @mousedown="startResizing"
       />
-      <PortalTarget name="panel-extension"></PortalTarget>
-    </div>
-  </aside>
 
-  <!-- 返回按钮：fixed 悬浮在侧边栏右侧顶部，始终可见 -->
-  <Teleport to="body">
-    <button
-      v-if="!isEmbedEnabled"
-      v-tippy="getTooltipProps('返回上一级', { placement: 'right' })"
-      class="fixed z-[10] top-2 flex items-center space-x-1 text-black bg-white hover:bg-gray-100 px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors shadow-sm"
-      :style="backBtnStyle"
-      @click="goBackToPreviousPage"
-    >
-      <ArrowLeft class="w-4 h-4" />
-      <span>返回</span>
-    </button>
-  </Teleport>
+      <!-- Scrollable controls container -->
+      <div
+        v-show="activePanel !== 'none'"
+        ref="scrollableControlsContainer"
+        :class="[
+          'bg-foundation absolute z-10 left-[calc(2.5rem+1px)] top-[-1px] bottom-[-1px] overflow-hidden border-outline-2 border border-l-0 rounded-lg rounded-tl-none rounded-bl-none ',
+          hasActivePanel ? 'opacity-100' : 'opacity-0',
+          isEmbedEnabled ? '' : 'lg:left-[calc(3rem+1px)] lg:rounded-none'
+        ]"
+        :style="`width: ${widthClass};`"
+      >
+        <ViewerModelsPanel
+          v-if="activePanel === 'models'"
+          v-model:sub-view="modelsSubView"
+        />
+        <ViewerFiltersPanel v-if="activePanel === 'filters'" />
+        <ViewerCommentsPanel
+          v-if="resourceItems.length !== 0 && activePanel === 'discussions'"
+        />
+        <AutomateViewerPanel
+          v-if="activePanel === 'automate'"
+          :automation-runs="allAutomationRuns"
+          :summary="summary"
+        />
+        <ViewerDataviewerPanel v-if="activePanel === 'devMode'" />
+        <ViewerCatalogPanel v-if="activePanel === 'catalog'"></ViewerCatalogPanel>
+        <ViewerAlignmentsPanel v-if="activePanel === 'alignments'" />
+        <KeepAlive>
+          <ViewerSavedViewsPanel
+            v-if="isSavedViewsEnabled && activePanel === 'savedViews'"
+            @close="activePanel = 'none'"
+          />
+        </KeepAlive>
+      </div>
+
+      <!-- Panel Extension - Portal target for additional content -->
+      <div
+        id="panel-extension"
+        class="absolute z-50 left-[calc(100dvw-16rem)] sm:left-72 max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] top-12 bg-foundation rounded-lg overflow-hidden"
+        :style="`left: ${panelExtensionLeft} !important; width: ${panelExtensionWidth}px;`"
+      >
+        <!-- Resize handle for panel extension -->
+        <div
+          ref="panelExtensionResizeHandle"
+          class="absolute h-full max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] w-4 transition border-r hover:border-r-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30 right-0"
+          @mousedown="startPanelExtensionResizing"
+        />
+        <PortalTarget name="panel-extension"></PortalTarget>
+      </div>
+    </aside>
+
+    <!-- 返回按钮：fixed 悬浮在侧边栏右侧顶部，始终可见 -->
+    <Teleport to="body">
+      <button
+        v-if="!isEmbedEnabled"
+        v-tippy="getTooltipProps('返回上一级', { placement: 'right' })"
+        class="fixed z-[10] top-2 flex items-center space-x-1 text-black bg-white hover:bg-gray-100 px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors shadow-sm"
+        :style="backBtnStyle"
+        @click="goBackToPreviousPage"
+      >
+        <ArrowLeft class="w-4 h-4" />
+        <span>返回</span>
+      </button>
+    </Teleport>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -218,6 +226,7 @@ import {
 import { useViewerPanelsUtilities } from '~/lib/viewer/composables/setup/panels'
 import type { ActivePanel } from '~/lib/viewer/helpers/sceneExplorer'
 import { useSettingsMenuState } from '~/lib/settings/composables/menu'
+import { useAlignmentState } from '~/lib/viewer/composables/setup/alignment'
 
 // TODO: Refactor all of this event business and just read/write panels state directly
 const emit = defineEmits<{
@@ -236,7 +245,6 @@ const isTablet = breakpoints.smaller('lg')
 const isLargerThanLg = breakpoints.greater('lg')
 const { getTooltipProps } = useSmartTooltipDelay()
 const isSavedViewsEnabled = useAreSavedViewsEnabled()
-const isWorkspacesEnabled = useIsWorkspacesEnabled()
 const {
   filters: { hasAnyFiltersApplied }
 } = useInjectedViewerInterfaceState()
@@ -247,6 +255,7 @@ const {
 } = useInjectedViewerState()
 
 const { onPanelButtonClick } = useViewerPanelsUtilities()
+const { state: alignmentState, disableSplitScreen } = useAlignmentState()
 
 const width = ref(264)
 const panelExtensionWidth = ref(isMobile.value ? 200 : isLargerThanLg.value ? 300 : 256)
@@ -404,6 +413,11 @@ watch(activePanel, (newVal, oldVal) => {
   // If a panel is being opened (not closed) on mobile, emit event to parent
   if (wasNone && newVal !== 'none' && isMobile.value) {
     emit('forceClosePanels')
+  }
+
+  const leavingAlignments = oldVal === 'alignments' && newVal !== 'alignments'
+  if (leavingAlignments && alignmentState.splitScreenEnabled) {
+    disableSplitScreen()
   }
 })
 

@@ -1,5 +1,16 @@
 <template>
   <div>
+    <!-- Split-screen overlay: clips the Speckle viewer to right pane via CSS, adds CAD left pane -->
+    <ClientOnly>
+      <ViewerAlignmentsSplitScreen
+        v-if="alignState.splitScreenEnabled"
+        :split-ratio="alignState.splitRatio"
+        :offset="alignState.offset"
+        :camera-sync-enabled="alignState.cameraSyncEnabled"
+        @update:split-ratio="alignSetSplitRatio"
+      />
+    </ClientOnly>
+
     <div class="flex-1">
       <!-- Nav -->
       <Portal to="navigation">
@@ -111,6 +122,7 @@
 </template>
 <script setup lang="ts">
 import { useInjectedViewerState } from '~~/lib/viewer/composables/setup'
+import { useAlignmentState } from '~/lib/viewer/composables/setup/alignment'
 import dayjs from 'dayjs'
 import { graphql } from '~~/lib/common/generated/gql'
 import { useEmbed } from '~/lib/viewer/composables/setup/embed'
@@ -160,6 +172,9 @@ const anchoredPoints = ref()
 
 const state = useInjectedViewerState()
 const resourceIdString = computed(() => state.resources.request.resourceIdString.value)
+
+// Alignment / split-screen state
+const { state: alignState, setSplitRatio: alignSetSplitRatio } = useAlignmentState()
 
 const {
   isEnabled: isEmbedEnabled,
