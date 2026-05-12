@@ -51,16 +51,16 @@
                     :class="[
                       'py-2.5 mb-1 rounded-[8px]',
                       isProjectActive('/workbench') &&
-                        'bg-primary/10 hover:!bg-primary/10 text-primary',
+                        'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
                       !isProjectActive('/workbench') &&
-                        'text-[#666] hover:bg-[#f5f7fa] hover:text-primary'
+                        'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                     ]"
                     label="工作台"
                   >
                     <template #icon>
                       <IconHome
                         class="size-4"
-                        :class="isProjectActive('/workbench') ? 'text-primary' : 'text-gray-400'"
+                        :class="isProjectActive('/workbench') ? 'text-[#00b4b6]' : 'text-gray-400'"
                       />
                     </template>
                   </LayoutSidebarMenuGroupItem>
@@ -74,7 +74,7 @@
                   arrow-class="text-[#666]"
                 >
                   <template #title-icon>
-                    <IconModelfiles class="size-4 text-primary" />
+                    <IconModelfiles class="size-4 text-[#00b4b6]" />
                   </template>
                   <NuxtLink
                     v-if="showWorkspaceLinks"
@@ -85,9 +85,9 @@
                       :class="[
                         'py-2.5 mb-1 rounded-[8px]',
                         isProjectActive('/model-list') &&
-                          'bg-primary/10 hover:!bg-primary/10 text-primary',
+                          'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
                         !isProjectActive('/model-list') &&
-                          'text-[#666] hover:bg-[#f5f7fa] hover:text-primary'
+                          'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                       ]"
                       extra-padding
                       label="文件管理"
@@ -102,9 +102,9 @@
                       :class="[
                         'py-2.5 mb-1 rounded-[8px]',
                         isProjectActive('/workbench/discussions') &&
-                          'bg-primary/10 hover:!bg-primary/10 text-primary',
+                          'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
                         !isProjectActive('/workbench/discussions') &&
-                          'text-[#666] hover:bg-[#f5f7fa] hover:text-primary'
+                          'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                       ]"
                       extra-padding
                       label="协同管理"
@@ -120,7 +120,7 @@
                   arrow-class="text-[#666]"
                 >
                   <template #title-icon>
-                    <IconProgress class="size-4 text-primary" />
+                    <IconProgress class="size-4 text-[#00b4b6]" />
                   </template>
                   <NuxtLink
                     v-if="showWorkspaceLinks"
@@ -131,9 +131,9 @@
                       :class="[
                         'py-2.5 mb-1 rounded-[8px]',
                         isProjectActive('/progress/schedule') &&
-                          'bg-primary/10 hover:!bg-primary/10 text-primary',
+                          'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
                         !isProjectActive('/progress/schedule') &&
-                          'text-[#666] hover:bg-[#f5f7fa] hover:text-primary'
+                          'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                       ]"
                       extra-padding
                       label="进度计划"
@@ -148,9 +148,9 @@
                       :class="[
                         'py-2.5 mb-1 rounded-[8px]',
                         isProjectActive('/progress/actual') &&
-                          'bg-primary/10 hover:!bg-primary/10 text-primary',
+                          'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
                         !isProjectActive('/progress/actual') &&
-                          'text-[#666] hover:bg-[#f5f7fa] hover:text-primary'
+                          'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                       ]"
                       extra-padding
                       label="实际进度"
@@ -165,9 +165,9 @@
                       :class="[
                         'py-2.5 mb-1 rounded-[8px]',
                         isProjectActive('/progress/physical') &&
-                          'bg-primary/10 hover:!bg-primary/10 text-primary',
+                          'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
                         !isProjectActive('/progress/physical') &&
-                          'text-[#666] hover:bg-[#f5f7fa] hover:text-primary'
+                          'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                       ]"
                       extra-padding
                       label="形象进度"
@@ -184,16 +184,16 @@
                     :class="[
                       'py-2.5 mb-1 rounded-[8px]',
                       isProjectActive('/quality-acceptance') &&
-                        'bg-primary/10 hover:!bg-primary/10 text-primary',
+                        'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
                       !isProjectActive('/quality-acceptance') &&
-                        'text-[#666] hover:bg-[#f5f7fa] hover:text-primary'
+                        'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                     ]"
                     label="质量验收"
                   >
                     <template #icon>
                       <IconCircleCheck
                         class="size-4"
-                        :class="isProjectActive('/quality-acceptance') ? 'text-primary' : 'text-gray-400'"
+                        :class="isProjectActive('/quality-acceptance') ? 'text-[#00b4b6]' : 'text-gray-400'"
                       />
                     </template>
                   </LayoutSidebarMenuGroupItem>
@@ -207,7 +207,7 @@
                   arrow-class="text-[#666]"
                 >
                   <template #title-icon>
-                    <IconCalculator class="size-4 text-primary" />
+                    <IconCalculator class="size-4 text-[#00b4b6]" />
                   </template>
                   <NuxtLink
                     v-if="showWorkspaceLinks"
@@ -218,9 +218,9 @@
                       :class="[
                         'py-2.5 mb-1 rounded-[8px]',
                         isProjectActive('/work-valuation/BOQ') &&
-                          'bg-primary/10 hover:!bg-primary/10 text-primary',
+                          'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
                         !isProjectActive('/work-valuation/BOQ') &&
-                          'text-[#666] hover:bg-[#f5f7fa] hover:text-primary'
+                          'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                       ]"
                       extra-padding
                       label="清单管理"
@@ -235,9 +235,9 @@
                       :class="[
                         'py-2.5 mb-1 rounded-[8px]',
                         isProjectActive('/work-valuation/monthly-measurement') &&
-                          'bg-primary/10 hover:!bg-primary/10 text-primary',
+                          'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
                         !isProjectActive('/work-valuation/monthly-measurement') &&
-                          'text-[#666] hover:bg-[#f5f7fa] hover:text-primary'
+                          'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                       ]"
                       extra-padding
                       label="月度验工"
@@ -253,7 +253,7 @@
                   arrow-class="text-[#666]"
                 >
                   <template #title-icon>
-                    <IconFile class="size-4 text-primary" />
+                    <IconFile class="size-4 text-[#00b4b6]" />
                   </template>
                   <NuxtLink
                     v-if="showWorkspaceLinks"
@@ -264,9 +264,9 @@
                       :class="[
                         'py-2.5 mb-1 rounded-[8px]',
                         isProjectActive('/archive/model-to-site') &&
-                          'bg-primary/10 hover:!bg-primary/10 text-primary',
+                          'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
                         !isProjectActive('/archive/model-to-site') &&
-                          'text-[#666] hover:bg-[#f5f7fa] hover:text-primary'
+                          'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                       ]"
                       extra-padding
                       label="实模一致性检查"
@@ -281,9 +281,9 @@
                       :class="[
                         'py-2.5 mb-1 rounded-[8px]',
                         isProjectActive('/archive/archives') &&
-                          'bg-primary/10 hover:!bg-primary/10 text-primary',
+                          'bg-[#e6f7f8] hover:!bg-[#e6f7f8] text-[#00b4b6]',
                         !isProjectActive('/archive/archives') &&
-                          'text-[#666] hover:bg-[#f5f7fa] hover:text-primary'
+                          'text-[#666] hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
                       ]"
                       extra-padding
                       label="档案管理"

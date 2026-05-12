@@ -15,7 +15,7 @@
       <!-- Search Bar -->
       <div class="p-4 border-b border-gray-100 bg-white/50 flex justify-between items-center">
         <span class="text-sm text-gray-600">
-          导入到: <span class="font-medium text-primary">{{ activeDirName }}</span>
+          导入到: <span class="font-medium text-[#00b4b6]">{{ activeDirName }}</span>
         </span>
         <div class="relative">
           <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -23,7 +23,7 @@
             v-model="searchQuery"
             type="text" 
             placeholder="搜索模型库..." 
-            class="w-64 bg-white/80 backdrop-blur-md border border-gray-200 rounded-md py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-primary text-[#333]"
+            class="w-64 bg-white/80 backdrop-blur-md border border-gray-200 rounded-md py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-[#00b4b6] text-[#333]"
           />
         </div>
       </div>
@@ -40,18 +40,18 @@
               isAlreadyImported(model.id) 
                 ? 'opacity-60 bg-gray-50 border-gray-200 cursor-not-allowed'
                 : isSelected(model.id)
-                  ? 'border-primary bg-primary/10 shadow-sm'
-                  : 'border-gray-200 hover:border-primary bg-white/80 backdrop-blur-md'
+                  ? 'border-[#00b4b6] bg-[#e6f7f8] shadow-sm'
+                  : 'border-gray-200 hover:border-[#00b4b6] bg-white/80 backdrop-blur-md'
             ]"
           >
             <div class="flex items-start justify-between mb-2">
               <div class="flex items-center space-x-2">
-                <CubeIcon :class="['h-4 w-4', isSelected(model.id) ? 'text-primary' : 'text-gray-400']" />
+                <CubeIcon :class="['h-4 w-4', isSelected(model.id) ? 'text-[#00b4b6]' : 'text-gray-400']" />
                 <h4 class="text-sm font-medium text-[#333] line-clamp-1" :title="model.name">
                   {{ model.name }}
                 </h4>
               </div>
-              <div v-if="!isAlreadyImported(model.id)" :class="isSelected(model.id) ? 'text-primary' : 'text-gray-300'">
+              <div v-if="!isAlreadyImported(model.id)" :class="isSelected(model.id) ? 'text-[#00b4b6]' : 'text-gray-300'">
                 <CheckIcon v-if="isSelected(model.id)" class="h-5 w-5" />
                 <Square2StackIcon v-else class="h-5 w-5" />
               </div>
@@ -70,7 +70,7 @@
       <!-- Footer -->
       <div class="p-4 border-t border-gray-100 flex justify-between items-center bg-white/50">
         <span class="text-sm text-gray-600">
-          已选择 <span class="font-medium text-primary">{{ selectedCount }}</span> 个模型
+          已选择 <span class="font-medium text-[#00b4b6]">{{ selectedCount }}</span> 个模型
         </span>
         <div class="space-x-3">
           <button 

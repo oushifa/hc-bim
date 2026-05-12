@@ -5,7 +5,7 @@
       :class="[
         'group w-full flex items-center justify-between px-2 py-1.5 rounded-[8px] text-sm transition-colors cursor-pointer',
         activeDir === directory.id
-          ? 'bg-primary/10 text-primary font-medium'
+          ? 'bg-[#e6f7f8] text-[#00b4b6] font-medium'
           : 'text-gray-600 hover:bg-gray-100'
       ]"
       :style="{ paddingLeft: `${level * 12 + 8}px` }"
@@ -24,20 +24,20 @@
         <FolderIcon
           :class="[
             'w-4 h-4 shrink-0',
-            activeDir === directory.id ? 'text-primary' : 'text-gray-400'
+            activeDir === directory.id ? 'text-[#00b4b6]' : 'text-gray-400'
           ]"
         />
         <span class="truncate">{{ directory.name }}</span>
       </div>
       <div class="opacity-0 group-hover:opacity-100 flex items-center">
         <button
-          class="p-1 text-gray-400 hover:text-primary"
+          class="p-1 text-gray-400 hover:text-[#00b4b6]"
           title="添加子目录"
           @click.stop="$emit('addChild', directory.id)"
         >
           <PlusIcon class="w-3.5 h-3.5" />
         </button>
-        <button class="p-1 text-gray-400 hover:text-primary">
+        <button class="p-1 text-gray-400 hover:text-[#00b4b6]">
           <EllipsisHorizontalIcon class="w-3.5 h-3.5" />
         </button>
       </div>

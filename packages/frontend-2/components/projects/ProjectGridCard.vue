@@ -1,6 +1,6 @@
 <template>
   <div
-    class="group bg-white/80 backdrop-blur-[151.88px] rounded-[26px] overflow-hidden border border-white/40 shadow-[0px_60px_60px_-30px_rgba(64,74,72,0.1)] hover:shadow-md hover:border-primary/30 transition-all cursor-pointer relative"
+    class="group bg-white/80 backdrop-blur-[151.88px] rounded-[26px] overflow-hidden border border-white/40 shadow-[0px_60px_60px_-30px_rgba(64,74,72,0.1)] hover:shadow-md hover:border-[#00b4b6]/30 transition-all cursor-pointer relative"
   >
     <!-- 可点击区域 -->
     <NuxtLink :to="projectRoute(project.id) + '/workbench'" class="block">
@@ -15,7 +15,7 @@
       </div>
       <div class="p-4 relative">
         <h3
-          class="text-base font-medium text-[#333] mb-1 group-hover:text-primary transition-colors pr-8 truncate"
+          class="text-base font-medium text-[#333] mb-1 group-hover:text-[#00b4b6] transition-colors pr-8 truncate"
           :title="project.name"
         >
           {{ project.name }}
@@ -29,7 +29,7 @@
     <div class="absolute bottom-3 right-3 z-30">
       <button
         type="button"
-        class="p-1.5 bg-gray-50 hover:bg-white rounded-full shadow-sm text-gray-600 hover:text-primary transition-colors border border-gray-100"
+        class="p-1.5 bg-gray-50 hover:bg-white rounded-full shadow-sm text-gray-600 hover:text-[#00b4b6] transition-colors border border-gray-100"
         @click.prevent="toggleActionMenu"
       >
         <EllipsisHorizontalIcon class="w-4 h-4" />
@@ -51,7 +51,7 @@
           <button
             v-if="isOwner"
             type="button"
-            class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-primary transition-colors"
+            class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-[#00b4b6] transition-colors"
             @click.stop="openEditDialog"
           >
             <PencilIcon class="w-3.5 h-3.5" />
@@ -59,7 +59,7 @@
           </button>
           <button
             type="button"
-            class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-primary transition-colors"
+            class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-[#00b4b6] transition-colors"
             @click.stop="copyProjectLink"
           >
             <ShareIcon class="w-3.5 h-3.5" />

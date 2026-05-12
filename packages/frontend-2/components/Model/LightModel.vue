@@ -181,12 +181,12 @@
                     <div
                       class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden border border-slate-200 group-hover:border-primary/30 transition-colors shadow-inner"
                     >
-                      <img
-                        v-if="model.hasModel"
-                        src="https://images.unsplash.com/photo-1581094794329-c8112a89af12?q=80&w=100&auto=format&fit=crop"
-                        alt="thumbnail"
-                        class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                      />
+                      <div
+                        v-if="model.previewUrl"
+                        class="w-full h-full opacity-80 group-hover:opacity-100 transition-opacity"
+                      >
+                        <PreviewImage :preview-url="model.previewUrl" />
+                      </div>
                       <CubeIcon v-else class="h-5 w-5 text-slate-300" />
                     </div>
                     <div class="flex flex-col">
@@ -341,6 +341,7 @@ interface Model {
   title: string
   projectId: string
   streamName?: string
+  previewUrl?: string | null
   updateTime: string
   comments: number
   versions: number

@@ -23,7 +23,7 @@
         >
           <span class="text-sm font-medium text-[#333]">组织架构</span>
           <button
-            class="text-gray-400 hover:text-primary transition-colors"
+            class="text-gray-400 hover:text-[#00b4b6] transition-colors"
             title="新增一级部门"
             type="button"
             :disabled="createDepartmentLoading"
@@ -36,19 +36,41 @@
           <div
             v-for="org in orgTree"
             :key="org.id"
+            v-show="shouldShowRow(org)"
             class="group w-full flex items-center justify-between px-3 py-2 rounded-[8px] text-sm transition-colors cursor-pointer"
             :style="{ paddingLeft: `${org.level * 12 + 12}px` }"
             :class="
               activeOrg === org.id
-                ? 'bg-primary/10 text-primary font-medium'
+                ? 'bg-[#e6f7f8] text-[#00b4b6] font-medium'
                 : 'text-gray-600 hover:bg-gray-100'
             "
             @click="selectTreeRow(org)"
           >
             <div class="flex items-center space-x-2 truncate pr-1 min-w-0">
+              <!-- 折叠/展开图标 -->
+              <button
+                v-if="org.hasChildren"
+                class="w-4 h-4 flex items-center justify-center shrink-0 text-gray-400 hover:text-[#00b4b6] transition-colors"
+                @click.stop="toggleCollapse(org)"
+              >
+                <svg
+                  class="w-3 h-3 transition-transform duration-200"
+                  :class="isCollapsed(org.id) ? '' : 'rotate-90'"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
+              <div v-else class="w-4 h-4 shrink-0"></div>
+              
               <BuildingIcon
                 class="w-4 h-4 shrink-0"
-                :class="activeOrg === org.id ? 'text-primary' : 'text-gray-400'"
+                :class="activeOrg === org.id ? 'text-[#00b4b6]' : 'text-gray-400'"
               />
               <span class="truncate">{{ org.name }}</span>
             </div>
@@ -60,7 +82,7 @@
               </span> -->
               <!-- 新增子部门 -->
               <span
-                class="inline-flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-primary hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
+                class="inline-flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-[#00b4b6] hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
                 role="button"
                 tabindex="0"
                 title="新增子部门"
@@ -72,7 +94,7 @@
               </span>
               <!-- 编辑部门 -->
               <!-- <span
-                class="inline-flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-primary hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
+                class="inline-flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-[#00b4b6] hover:bg-white opacity-0 group-hover:opacity-100 transition-opacity"
                 role="button"
                 tabindex="0"
                 title="重命名部门"
@@ -106,7 +128,7 @@
           class="h-14 px-5 border-t border-b border-gray-100 flex items-center justify-between shrink-0 bg-white"
         >
           <div class="flex items-center space-x-2">
-            <!-- <UserGroupIcon class="w-5 h-5 text-primary" /> -->
+            <!-- <UserGroupIcon class="w-5 h-5 text-[#00b4b6]" /> -->
             <span class="font-medium text-sm text-[#333]">人员信息</span>
           </div>
           <div class="flex items-center gap-3">
@@ -123,7 +145,7 @@
                 v-model="searchQuery"
                 type="text"
                 placeholder="搜索姓名/手机号..."
-                class="w-56 bg-[#f5f7fa] border border-transparent rounded-[8px] py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-primary focus:bg-white text-[#333] transition-all"
+                class="focus-brand w-56 bg-[#f5f7fa] border border-transparent rounded-[8px] py-1.5 pl-9 pr-4 text-sm focus:outline-none text-[#333] transition-all"
               />
             </div>
           </div>
@@ -151,7 +173,7 @@
                 <td class="py-3.5 pl-6">
                   <div class="flex items-center space-x-3">
                     <div
-                      class="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs shrink-0"
+                      class="h-8 w-8 rounded-lg bg-[#e6f7f8] flex items-center justify-center text-[#00b4b6] font-semibold text-xs shrink-0"
                     >
                       {{ user.name.charAt(0) }}
                     </div>
@@ -182,7 +204,7 @@
                 <td class="py-3.5 pr-6 text-right">
                   <div class="relative inline-block text-left action-menu-container">
                     <button
-                      class="text-gray-400 hover:text-primary transition-colors p-1 rounded hover:bg-gray-100"
+                      class="text-gray-400 hover:text-[#00b4b6] transition-colors p-1 rounded hover:bg-gray-100"
                       @click.stop="toggleActionMenu(user.id)"
                     >
                       <EllipsisHorizontalIcon class="w-4 h-4" />
@@ -194,7 +216,7 @@
                       class="absolute right-0 mt-2 w-36 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10"
                     >
                       <button
-                        class="w-full px-4 py-2 text-sm text-left text-primary hover:bg-gray-50 transition-colors"
+                        class="w-full px-4 py-2 text-sm text-left text-[#00b4b6] hover:bg-gray-50 transition-colors"
                         @click.stop="openRoleManageDialog(user)"
                       >
                         角色管理
@@ -229,7 +251,7 @@
         <input
           id="organization-edit-department-name"
           v-model.trim="editDepartmentName"
-          class="w-full bg-[#f5f7fa] border border-transparent rounded-[8px] py-2 px-3 text-sm focus:outline-none focus:border-primary focus:bg-white text-[#333] transition-all"
+          class="w-full bg-[#f5f7fa] border border-transparent rounded-[8px] py-2 px-3 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white text-[#333] transition-all"
           placeholder="请输入新的部门名称"
           @keydown.enter.prevent="submitEditDepartment"
           @keydown.esc="closeEditDepartmentDialog"
@@ -307,7 +329,7 @@
         <input
           id="organization-new-department-name"
           v-model.trim="newDepartmentName"
-          class="w-full bg-[#f5f7fa] border border-transparent rounded-[8px] py-2 px-3 text-sm focus:outline-none focus:border-primary focus:bg-white text-[#333] transition-all"
+          class="w-full bg-[#f5f7fa] border border-transparent rounded-[8px] py-2 px-3 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white text-[#333] transition-all"
           placeholder="请输入部门名称"
           @keydown.enter.prevent="submitCreateDepartment"
           @keydown.esc="closeCreateDepartmentDialog"
@@ -346,7 +368,7 @@
             v-model.trim="newMemberForm.name"
             type="text"
             placeholder="请输入姓名"
-            class="w-full bg-[#f5f7fa] border border-transparent rounded-[8px] py-2 px-3 text-sm focus:outline-none focus:border-primary focus:bg-white text-[#333] transition-all"
+            class="focus-brand w-full bg-[#f5f7fa] border border-transparent rounded-[8px] py-2 px-3 text-sm focus:outline-none text-[#333] transition-all"
             :disabled="createMemberLoading"
           />
         </div>
@@ -360,7 +382,7 @@
             v-model.trim="newMemberForm.phone"
             type="tel"
             placeholder="请输入手机号"
-            class="w-full bg-[#f5f7fa] border border-transparent rounded-[8px] py-2 px-3 text-sm focus:outline-none focus:border-primary focus:bg-white text-[#333] transition-all"
+            class="focus-brand w-full bg-[#f5f7fa] border border-transparent rounded-[8px] py-2 px-3 text-sm focus:outline-none text-[#333] transition-all"
             :disabled="createMemberLoading"
           />
         </div>
@@ -445,12 +467,12 @@
               v-for="role in roleList"
               :key="role.id"
               class="flex items-center px-3 py-2 rounded cursor-pointer transition-colors"
-              :class="selectedRoleId === role.id ? 'bg-primary/10 border border-primary' : 'hover:bg-gray-50 border border-transparent'"
+              :class="selectedRoleId === role.id ? 'bg-[#e6f7f8] border border-[#00b4b6]' : 'hover:bg-gray-50 border border-transparent'"
               @click="selectedRoleId = role.id"
             >
               <div
                 class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center"
-                :class="selectedRoleId === role.id ? 'border-primary bg-[#00b4b6]' : 'border-gray-300'"
+                :class="selectedRoleId === role.id ? 'border-[#00b4b6] bg-[#00b4b6]' : 'border-gray-300'"
               >
                 <div v-if="selectedRoleId === role.id" class="w-1.5 h-1.5 rounded-full bg-white"></div>
               </div>
@@ -513,6 +535,8 @@ type OrganizationTreeRow = {
   level: number
   type: 'unit'
   organizationId: string
+  children?: DepartmentTreeNode[]
+  hasChildren: boolean
 }
 type MemberStatus = '正常' | '离线' | '禁用'
 type MemberRow = {
@@ -619,6 +643,7 @@ const memberSearchUsersQuery = gql`
 
 const activeOrg = ref<string | null>(null)
 const searchQuery = ref('')
+const collapsedOrgs = ref<Set<string>>(new Set())
 const createDepartmentDialogOpen = ref(false)
 const newDepartmentName = ref('')
 const createDepartmentParentId = ref<string | null>(null)
@@ -664,7 +689,9 @@ const buildDepartmentTreeRows = (
       count: children.length,
       level,
       type: 'unit',
-      organizationId
+      organizationId,
+      children: children.length > 0 ? children : undefined,
+      hasChildren: children.length > 0
     })
     if (children.length) {
       rows.push(...buildDepartmentTreeRows(children, organizationId, level + 1))
@@ -701,6 +728,43 @@ const activeDepartmentId = computed(() => {
 
 const selectTreeRow = (row: OrganizationTreeRow) => {
   activeOrg.value = row.id
+}
+
+const toggleCollapse = (row: OrganizationTreeRow) => {
+  if (!row.hasChildren) return
+  
+  if (collapsedOrgs.value.has(row.id)) {
+    collapsedOrgs.value.delete(row.id)
+  } else {
+    collapsedOrgs.value.add(row.id)
+  }
+  // 触发响应式更新
+  collapsedOrgs.value = new Set(collapsedOrgs.value)
+}
+
+const isCollapsed = (rowId: string) => {
+  return collapsedOrgs.value.has(rowId)
+}
+
+const shouldShowRow = (row: OrganizationTreeRow): boolean => {
+  // 检查所有父级是否被折叠
+  const orgTreeArray = orgTree.value
+  const rowIndex = orgTreeArray.findIndex(r => r.id === row.id)
+  if (rowIndex === -1) return true
+  
+  // 向前查找所有层级小于当前行的父级
+  for (let i = rowIndex - 1; i >= 0; i--) {
+    const parentRow = orgTreeArray[i]
+    if (parentRow.level < row.level) {
+      // 找到一个父级，检查是否被折叠
+      if (collapsedOrgs.value.has(parentRow.id)) {
+        return false
+      }
+      // 继续查找更上层
+      if (parentRow.level === 1) break
+    }
+  }
+  return true
 }
 
 const { result: departmentUsersResult, refetch: refetchDepartmentUsers } = useQuery(
@@ -1260,3 +1324,14 @@ watch(departmentUsersResult, () => {
   loadRoleData()
 })
 </script>
+
+<style scoped>
+/* 强制覆盖输入框聚焦时的边框颜色与背景色 */
+.focus-brand:focus,
+.focus-brand:focus-visible {
+  border: 1px solid #00b4b6 !important;
+  background-color: #ffffff !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+</style>
