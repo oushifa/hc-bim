@@ -36,23 +36,19 @@ export default defineNuxtPlugin(() => {
   let cachedDtpToken: string | null = null
   let tokenExpiryTime: number = 0
 
-  // 获取DTP token（带缓存）
+  // 获取DTP token（每次都从localStorage获取最新的）
   const getDtpToken = async (): Promise<string | null> => {
     try {
-      // 检查缓存的token是否仍然有效（提前5分钟过期）
-      if (cachedDtpToken && Date.now() < tokenExpiryTime - 5 * 60 * 1000) {
-        return cachedDtpToken
-      }
-
-      // 从localStorage获取DTP token（登录时保存的）
+      // 每次都从localStorage获取最新的DTP token，不使用缓存
       const storedToken = typeof window !== 'undefined' ? localStorage.getItem('dtp-token') : null
-      if (storedToken) {
+      
+      // 如果获取到了新的token，更新缓存
+      if (storedToken && storedToken !== cachedDtpToken) {
         cachedDtpToken = storedToken
         tokenExpiryTime = Date.now() + 24 * 60 * 60 * 1000 // 24小时
-        return storedToken
       }
       
-      return null
+      return cachedDtpToken || storedToken
     } catch (error) {
       console.error('Error getting DTP token:', error)
       return null
