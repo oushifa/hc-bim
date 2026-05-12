@@ -24,7 +24,7 @@
             <input
               v-model="formData.name"
               type="text"
-              class="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-xl focus:outline-none focus:border-[#00b4b6] focus:bg-white transition-all text-gray-700"
+              class="focus-brand w-full px-4 py-3 bg-gray-50 border border-transparent rounded-xl focus:outline-none transition-all text-gray-700"
               placeholder="输入项目名称"
             />
           </div>
@@ -83,3 +83,14 @@ const handleSubmit = () => {
   })
 }
 </script>
+
+<style scoped>
+/* 强制覆盖输入框聚焦时的边框颜色与背景色 */
+.focus-brand:focus,
+.focus-brand:focus-visible {
+  border: 1px solid #00b4b6 !important;
+  background-color: #ffffff !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+</style>
