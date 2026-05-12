@@ -36,6 +36,7 @@
           <div
             v-for="org in orgTree"
             :key="org.id"
+            v-show="shouldShowRow(org)"
             class="group w-full flex items-center justify-between px-3 py-2 rounded-[8px] text-sm transition-colors cursor-pointer"
             :style="{ paddingLeft: `${org.level * 12 + 12}px` }"
             :class="
@@ -46,6 +47,27 @@
             @click="selectTreeRow(org)"
           >
             <div class="flex items-center space-x-2 truncate pr-1 min-w-0">
+              <!-- 折叠/展开图标 -->
+              <button
+                v-if="org.hasChildren"
+                class="w-4 h-4 flex items-center justify-center shrink-0 text-gray-400 hover:text-[#00b4b6] transition-colors"
+                @click.stop="toggleCollapse(org)"
+              >
+                <svg
+                  class="w-3 h-3 transition-transform duration-200"
+                  :class="isCollapsed(org.id) ? '' : 'rotate-90'"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
+              <div v-else class="w-4 h-4 shrink-0"></div>
+              
               <BuildingIcon
                 class="w-4 h-4 shrink-0"
                 :class="activeOrg === org.id ? 'text-[#00b4b6]' : 'text-gray-400'"
@@ -513,6 +535,8 @@ type OrganizationTreeRow = {
   level: number
   type: 'unit'
   organizationId: string
+  children?: DepartmentTreeNode[]
+  hasChildren: boolean
 }
 type MemberStatus = '正常' | '离线' | '禁用'
 type MemberRow = {
@@ -619,6 +643,7 @@ const memberSearchUsersQuery = gql`
 
 const activeOrg = ref<string | null>(null)
 const searchQuery = ref('')
+const collapsedOrgs = ref<Set<string>>(new Set())
 const createDepartmentDialogOpen = ref(false)
 const newDepartmentName = ref('')
 const createDepartmentParentId = ref<string | null>(null)
@@ -664,7 +689,9 @@ const buildDepartmentTreeRows = (
       count: children.length,
       level,
       type: 'unit',
-      organizationId
+      organizationId,
+      children: children.length > 0 ? children : undefined,
+      hasChildren: children.length > 0
     })
     if (children.length) {
       rows.push(...buildDepartmentTreeRows(children, organizationId, level + 1))
@@ -701,6 +728,43 @@ const activeDepartmentId = computed(() => {
 
 const selectTreeRow = (row: OrganizationTreeRow) => {
   activeOrg.value = row.id
+}
+
+const toggleCollapse = (row: OrganizationTreeRow) => {
+  if (!row.hasChildren) return
+  
+  if (collapsedOrgs.value.has(row.id)) {
+    collapsedOrgs.value.delete(row.id)
+  } else {
+    collapsedOrgs.value.add(row.id)
+  }
+  // 触发响应式更新
+  collapsedOrgs.value = new Set(collapsedOrgs.value)
+}
+
+const isCollapsed = (rowId: string) => {
+  return collapsedOrgs.value.has(rowId)
+}
+
+const shouldShowRow = (row: OrganizationTreeRow): boolean => {
+  // 检查所有父级是否被折叠
+  const orgTreeArray = orgTree.value
+  const rowIndex = orgTreeArray.findIndex(r => r.id === row.id)
+  if (rowIndex === -1) return true
+  
+  // 向前查找所有层级小于当前行的父级
+  for (let i = rowIndex - 1; i >= 0; i--) {
+    const parentRow = orgTreeArray[i]
+    if (parentRow.level < row.level) {
+      // 找到一个父级，检查是否被折叠
+      if (collapsedOrgs.value.has(parentRow.id)) {
+        return false
+      }
+      // 继续查找更上层
+      if (parentRow.level === 1) break
+    }
+  }
+  return true
 }
 
 const { result: departmentUsersResult, refetch: refetchDepartmentUsers } = useQuery(
