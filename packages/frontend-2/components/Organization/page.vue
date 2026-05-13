@@ -1040,7 +1040,8 @@ const submitCreateMember = async () => {
         },
         body: JSON.stringify({
           username: name,
-          mobile: phone
+          mobile: phone,
+          contact: '17338404660'
         })
       })
       console.log('第三方注册成功')
