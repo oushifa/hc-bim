@@ -157,8 +157,9 @@ const onSubmit = handleSubmit(async ({ email, password }) => {
       
       const bimpToken = encrypted.toString()
       
-      // 直接调用第三方登录接口（不再使用代理）
-      const loginUrl = 'http://10.66.8.185:30080/service/v1/login/third-party'
+      // 使用动态配置的DTP origin，避免CORS问题
+      const dtpOrigin = useDtpApiOrigin()
+      const loginUrl = `${dtpOrigin}/v1/login/third-party`
       const response = await fetch(loginUrl, {
         method: 'POST',
         headers: {

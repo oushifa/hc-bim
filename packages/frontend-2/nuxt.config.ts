@@ -182,6 +182,10 @@ export default defineNuxtConfig({
         '999-parallel-finalize'
       ]
     },
+    // Proxy DTP API requests (both dev and production)
+    '/__dtp/**': {
+      proxy: 'http://10.66.8.185:30080/service/**'
+    },
     '/functions': {
       redirect: {
         to: '/',
@@ -250,6 +254,12 @@ export default defineNuxtConfig({
     compressPublicAssets: true,
     externals: {
       external
+    },
+    devProxy: {
+      '/__dtp': {
+        target: 'http://10.66.8.185:30080/service',
+        changeOrigin: true
+      }
     }
   },
 

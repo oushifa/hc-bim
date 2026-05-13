@@ -18,16 +18,21 @@ export default defineNuxtPlugin(() => {
     }
   }
 
-  let dtpApiBase: URL
-  try {
-    dtpApiBase = new URL(dtpApiOrigin)
-  } catch {
-    console.warn(
-      `[fetchDtp] Invalid NUXT_PUBLIC_DTP_API_ORIGIN: "${dtpApiOrigin}", falling back to default $fetch.`
-    )
-    return {
-      provide: {
-        dtpFetch: $fetch
+  let dtpApiBase: URL | string
+  // Support relative origin (e.g., '/__dtp' for proxied requests)
+  if (dtpApiOrigin.startsWith('/')) {
+    dtpApiBase = dtpApiOrigin
+  } else {
+    try {
+      dtpApiBase = new URL(dtpApiOrigin)
+    } catch {
+      console.warn(
+        `[fetchDtp] Invalid NUXT_PUBLIC_DTP_API_ORIGIN: "${dtpApiOrigin}", falling back to default $fetch.`
+      )
+      return {
+        provide: {
+          dtpFetch: $fetch
+        }
       }
     }
   }

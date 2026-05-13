@@ -1028,9 +1028,10 @@ const submitCreateMember = async () => {
       }
     })
 
-    // Step 2: 同时调用第三方注册接口（不再使用代理）
+    // Step 2: 同时调用第三方注册接口（使用代理避免CORS）
     try {
-      const thirdPartyRegisterUrl = 'http://10.66.8.185:30080/service/v1/oauth/third-party/register'
+      const dtpOrigin = useDtpApiOrigin()
+      const thirdPartyRegisterUrl = `${dtpOrigin}/v1/oauth/third-party/register`
       await fetch(thirdPartyRegisterUrl, {
         method: 'POST',
         headers: {

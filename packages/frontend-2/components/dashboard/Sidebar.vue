@@ -937,7 +937,8 @@ const ensureDtpToken = async (): Promise<string | null> => {
     })
     const bimpToken = encrypted.toString()
 
-    const loginUrl = 'http://10.66.8.185:30080/service/v1/login/third-party'
+    const dtpOrigin = useDtpApiOrigin()
+    const loginUrl = `${dtpOrigin}/v1/login/third-party`
     const response = await fetch(loginUrl, {
       method: 'POST',
       headers: {
