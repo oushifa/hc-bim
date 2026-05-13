@@ -1183,10 +1183,10 @@ const fetchOfficialModels = async () => {
       // 如果有 data 字段，解析数据
       if (responseData.result.data && Array.isArray(responseData.result.data)) {
         officialModelsData.value = responseData.result.data.map((item: any) => {
-          // 拼接缩略图URL
+          // 拼接缩略图URL（使用相对路径通过代理，避免混合内容问题）
           let thumbnailUrl = ''
           if (item.thumbnails && Array.isArray(item.thumbnails) && item.thumbnails.length > 0 && item.thumbnails[0].uri) {
-            thumbnailUrl = 'http://10.66.8.185:30080' + item.thumbnails[0].uri
+            thumbnailUrl = '/__dtp' + item.thumbnails[0].uri
           }
                   
           return {
