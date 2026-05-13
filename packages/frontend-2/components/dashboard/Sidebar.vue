@@ -916,6 +916,53 @@ const fetchCurrentWorkgroupInfo = async () => {
   }
 }
 
+// 确保本地存在 dtp-token，没有则通过第三方登录接口获取
+const ensureDtpToken = async (): Promise<string | null> => {
+  if (!import.meta.client) return null
+  const existing = localStorage.getItem('dtp-token')
+  if (existing) return existing
+
+  const mobile = activeUser.value?.email
+  if (!mobile) return null
+
+  try {
+    const CryptoJS = await import('crypto-js')
+    const AES_KEY = 'Ze/0w7rnQg7jznntRcuxGQ=='
+    const data = JSON.stringify({ mobile })
+    const dataParsed = CryptoJS.enc.Utf8.parse(data)
+    const keyParsed = CryptoJS.enc.Utf8.parse(AES_KEY)
+    const encrypted = CryptoJS.AES.encrypt(dataParsed, keyParsed, {
+      mode: CryptoJS.mode.ECB,
+      padding: CryptoJS.pad.Pkcs7
+    })
+    const bimpToken = encrypted.toString()
+
+    const loginUrl = 'http://10.66.8.185:30080/service/v1/login/third-party'
+    const response = await fetch(loginUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: JSON.stringify({ token: bimpToken })
+    })
+    if (!response.ok) return null
+
+    const responseData = await response.json()
+    if (responseData?.success && responseData?.code === 200) {
+      const dtpToken = responseData.results?.tokens?.[0] as string | undefined
+      if (dtpToken) {
+        localStorage.setItem('dtp-token', dtpToken)
+        return dtpToken
+      }
+    }
+    return null
+  } catch (err) {
+    console.warn('DTP token 获取失败:', err)
+    return null
+  }
+}
+
 const routeTwinWorkgroupId = computed(() => {
   const m = route.path.match(/^\/twin-scene\/([^/]+)/)
   return m?.[1] ?? null
@@ -985,6 +1032,8 @@ const newTwinWorkgroupName = ref('')
 const toggleTwinWorkgroupDropdown = async () => {
   twinWorkgroupDropdownOpen.value = !twinWorkgroupDropdownOpen.value
   if (twinWorkgroupDropdownOpen.value) {
+    // 每次点击切换工作组时，刷新工作组列表
+    void fetchWorkgroupList()
     await nextTick()
     updateTwinWorkgroupDropdownPosition()
   }
@@ -1005,6 +1054,9 @@ const selectTwinWorkgroup = async (wgId: string) => {
     // 切换成功后更新本地状态
     activeTwinWorkgroupId.value = wgId
     twinWorkgroupDropdownOpen.value = false
+    
+    // 重新获取工作组列表
+    await fetchWorkgroupList()
     
     // 更新路由
     const sub = route.path.match(/\/twin-scene\/[^/]+\/(cases|members|settings)/)
@@ -1087,12 +1139,22 @@ watch(
   }
 )
 
-// 组件挂载时获取工作组信息
+// 每次展示 3D 孪生场景编辑（菜单展开）时，获取当前工作组信息
+watch(
+  showTwinSceneMenu,
+  async (val) => {
+    if (!val) return
+    if (!import.meta.client) return
+    // 若本地没有 dtp-token，则先调用第三方登录接口获取
+    await ensureDtpToken()
+    void fetchCurrentWorkgroupInfo()
+  },
+  { immediate: true }
+)
+
+// 组件挂载时获取工作组列表
 if (import.meta.client) {
   onMounted(async () => {
-    // 先获取当前工作组信息
-    await fetchCurrentWorkgroupInfo()
-    // 再获取工作组列表
     await fetchWorkgroupList()
   })
 }
