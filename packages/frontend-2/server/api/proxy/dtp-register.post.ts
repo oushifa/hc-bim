@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   
   try {
-    const response = await fetch('http://10.66.8.188:30080/service/v1/oauth/third-party/register', {
+    const response = await fetch('http://10.66.8.185:30080/service/v1/oauth/third-party/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
