@@ -22,7 +22,7 @@ definePageMeta({
 
 /** 系统管理 iframe 基础路径（使用相对路径通过代理，避免混合内容问题） */
 const SYSTEM_SET_BASE_URL =
-  '/__dtp/ui/system-setting/system-set?embed=embed&theme=light'
+  '/__dtp-ui/system-setting/system-set?embed=embed&theme=light'
 
 const { iframeSrc } = useDtpIframeSrc(SYSTEM_SET_BASE_URL)
 

@@ -22,7 +22,7 @@ definePageMeta({
 
 /** 组员管理 iframe 基础路径（使用相对路径通过代理，避免混合内容问题） */
 const TEAM_MEMBER_BASE_URL =
-  '/__dtp/ui/team-manage/team-member?embed=embed&theme=light'
+  '/__dtp-ui/team-manage/team-member?embed=embed&theme=light'
 
 const { iframeSrc } = useDtpIframeSrc(TEAM_MEMBER_BASE_URL)
 

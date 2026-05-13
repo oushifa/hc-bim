@@ -28,7 +28,7 @@ const DTP_TOKEN_STORAGE_KEY = 'dtp-token'
 
 /** 组内案例 iframe 基础路径（使用相对路径通过代理，避免混合内容问题） */
 const CASE_CREATE_BASE_URL =
-  '/__dtp/ui/case-create?embed=embed&theme=light'
+  '/__dtp-ui/case-create?embed=embed&theme=light'
 
 const caseCreateIframeSrc = ref('')
 

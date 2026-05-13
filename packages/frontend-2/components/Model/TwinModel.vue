@@ -1186,7 +1186,7 @@ const fetchOfficialModels = async () => {
           // 拼接缩略图URL（使用相对路径通过代理，避免混合内容问题）
           let thumbnailUrl = ''
           if (item.thumbnails && Array.isArray(item.thumbnails) && item.thumbnails.length > 0 && item.thumbnails[0].uri) {
-            thumbnailUrl = '/__dtp' + item.thumbnails[0].uri
+            thumbnailUrl = '/__dtp-static' + item.thumbnails[0].uri
           }
                   
           return {
