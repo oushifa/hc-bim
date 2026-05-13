@@ -157,12 +157,13 @@ const onSubmit = handleSubmit(async ({ email, password }) => {
       
       const bimpToken = encrypted.toString()
       
-      // 通过代理调用第三方登录接口
-      const loginUrl = '/api/proxy/dtp-login'
+      // 直接调用第三方登录接口（不再使用代理）
+      const loginUrl = 'http://10.66.8.185:30080/service/v1/login/third-party'
       const response = await fetch(loginUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({ 
           token: bimpToken,

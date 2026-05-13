@@ -1028,13 +1028,14 @@ const submitCreateMember = async () => {
       }
     })
 
-    // Step 2: 同时调用第三方注册接口
+    // Step 2: 同时调用第三方注册接口（不再使用代理）
     try {
-      const thirdPartyRegisterUrl = '/api/proxy/dtp-register'
+      const thirdPartyRegisterUrl = 'http://10.66.8.185:30080/service/v1/oauth/third-party/register'
       await fetch(thirdPartyRegisterUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           username: name,
