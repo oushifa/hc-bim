@@ -174,16 +174,17 @@
                         >
                           {{ wg.name }}
                         </button>
-                        <div class="h-px bg-gray-100 my-1" />
-                        <button
-                          v-if="canAddTwinWorkgroup"
-                          type="button"
-                          class="w-full text-left px-3 py-2 text-sm text-[#00b4b6] hover:bg-[#f5f7fa] transition-colors flex items-center gap-1"
-                          @click="openAddTwinWorkgroupModal"
-                        >
-                          <PlusIcon class="w-3.5 h-3.5" />
-                          <span>添加工作组</span>
-                        </button>
+                        <template v-if="canAddTwinWorkgroup">
+                          <div class="h-px bg-gray-100 my-1" />
+                          <button
+                            type="button"
+                            class="w-full text-left px-3 py-2 text-sm text-[#00b4b6] hover:bg-[#f5f7fa] transition-colors flex items-center gap-1"
+                            @click="openAddTwinWorkgroupModal"
+                          >
+                            <PlusIcon class="w-3.5 h-3.5" />
+                            <span>添加工作组</span>
+                          </button>
+                        </template>
                       </div>
                     </Teleport>
 
@@ -214,7 +215,7 @@
                               : 'text-gray-500 hover:text-[#00b4b6]'
                           "
                         >
-                          组内案例
+                          团队案例
                         </span>
                       </div>
                     </NuxtLink>
@@ -249,7 +250,7 @@
                               : 'text-gray-500 hover:text-[#00b4b6]'
                           "
                         >
-                          组员管理
+                          团队管理
                         </span>
                       </div>
                     </NuxtLink>
@@ -877,6 +878,8 @@ const fetchWorkgroupList = async () => {
       const workgroups: TwinWorkgroup[] = []
       
       for (const unit of responseData.results) {
+        // 过滤掉 unitType 为 Personal 的个人组织
+        if (unit.unitType === 'Personal') continue
         if (unit.teamList && Array.isArray(unit.teamList)) {
           for (const team of unit.teamList) {
             workgroups.push({
@@ -904,7 +907,39 @@ const fetchCurrentWorkgroupInfo = async () => {
     
     const responseData = data as any
     if (responseData && responseData.success && responseData.results) {
-      const { teamId, teamName } = responseData.results
+      const { teamId, teamName, unitType } = responseData.results
+      
+      // 如果当前工作组属于个人组织，自动切换到非个人组织的第一个工作组
+      if (unitType === 'Personal') {
+        try {
+          const listData = await $dtpFetch('/v1/team/unit/list', {
+            method: 'GET'
+          })
+          const listResp = listData as any
+          if (listResp && listResp.success && Array.isArray(listResp.results)) {
+            const nonPersonalUnit = listResp.results.find(
+              (u: any) =>
+                u &&
+                u.unitType !== 'Personal' &&
+                Array.isArray(u.teamList) &&
+                u.teamList.length > 0
+            )
+            const firstTeamId = nonPersonalUnit?.teamList?.[0]?.teamId
+            if (firstTeamId) {
+              await $dtpFetch('/v1/team/switch', {
+                method: 'PUT',
+                body: { teamId: firstTeamId }
+              })
+              activeTwinWorkgroupId.value = firstTeamId
+              // 切换后刷新工作组列表
+              await fetchWorkgroupList()
+              return
+            }
+          }
+        } catch (switchError) {
+          console.error('自动切换工作组失败:', switchError)
+        }
+      }
       
       // 设置当前工作组
       if (teamId) {
@@ -1056,8 +1091,8 @@ const selectTwinWorkgroup = async (wgId: string) => {
     activeTwinWorkgroupId.value = wgId
     twinWorkgroupDropdownOpen.value = false
     
-    // 重新获取工作组列表
-    await fetchWorkgroupList()
+    // 获取当前工作组信息
+    await fetchCurrentWorkgroupInfo()
     
     // 更新路由
     const sub = route.path.match(/\/twin-scene\/[^/]+\/(cases|members|settings)/)

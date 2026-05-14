@@ -403,15 +403,32 @@
               <ChevronRightIcon class="w-4 h-4" />
             </button>
           </div>
-          <select
-            v-model="currentPageSize"
-            class="border border-[#00b4b6] rounded-[8px] px-2 py-1 text-sm focus:outline-none focus:border-[#00b4b6] cursor-pointer"
-            @change="onPageSizeChange"
-          >
-            <option :value="20">20 / page</option>
-            <option :value="50">50 / page</option>
-            <option :value="100">100 / page</option>
-          </select>
+          <div class="relative" @click.stop>
+            <div
+              class="px-3 py-1 border border-[#00b4b6] rounded-[8px] text-sm text-gray-700 bg-white cursor-pointer transition-colors hover:bg-[#00b4b6]/5 flex items-center justify-between min-w-[88px]"
+              @click="pageSizeDropdownOpen = !pageSizeDropdownOpen"
+            >
+              <span class="truncate">{{ currentPageSize }}/页</span>
+              <ChevronDownIcon
+                class="w-4 h-4 text-[#00b4b6] transition-transform shrink-0 ml-2"
+                :class="pageSizeDropdownOpen ? 'rotate-180' : ''"
+              />
+            </div>
+            <div
+              v-if="pageSizeDropdownOpen"
+              class="absolute right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-50 overflow-hidden min-w-[88px]"
+            >
+              <div
+                v-for="size in pageSizeOptions"
+                :key="size"
+                class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors whitespace-nowrap"
+                :class="currentPageSize === size ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
+                @click="selectPageSize(size)"
+              >
+                {{ size }}/页
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1679,6 +1696,7 @@ onMounted(async () => {
   document.addEventListener('click', () => {
     officialCategoryDropdownOpen.value = false
     openFilterDropdown.value = null
+    pageSizeDropdownOpen.value = false
   })
   
   // 先获取团队列表
@@ -1923,6 +1941,16 @@ const onPageSizeChange = async () => {
   } else {
     await fetchOfficialModels()
   }
+}
+
+// 页大小下拉框
+const pageSizeOptions = [20, 50, 100]
+const pageSizeDropdownOpen = ref(false)
+const selectPageSize = async (size: number) => {
+  pageSizeDropdownOpen.value = false
+  if (currentPageSize.value === size) return
+  currentPageSize.value = size
+  await onPageSizeChange()
 }
 </script>
 

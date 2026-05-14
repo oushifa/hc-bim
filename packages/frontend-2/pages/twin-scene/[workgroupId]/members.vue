@@ -7,7 +7,7 @@
         v-if="iframeSrc"
         :src="iframeSrc"
         class="absolute inset-0 h-full w-full border-0"
-        title="组员管理"
+        title="团队管理"
         frameborder="0"
         allowfullscreen
       />
@@ -20,13 +20,13 @@ definePageMeta({
   middleware: ['auth', 'permission']
 })
 
-/** 组员管理 iframe 基础路径（使用相对路径通过代理，避免混合内容问题） */
+/** 团队管理 iframe 基础路径（使用相对路径通过代理，避免混合内容问题） */
 const TEAM_MEMBER_BASE_URL =
   'http://10.66.8.185:30080/ui/team-manage/team-member?embed=embed&theme=light'
 
 const { iframeSrc } = useDtpIframeSrc(TEAM_MEMBER_BASE_URL)
 
 useHead({
-  title: '组员管理'
+  title: '团队管理'
 })
 </script>

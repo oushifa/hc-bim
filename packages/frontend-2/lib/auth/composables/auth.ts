@@ -591,6 +591,8 @@ export const useAuthManager = (
     thirdPartyTokenState.oaUser.value = null
     SafeLocalStorage.remove(ThirdPartyOaTokenLocalStorageKey)
     SafeLocalStorage.remove(ThirdPartyOaUserLocalStorageKey)
+    // 清除 DTP 本地 token
+    SafeLocalStorage.remove('dtp-token')
 
     // Clear cached custom-role menu/model permissions so the next login fetches fresh perms.
     try {
