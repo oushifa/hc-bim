@@ -60,35 +60,71 @@
         <template v-if="activeTab === 'user'">
           <div class="flex items-center space-x-2">
             <span class="text-sm text-gray-600 whitespace-nowrap">状态：</span>
-            <select
-              v-model="statusFilter"
-              class="focus-brand w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none cursor-pointer transition-colors"
-              :class="
-                statusFilter
-                  ? 'border-[#00b4b6] bg-white'
-                  : 'border-transparent bg-gray-50'
-              "
-            >
-              <option value="">请选择</option>
-              <option value="1">已上架</option>
-              <option value="2">已下架</option>
-            </select>
+            <div class="relative w-32" @click.stop>
+              <div
+                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between"
+                :class="
+                  statusFilter
+                    ? 'border-[#00b4b6] bg-white text-gray-700'
+                    : 'border-transparent bg-gray-50 text-gray-400'
+                "
+                @click="toggleFilterDropdown('status')"
+              >
+                <span class="truncate">{{ statusFilterLabel }}</span>
+                <ChevronDownIcon
+                  class="w-4 h-4 text-gray-400 transition-transform shrink-0 ml-1"
+                  :class="openFilterDropdown === 'status' ? 'rotate-180' : ''"
+                />
+              </div>
+              <div
+                v-if="openFilterDropdown === 'status'"
+                class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-50 overflow-hidden"
+              >
+                <div
+                  v-for="opt in statusFilterOptions"
+                  :key="opt.value"
+                  class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
+                  :class="statusFilter === opt.value ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
+                  @click="statusFilter = opt.value; openFilterDropdown = null"
+                >
+                  {{ opt.label }}
+                </div>
+              </div>
+            </div>
           </div>
           <div class="flex items-center space-x-2">
             <span class="text-sm text-gray-600 whitespace-nowrap">构件数据：</span>
-            <select
-              v-model="componentDataFilter"
-              class="focus-brand w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none cursor-pointer transition-colors"
-              :class="
-                componentDataFilter
-                  ? 'border-[#00b4b6] bg-white'
-                  : 'border-transparent bg-gray-50'
-              "
-            >
-              <option value="">请选择</option>
-              <option value="1">有</option>
-              <option value="0">无</option>
-            </select>
+            <div class="relative w-32" @click.stop>
+              <div
+                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between"
+                :class="
+                  componentDataFilter
+                    ? 'border-[#00b4b6] bg-white text-gray-700'
+                    : 'border-transparent bg-gray-50 text-gray-400'
+                "
+                @click="toggleFilterDropdown('component')"
+              >
+                <span class="truncate">{{ componentDataFilterLabel }}</span>
+                <ChevronDownIcon
+                  class="w-4 h-4 text-gray-400 transition-transform shrink-0 ml-1"
+                  :class="openFilterDropdown === 'component' ? 'rotate-180' : ''"
+                />
+              </div>
+              <div
+                v-if="openFilterDropdown === 'component'"
+                class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-50 overflow-hidden"
+              >
+                <div
+                  v-for="opt in componentDataFilterOptions"
+                  :key="opt.value"
+                  class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
+                  :class="componentDataFilter === opt.value ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
+                  @click="componentDataFilter = opt.value; openFilterDropdown = null"
+                >
+                  {{ opt.label }}
+                </div>
+              </div>
+            </div>
           </div>
         </template>
 
@@ -96,48 +132,83 @@
         <template v-else>
           <div class="flex items-center space-x-2">
             <span class="text-sm text-gray-600 whitespace-nowrap">上架状态：</span>
-            <select
-              v-model="publishStatusFilter"
-              class="focus-brand w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none cursor-pointer transition-colors"
-              :class="
-                publishStatusFilter
-                  ? 'border-[#00b4b6] bg-white'
-                  : 'border-transparent bg-gray-50'
-              "
-            >
-              <option value="">请选择状态</option>
-              <option value="已上架">已上架</option>
-              <option value="已下架">已下架</option>
-            </select>
+            <div class="relative w-32" @click.stop>
+              <div
+                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between"
+                :class="
+                  publishStatusFilter
+                    ? 'border-[#00b4b6] bg-white text-gray-700'
+                    : 'border-transparent bg-gray-50 text-gray-400'
+                "
+                @click="toggleFilterDropdown('publish')"
+              >
+                <span class="truncate">{{ publishStatusFilterLabel }}</span>
+                <ChevronDownIcon
+                  class="w-4 h-4 text-gray-400 transition-transform shrink-0 ml-1"
+                  :class="openFilterDropdown === 'publish' ? 'rotate-180' : ''"
+                />
+              </div>
+              <div
+                v-if="openFilterDropdown === 'publish'"
+                class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-50 overflow-hidden"
+              >
+                <div
+                  v-for="opt in publishStatusFilterOptions"
+                  :key="opt.value"
+                  class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
+                  :class="publishStatusFilter === opt.value ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
+                  @click="publishStatusFilter = opt.value; openFilterDropdown = null"
+                >
+                  {{ opt.label }}
+                </div>
+              </div>
+            </div>
           </div>
           <div class="flex items-center space-x-2">
             <span class="text-sm text-gray-600 whitespace-nowrap">分类：</span>
-            <select
-              v-model="categoryFilter"
-              class="focus-brand w-32 px-3 py-1.5 border rounded-[8px] text-sm text-gray-600 focus:outline-none cursor-pointer transition-colors"
-              :class="
-                categoryFilter
-                  ? 'border-[#00b4b6] bg-white'
-                  : 'border-transparent bg-gray-50'
-              "
-            >
-              <option value="">请选择分类</option>
-              <option v-for="cat in flatCategoryList" :key="cat.id" :value="cat.name">
-                {{ cat.name }}
-              </option>
-            </select>
+            <div class="relative w-32" @click.stop>
+              <div
+                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between"
+                :class="
+                  categoryFilter
+                    ? 'border-[#00b4b6] bg-white text-gray-700'
+                    : 'border-transparent bg-gray-50 text-gray-400'
+                "
+                @click="toggleFilterDropdown('category')"
+              >
+                <span class="truncate">{{ categoryFilter || '请选择分类' }}</span>
+                <ChevronDownIcon
+                  class="w-4 h-4 text-gray-400 transition-transform shrink-0 ml-1"
+                  :class="openFilterDropdown === 'category' ? 'rotate-180' : ''"
+                />
+              </div>
+              <div
+                v-if="openFilterDropdown === 'category'"
+                class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-50 max-h-60 overflow-y-auto"
+              >
+                <div
+                  class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
+                  :class="!categoryFilter ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
+                  @click="categoryFilter = ''; openFilterDropdown = null"
+                >
+                  全部
+                </div>
+                <div
+                  v-for="cat in flatCategoryList"
+                  :key="cat.id"
+                  class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
+                  :class="categoryFilter === cat.name ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
+                  @click="categoryFilter = cat.name; openFilterDropdown = null"
+                >
+                  {{ cat.name }}
+                </div>
+              </div>
+            </div>
           </div>
         </template>
 
         <div class="flex-1 flex justify-end">
-          <button
-            v-if="activeTab === 'user'"
-            :disabled="selectedIds.size === 0"
-            class="px-4 py-1.5 border border-gray-200 rounded-[8px] text-sm text-gray-600 hover:text-[#00b4b6] hover:border-[#00b4b6] transition-colors bg-white/80 backdrop-blur-md disabled:opacity-50 disabled:cursor-not-allowed"
-            @click="showOffshelfPopover('batch', $event)"
-          >
-            批量下架
-          </button>
+          <!-- 用户模型下批量下架功能已隐藏 -->
         </div>
       </div>
     </div>
@@ -150,43 +221,6 @@
         <table class="w-full text-left border-collapse min-w-[1000px]">
           <thead class="bg-[#f8f9fa] sticky top-0 z-10">
             <tr class="border-b border-gray-100 text-sm text-gray-600 font-medium">
-              <!-- 仅用户模型显示全选框 -->
-              <th v-if="activeTab === 'user'" class="py-3 px-4 w-12 text-center">
-                <div
-                  class="w-4 h-4 border-2 rounded-sm cursor-pointer flex items-center justify-center mx-auto transition-colors"
-                  :class="
-                    isAllSelected
-                      ? 'bg-[#00b4b6] border-[#00b4b6]'
-                      : isIndeterminate
-                      ? 'bg-[#00b4b6] border-[#00b4b6]'
-                      : 'border-gray-300 hover:border-[#00b4b6]'
-                  "
-                  @click="toggleSelectAll"
-                >
-                  <svg
-                    v-if="isAllSelected"
-                    class="w-3 h-3 text-white"
-                    fill="none"
-                    viewBox="0 0 12 12"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M2 6l3 3 5-5"
-                    />
-                  </svg>
-                  <svg
-                    v-else-if="isIndeterminate"
-                    class="w-3 h-3 text-white"
-                    fill="currentColor"
-                    viewBox="0 0 12 12"
-                  >
-                    <rect x="2" y="5" width="8" height="2" rx="1" />
-                  </svg>
-                </div>
-              </th>
               <th class="py-3 px-4">模型名称/ID</th>
               <th v-if="activeTab === 'official'" class="py-3 px-4">分类</th>
               <th class="py-3 px-4">系统</th>
@@ -208,7 +242,7 @@
             <!-- Loading 状态 -->
             <tr v-if="(activeTab === 'user' && userLoading) || (activeTab === 'official' && officialLoading)">
               <td
-                :colspan="activeTab === 'user' ? 9 : 9"
+                :colspan="activeTab === 'user' ? 8 : 9"
                 class="py-16 text-center"
               >
                 <svg class="animate-spin h-8 w-8 text-[#00b4b6] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -225,41 +259,14 @@
               :key="model.id"
               class="border-b border-gray-50 hover:bg-gray-50 transition-colors"
             >
-              <!-- 仅用户模型显示行勾选框 -->
-              <td v-if="activeTab === 'user'" class="py-4 px-4 text-center">
-                <div
-                  class="w-4 h-4 border-2 rounded-sm cursor-pointer flex items-center justify-center mx-auto transition-colors"
-                  :class="
-                    selectedIds.has(model.id)
-                      ? 'bg-[#00b4b6] border-[#00b4b6]'
-                      : 'border-gray-300 hover:border-[#00b4b6]'
-                  "
-                  @click="toggleSelect(model.id)"
-                >
-                  <svg
-                    v-if="selectedIds.has(model.id)"
-                    class="w-3 h-3 text-white"
-                    fill="none"
-                    viewBox="0 0 12 12"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M2 6l3 3 5-5"
-                    />
-                  </svg>
-                </div>
-              </td>
               <td class="py-4 px-4">
                 <div class="flex items-center space-x-3">
                   <div
                     class="w-10 h-10 rounded-[8px] bg-gray-100 overflow-hidden shrink-0"
                   >
                     <img
-                      v-if="activeTab === 'official' && (model as OfficialModel).thumbnailUrl"
-                      :src="(model as OfficialModel).thumbnailUrl"
+                      v-if="(model as any).thumbnailUrl"
+                      :src="(model as any).thumbnailUrl"
                       :alt="model.name"
                       class="w-full h-full object-cover"
                     />
@@ -309,7 +316,7 @@
                       class="text-[#00b4b6] hover:underline cursor-pointer"
                       @click="showOffshelfPopover(model.id, $event)"
                     >
-                      下架
+                      {{ (model as UserModel).published ? '下架' : '上架' }}
                     </button>
                   </div>
                   <button
@@ -336,7 +343,7 @@
             </tr>
             <tr v-if="filteredModels.length === 0 && !((activeTab === 'user' && userLoading) || (activeTab === 'official' && officialLoading))">
               <td
-                :colspan="activeTab === 'user' ? 9 : 9"
+                :colspan="activeTab === 'user' ? 8 : 9"
                 class="py-16 text-center text-gray-400 text-sm"
               >
                 暂无孪生模型数据
@@ -436,7 +443,7 @@
         class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-l border-t border-gray-100 rotate-45"
       />
       <div class="px-4 pt-3 pb-2">
-        <p class="text-sm font-medium text-gray-800 mb-3">确定下架？</p>
+        <p class="text-sm font-medium text-gray-800 mb-3">{{ popoverConfirmText }}</p>
         <div class="flex justify-end space-x-2">
           <button
             class="px-3 py-1 text-xs border border-gray-200 rounded-[6px] text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
@@ -532,7 +539,7 @@
                 缩略图
               </label>
               <div
-                class="relative w-full h-36 border-2 border-dashed border-gray-200 rounded-[10px] overflow-hidden cursor-pointer hover:border-[#00b4b6] transition-colors group"
+                class="relative w-36 h-36 border-2 border-dashed border-gray-200 rounded-[10px] overflow-hidden cursor-pointer hover:border-[#00b4b6] transition-colors group"
                 @click="thumbnailInput?.click()"
               >
                 <img
@@ -996,6 +1003,7 @@ import {
   CubeIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
   EllipsisHorizontalIcon,
   XMarkIcon
 } from '@heroicons/vue/24/outline'
@@ -1100,12 +1108,32 @@ const fetchTeamList = async () => {
 const fetchUserModels = async () => {
   userLoading.value = true
   try {
+    // 状态筛选：'1' 已上架 / '2' 已下架
+    let publishedSet: boolean[]
+    if (statusFilter.value === '1') {
+      publishedSet = [true]
+    } else if (statusFilter.value === '2') {
+      publishedSet = [false]
+    } else {
+      publishedSet = [true, false]
+    }
+
+    // 构件数据筛选：'1' 有 / '0' 无
+    let hierarchySet: boolean[]
+    if (componentDataFilter.value === '1') {
+      hierarchySet = [true]
+    } else if (componentDataFilter.value === '0') {
+      hierarchySet = [false]
+    } else {
+      hierarchySet = [true, false]
+    }
+
     const data = await $dtpFetch('/v1/daas/asset/model/personal/list', {
       method: 'POST',
       body: {
         keyword: searchQuery.value || '',
-        publishedSet: [true, false],
-        hierarchySet: [true, false],
+        publishedSet,
+        hierarchySet,
         teamId: teamIds.value,
         pageNumber: currentPage.value,
         pageSize: currentPageSize.value
@@ -1115,19 +1143,39 @@ const fetchUserModels = async () => {
     // 解析用户模型数据
     const responseData = data as any
     if (responseData && responseData.result) {
-      // 如果有 data 字段，解析数据
-      if (responseData.result.data) {
-        userModelsData.value = Array.isArray(responseData.result.data) 
-          ? responseData.result.data 
-          : (responseData.result.data.records || responseData.result.data.list || [])
-        
-        // 更新总记录数
-        userTotalRecords.value = responseData.result.total || userModelsData.value.length
-      } else {
-        // 没有数据时清空
-        userModelsData.value = []
-        userTotalRecords.value = 0
-      }
+      const rawList = Array.isArray(responseData.result.data)
+        ? responseData.result.data
+        : (responseData.result.data?.records || responseData.result.data?.list || [])
+
+      userModelsData.value = rawList.map((item: any) => {
+        // 拼接缩略图URL（通过代理避免混合内容问题）
+        let thumbnailUrl = ''
+        if (item.thumbnails && Array.isArray(item.thumbnails) && item.thumbnails.length > 0 && item.thumbnails[0].uri) {
+          thumbnailUrl = '/__dtp-static' + item.thumbnails[0].uri
+        }
+
+        return {
+          id: String(item.id),
+          assetId: item.assetId || '',
+          name: item.assetName || '',
+          seedId: item.seedId || '',
+          system: item.platform || '',
+          productType: item.stageProduct || '',
+          originalFormat: item.originalAssetExt || '',
+          assetSize: formatFileSize(item.size || 0),
+          componentData: item.isHierarchy ? '有' : '无',
+          generationTime: item.publishedAt || '',
+          status: item.published ? '已上架' : '已下架',
+          published: !!item.published,
+          thumbnailUrl
+        }
+      })
+
+      // 更新总记录数
+      userTotalRecords.value = responseData.result.total || userModelsData.value.length
+    } else {
+      userModelsData.value = []
+      userTotalRecords.value = 0
     }
   } catch (error) {
     console.error('获取用户模型列表失败:', error)
@@ -1224,6 +1272,7 @@ const fetchOfficialModels = async () => {
 
 interface UserModel {
   id: string
+  assetId: string
   name: string
   seedId: string
   system: string
@@ -1233,6 +1282,8 @@ interface UserModel {
   componentData: string
   generationTime: string
   status: string
+  published: boolean
+  thumbnailUrl: string
 }
 
 interface OfficialModel {
@@ -1298,46 +1349,118 @@ const popoverStyle = computed(() => {
 const hideOffshelfPopover = () => {
   offshelfPopoverTarget.value = null
 }
-const confirmOffshelf = () => {
-  // TODO: 调用下架接口
+
+// 根据当前 Popover 目标动态计算提示文案
+// - 状态为已上架 → 点击下架
+// - 状态为已下架 → 点击上架
+const popoverConfirmText = computed(() => {
+  const targetId = offshelfPopoverTarget.value
+  if (!targetId || targetId === 'batch') return '确定下架？'
+  const model = userModelsData.value.find((m: any) => String(m.id) === targetId)
+  return model && model.published === false ? '确定上架？' : '确定下架？'
+})
+
+const confirmOffshelf = async () => {
+  const targetId = offshelfPopoverTarget.value
   hideOffshelfPopover()
+  if (!targetId || targetId === 'batch') return
+
+  // 用户模型行上下架：与官方模型一致，调用 /v1/daas/asset/publish
+  const model = userModelsData.value.find((m: any) => String(m.id) === targetId)
+  if (!model || !model.assetId) return
+
+  // 已下架 -> 上架（published:true），已上架 -> 下架（published:false）
+  const nextPublished = model.published === false
+
+  try {
+    await $dtpFetch('/v1/daas/asset/publish', {
+      method: 'PUT',
+      body: {
+        assetId: model.assetId,
+        published: nextPublished
+      }
+    })
+    await fetchUserModels()
+  } catch (error) {
+    console.error(nextPublished ? '上架失败:' : '下架失败:', error)
+  }
 }
 
 // ---------- 用户模型编辑 Modal ----------
 const editModalVisible = ref(false)
-const editForm = reactive({ name: '', thumbnail: '' })
+const editForm = reactive({
+  assetId: '',
+  name: '',
+  thumbnailUrl: ''
+})
+const editLoading = ref(false)
 const editNameError = ref('')
 const lightboxVisible = ref(false)
 
 const openEditModal = (model: UserModel) => {
+  editForm.assetId = model.assetId
   editForm.name = model.name
-  editForm.thumbnail = ''
+  editForm.thumbnailUrl = model.thumbnailUrl || ''
   editNameError.value = ''
-  thumbnailPreview.value = ''
+  // 复显已有缩略图
+  thumbnailPreview.value = model.thumbnailUrl || ''
   editModalVisible.value = true
 }
 const closeEditModal = () => {
   editModalVisible.value = false
 }
-const handleEditConfirm = () => {
+const handleEditConfirm = async () => {
   if (!editForm.name.trim()) {
     editNameError.value = '请输入名称'
     return
   }
-  // TODO: 调用编辑接口
-  closeEditModal()
+  editLoading.value = true
+  try {
+    await $dtpFetch('/v1/daas/asset/model/update', {
+      method: 'PUT',
+      body: {
+        assetId: editForm.assetId,
+        assetName: editForm.name,
+        thumbnails: editForm.thumbnailUrl ? [{ uri: editForm.thumbnailUrl }] : []
+      }
+    })
+    closeEditModal()
+    await fetchUserModels()
+  } catch (error) {
+    console.error('编辑用户模型失败:', error)
+  } finally {
+    editLoading.value = false
+  }
 }
 
 const thumbnailInput = ref<HTMLInputElement | null>(null)
 const thumbnailPreview = ref<string>('')
-const onThumbnailChange = (e: Event) => {
+const onThumbnailChange = async (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
+
+  // 先本地预览
   const reader = new FileReader()
   reader.onload = (ev) => {
     thumbnailPreview.value = ev.target?.result as string
   }
   reader.readAsDataURL(file)
+
+  // 上传缩略图获取URL
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const result = await $dtpFetch('/v1/daas/thumbnail/upload', {
+      method: 'POST',
+      body: formData
+    })
+    const responseData = result as any
+    if (responseData && responseData.result && responseData.result.url) {
+      editForm.thumbnailUrl = responseData.result.url
+    }
+  } catch (error) {
+    console.error('缩略图上传失败:', error)
+  }
 }
 
 // ---------- 官方模型编辑 Modal ----------
@@ -1555,6 +1678,7 @@ const handleVersionToggle = async (version: any) => {
 onMounted(async () => {
   document.addEventListener('click', () => {
     officialCategoryDropdownOpen.value = false
+    openFilterDropdown.value = null
   })
   
   // 先获取团队列表
@@ -1572,6 +1696,41 @@ const componentDataFilter = ref('')
 // 官方模型筛选
 const publishStatusFilter = ref('')
 const categoryFilter = ref('')
+
+// 筛选下拉框开关（同一时间最多开一个）
+type FilterDropdownKey = 'status' | 'component' | 'publish' | 'category' | null
+const openFilterDropdown = ref<FilterDropdownKey>(null)
+const toggleFilterDropdown = (key: Exclude<FilterDropdownKey, null>) => {
+  openFilterDropdown.value = openFilterDropdown.value === key ? null : key
+}
+
+// 筛选项定义
+const statusFilterOptions = [
+  { value: '', label: '全部' },
+  { value: '1', label: '已上架' },
+  { value: '2', label: '已下架' }
+]
+const componentDataFilterOptions = [
+  { value: '', label: '全部' },
+  { value: '1', label: '有' },
+  { value: '0', label: '无' }
+]
+const publishStatusFilterOptions = [
+  { value: '', label: '全部' },
+  { value: '已上架', label: '已上架' },
+  { value: '已下架', label: '已下架' }
+]
+
+// 下拉框显示文案
+const statusFilterLabel = computed(
+  () => statusFilterOptions.find((o) => o.value === statusFilter.value)?.label || '请选择'
+)
+const componentDataFilterLabel = computed(
+  () => componentDataFilterOptions.find((o) => o.value === componentDataFilter.value)?.label || '请选择'
+)
+const publishStatusFilterLabel = computed(
+  () => publishStatusFilterOptions.find((o) => o.value === publishStatusFilter.value)?.label || '请选择状态'
+)
 
 // 监听筛选条件变化，自动重新加载数据
 let isSwitchingTab = false
