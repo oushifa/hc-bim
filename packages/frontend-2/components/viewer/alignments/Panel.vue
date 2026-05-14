@@ -38,7 +38,9 @@
             <div class="flex items-center justify-between gap-3">
               <div class="flex flex-col gap-0.5">
                 <span class="text-foreground-2 text-body-xs">分屏模式</span>
-                <span class="text-foreground-3 text-body-3xs">左 CAD / 右 Speckle</span>
+                <span class="text-foreground-3 text-body-3xs">
+                  左 CAD / 右 srjViewer
+                </span>
               </div>
               <button
                 id="alignment-splitscreen-toggle"
@@ -78,7 +80,7 @@
                   class="flex justify-between text-foreground-3 text-body-3xs mt-0.5"
                 >
                   <span>◀ CAD</span>
-                  <span>Speckle ▶</span>
+                  <span>srjViewer ▶</span>
                 </div>
               </div>
             </Transition>
@@ -220,7 +222,7 @@
               {{
                 state.calibration.step === 'cad'
                   ? '校准第 1 步：请先点击左侧 CAD 中的特征点'
-                  : '校准第 2 步：请再点击右侧 Speckle 中对应的特征点'
+                  : '校准第 2 步：请再点击右侧 srjViewer 中对应的特征点'
               }}
             </div>
           </Transition>
