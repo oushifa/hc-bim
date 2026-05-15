@@ -1,127 +1,111 @@
 <template>
   <div
-    class="h-full flex flex-col bg-slate-50/50 backdrop-blur-xl rounded-[32px] shadow-2xl overflow-hidden border border-white/40"
+    class="h-full flex flex-col bg-white/80 backdrop-blur-md rounded-[26px] shadow-sm overflow-hidden"
   >
     <!-- Header & Toolbar -->
     <div
-      class="px-8 py-6 border-b border-slate-200/50 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shrink-0 bg-white/30"
+      class="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0"
     >
-      <div class="flex items-center space-x-3">
-        <div
-          class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00b4b6] to-[#008a8c] flex items-center justify-center shadow-lg shadow-primary/20"
-        >
-          <CubeIcon class="h-6 w-6 text-white" />
-        </div>
-        <div>
-          <h2
-            class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600"
-          >
-            轻量模型
-          </h2>
-          <p class="text-xs text-slate-500 font-medium opacity-70">
-            管理与查看您的BIM模型
-          </p>
-        </div>
+      <div class="flex items-center space-x-2">
+        <h2 class="text-xl font-bold text-[#333]">模型</h2>
       </div>
 
-      <div class="flex flex-wrap items-center gap-4">
+      <div class="flex flex-wrap items-center gap-3">
         <!-- Search -->
-        <div class="relative group">
-          <label for="model-search" class="sr-only">搜索模型</label>
+        <div class="relative">
           <input
-            id="model-search"
             v-model="searchQuery"
             type="text"
             placeholder="搜索模型..."
-            class="w-64 bg-white/60 border-slate-200 border rounded-xl py-2.5 pl-4 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-300 placeholder:text-slate-400 shadow-sm group-hover:shadow-md"
+            class="search-input w-48 bg-[#f5f7fa] border border-gray-200 rounded-[8px] py-1.5 pl-3 pr-8 text-sm focus:outline-none text-[#333] transition-all placeholder:text-gray-400"
             @input="debouncedFetch"
           />
           <MagnifyingGlassIcon
-            class="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-hover:text-primary transition-colors"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
           />
         </div>
 
         <!-- Custom Dropdowns -->
-        <div class="flex items-center gap-3">
-          <div ref="memberSelectRef" class="relative w-36">
-            <div
-              class="w-full px-4 py-2.5 bg-white/60 border border-slate-200 rounded-xl text-sm flex items-center justify-between cursor-pointer transition-all hover:shadow-md hover:border-primary/30 text-slate-600 font-medium"
-              @click="toggleMemberMenu"
-            >
-              <span class="truncate">
-                {{ memberOptions.find((o) => o.value === memberFilter)?.label }}
-              </span>
-              <ChevronDownIcon
-                :class="[
-                  'w-4 h-4 text-slate-400 transition-transform duration-300',
-                  memberOpen ? 'rotate-180' : ''
-                ]"
-              />
-            </div>
-            <Transition name="fade-down">
-              <div
-                v-if="memberOpen"
-                class="absolute top-full left-0 mt-2 w-full bg-white/90 backdrop-blur-md border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden py-1 ring-1 ring-black/5"
-              >
-                <div
-                  v-for="opt in memberOptions"
-                  :key="opt.value"
-                  class="px-4 py-2.5 text-sm cursor-pointer transition-colors"
-                  :class="
-                    memberFilter === opt.value
-                      ? 'bg-primary text-white'
-                      : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
-                  "
-                  @click="selectMemberFilter(opt.value)"
-                >
-                  {{ opt.label }}
-                </div>
-              </div>
-            </Transition>
+        <div ref="memberSelectRef" class="relative w-32">
+          <div
+            class="w-full px-3 py-1.5 border rounded-[8px] text-sm flex items-center justify-between cursor-pointer transition-colors text-gray-600"
+            :class="memberFilter === 'all' ? 'border-transparent bg-gray-50' : 'border-[#00b4b6] bg-white'"
+            @click="toggleMemberMenu"
+          >
+            <span class="truncate">
+              {{ memberOptions.find((o) => o.value === memberFilter)?.label }}
+            </span>
+            <ChevronDownIcon
+              :class="[
+                'w-4 h-4 text-gray-400 transition-transform',
+                memberOpen ? 'rotate-180' : ''
+              ]"
+            />
           </div>
+          <Transition name="fade-down">
+            <div
+              v-if="memberOpen"
+              class="absolute top-full left-0 mt-1 w-full bg-white border border-[#00b4b6] rounded-[8px] shadow-lg z-50 overflow-hidden py-1"
+            >
+              <div
+                v-for="opt in memberOptions"
+                :key="opt.value"
+                class="px-3 py-2 text-sm cursor-pointer transition-colors"
+                :class="
+                  memberFilter === opt.value
+                    ? 'bg-[#00b4b6] text-white'
+                    : 'text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6]'
+                "
+                @click="selectMemberFilter(opt.value)"
+              >
+                {{ opt.label }}
+              </div>
+            </div>
+          </Transition>
+        </div>
 
-          <div ref="sourceSelectRef" class="relative w-36">
-            <div
-              class="w-full px-4 py-2.5 bg-white/60 border border-slate-200 rounded-xl text-sm flex items-center justify-between cursor-pointer transition-all hover:shadow-md hover:border-primary/30 text-slate-600 font-medium"
-              @click="toggleSourceMenu"
-            >
-              <span class="truncate">
-                {{ sourceOptions.find((o) => o.value === sourceFilter)?.label }}
-              </span>
-              <ChevronDownIcon
-                :class="[
-                  'w-4 h-4 text-slate-400 transition-transform duration-300',
-                  sourceOpen ? 'rotate-180' : ''
-                ]"
-              />
-            </div>
-            <Transition name="fade-down">
-              <div
-                v-if="sourceOpen"
-                class="absolute top-full left-0 mt-2 w-full bg-white/90 backdrop-blur-md border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden py-1 ring-1 ring-black/5"
-              >
-                <div
-                  v-for="opt in sourceOptions"
-                  :key="opt.value"
-                  class="px-4 py-2.5 text-sm cursor-pointer transition-colors"
-                  :class="
-                    sourceFilter === opt.value
-                      ? 'bg-primary text-white'
-                      : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
-                  "
-                  @click="selectSourceFilter(opt.value)"
-                >
-                  {{ opt.label }}
-                </div>
-              </div>
-            </Transition>
+        <div ref="sourceSelectRef" class="relative w-32">
+          <div
+            class="w-full px-3 py-1.5 border rounded-[8px] text-sm flex items-center justify-between cursor-pointer transition-colors text-gray-600"
+            :class="sourceFilter === 'all' ? 'border-transparent bg-gray-50' : 'border-[#00b4b6] bg-white'"
+            @click="toggleSourceMenu"
+          >
+            <span class="truncate">
+              {{ sourceOptions.find((o) => o.value === sourceFilter)?.label }}
+            </span>
+            <ChevronDownIcon
+              :class="[
+                'w-4 h-4 text-gray-400 transition-transform',
+                sourceOpen ? 'rotate-180' : ''
+              ]"
+            />
           </div>
+          <Transition name="fade-down">
+            <div
+              v-if="sourceOpen"
+              class="absolute top-full left-0 mt-1 w-full bg-white border border-[#00b4b6] rounded-[8px] shadow-lg z-50 overflow-hidden py-1"
+            >
+              <div
+                v-for="opt in sourceOptions"
+                :key="opt.value"
+                class="px-3 py-2 text-sm cursor-pointer transition-colors"
+                :class="
+                  sourceFilter === opt.value
+                    ? 'bg-[#00b4b6] text-white'
+                    : 'text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6]'
+                "
+                @click="selectSourceFilter(opt.value)"
+              >
+                {{ opt.label }}
+              </div>
+            </div>
+          </Transition>
         </div>
 
         <!-- Action Button -->
         <button
           v-if="hasModelOp('canUpload')"
-          class="bg-primary hover:bg-primary-dark text-white px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0"
+          class="bg-[#00b4b6] hover:bg-[#009fa1] text-white px-4 py-1.5 rounded-[8px] text-sm font-medium transition-colors"
         >
           新建模型
         </button>
@@ -129,43 +113,39 @@
     </div>
 
     <!-- Content Area -->
-    <div class="flex-1 overflow-auto bg-slate-50/30 p-8">
-      <div
-        class="premium-card bg-white/70 backdrop-blur-md border border-white/60 rounded-2xl overflow-hidden shadow-sm"
-      >
+    <div class="flex-1 overflow-auto bg-[#f5f7fa] p-6">
+      <div class="bg-white/80 backdrop-blur-md border border-gray-200 rounded-[8px]">
         <table class="w-full text-left border-collapse">
           <thead>
-            <tr
-              class="bg-slate-100/50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200/50"
-            >
-              <th class="px-6 py-4 font-semibold">模型信息</th>
-              <th class="px-6 py-4 font-semibold">所属项目</th>
-              <th class="px-6 py-4 font-semibold">更新时间</th>
-              <th class="px-6 py-4 font-semibold text-center">版本</th>
-              <th class="px-6 py-4 font-semibold text-center">评论</th>
-              <th class="px-6 py-4 font-semibold text-right">操作</th>
+            <tr class="bg-[#f8f9fa] text-gray-500 text-sm border-b border-gray-200">
+              <th class="px-4 py-3 font-medium">模型名称</th>
+              <th class="px-4 py-3 font-medium">更新时间</th>
+              <th class="px-4 py-3 font-medium">状态</th>
+              <th class="px-4 py-3 font-medium text-center">评论数</th>
+              <th class="px-4 py-3 font-medium text-center">版本数</th>
+              <th class="px-4 py-3 font-medium text-right">操作</th>
             </tr>
           </thead>
-          <tbody class="text-sm text-slate-700 divide-y divide-slate-100/50 relative">
+          <tbody class="text-sm text-[#333] divide-y divide-gray-100">
             <template v-if="loading">
               <tr v-for="i in 5" :key="i" class="animate-pulse">
-                <td class="px-6 py-5">
-                  <div class="h-10 w-48 bg-slate-200 rounded-lg"></div>
+                <td class="px-4 py-3">
+                  <div class="h-10 w-48 bg-gray-200 rounded-md"></div>
                 </td>
-                <td class="px-6 py-5">
-                  <div class="h-4 w-32 bg-slate-200 rounded-md"></div>
+                <td class="px-4 py-3">
+                  <div class="h-4 w-24 bg-gray-200 rounded-md"></div>
                 </td>
-                <td class="px-6 py-5">
-                  <div class="h-4 w-24 bg-slate-200 rounded-md"></div>
+                <td class="px-4 py-3">
+                  <div class="h-4 w-16 bg-gray-200 rounded-md"></div>
                 </td>
-                <td class="px-6 py-5">
-                  <div class="h-4 w-12 bg-slate-200 rounded-md mx-auto"></div>
+                <td class="px-4 py-3">
+                  <div class="h-4 w-12 bg-gray-200 rounded-md mx-auto"></div>
                 </td>
-                <td class="px-6 py-5">
-                  <div class="h-4 w-12 bg-slate-200 rounded-md mx-auto"></div>
+                <td class="px-4 py-3">
+                  <div class="h-4 w-12 bg-gray-200 rounded-md mx-auto"></div>
                 </td>
-                <td class="px-6 py-5">
-                  <div class="h-4 w-8 bg-slate-200 rounded-md ml-auto"></div>
+                <td class="px-4 py-3">
+                  <div class="h-4 w-8 bg-gray-200 rounded-md ml-auto"></div>
                 </td>
               </tr>
             </template>
@@ -173,105 +153,69 @@
               <tr
                 v-for="model in filteredModels"
                 :key="model.id"
-                class="group hover:bg-white transition-all duration-300 cursor-pointer relative"
+                class="hover:bg-[#fcfcfc] transition-colors cursor-pointer relative"
                 @click="openModelDetail(model)"
               >
-                <td class="px-6 py-5">
-                  <div class="flex items-center space-x-4">
-                    <div
-                      class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden border border-slate-200 group-hover:border-primary/30 transition-colors shadow-inner"
-                    >
-                      <div
+                <td class="px-4 py-3">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-[8px] bg-gray-100 flex items-center justify-center shrink-0 overflow-hidden border border-gray-200">
+                      <img
                         v-if="model.previewUrl"
-                        class="w-full h-full opacity-80 group-hover:opacity-100 transition-opacity"
-                      >
-                        <PreviewImage :preview-url="model.previewUrl" />
-                      </div>
-                      <CubeIcon v-else class="h-5 w-5 text-slate-300" />
+                        :src="model.previewUrl"
+                        alt="thumbnail"
+                        class="w-full h-full object-cover"
+                      />
+                      <CubeIcon v-else class="h-4 w-4 text-gray-400" />
                     </div>
-                    <div class="flex flex-col">
-                      <span
-                        class="font-bold text-slate-800 group-hover:text-primary transition-colors"
-                      >
-                        {{ model.title }}
-                      </span>
-                      <div class="flex items-center space-x-2 mt-0.5">
-                        <span
-                          v-if="model.status"
-                          class="status-badge bg-rose-100 text-rose-600"
-                        >
-                          {{ model.status }}
-                        </span>
-                        <span
-                          v-else
-                          class="status-badge bg-emerald-100 text-emerald-600"
-                        >
-                          Active
-                        </span>
-                      </div>
-                    </div>
+                    <span class="font-medium whitespace-pre-line">{{ model.title }}</span>
                   </div>
                 </td>
-                <td class="px-6 py-5">
-                  <span class="text-slate-500 font-medium">
-                    {{ model.streamName || '未分配项目' }}
-                  </span>
+                <td class="px-4 py-3 text-gray-500">{{ formatDate(model.updateTime) }}</td>
+                <td class="px-4 py-3">
+                  <span v-if="model.status" class="text-red-500 text-xs">{{ model.status }}</span>
+                  <span v-else class="text-green-600 text-xs">正常</span>
                 </td>
-                <td class="px-6 py-5 text-slate-500 font-medium">
-                  {{ formatDate(model.updateTime) }}
-                </td>
-                <td class="px-6 py-5 text-center">
-                  <div
-                    class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 font-bold text-xs"
-                  >
-                    <ClockIcon class="w-3.5 h-3.5" />
-                    <span>{{ model.versions }}</span>
-                  </div>
-                </td>
-                <td class="px-6 py-5 text-center">
-                  <div
-                    class="inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 font-bold text-xs"
-                  >
-                    <ChatBubbleLeftIcon class="w-3.5 h-3.5" />
-                    <span>{{ model.comments }}</span>
-                  </div>
-                </td>
-                <td class="px-6 py-5 text-right relative">
+                <td class="px-4 py-3 text-center text-gray-500">{{ model.comments }}</td>
+                <td class="px-4 py-3 text-center text-gray-500">{{ model.versions }}</td>
+                <td class="px-4 py-3 text-right relative">
                   <button
-                    class="text-slate-400 hover:text-primary p-2 rounded-lg hover:bg-primary/5 transition-all"
+                    class="text-gray-400 hover:text-gray-600 p-1"
                     @click.stop="toggleActionMenu(model.id)"
                   >
-                    <EllipsisHorizontalIcon class="h-5 w-5" />
+                    <EllipsisHorizontalIcon class="h-4 w-4" />
                   </button>
                   <Transition name="fade-in">
                     <div
                       v-if="activeActionMenu === model.id"
-                      class="absolute right-12 top-10 w-48 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-slate-100 py-2 z-20 ring-1 ring-black/5 overflow-hidden text-left"
+                      class="absolute right-8 top-10 w-40 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-[60] overflow-hidden text-left"
                     >
                       <button class="menu-item" @click.stop="closeActionMenu">
-                        <ArrowDownTrayIcon class="w-4 h-4" />
-                        <span>导出模型</span>
+                        <ArrowDownTrayIcon class="w-3.5 h-3.5" />
+                        <span>导出模型数据</span>
                       </button>
                       <button class="menu-item" @click.stop="closeActionMenu">
-                        <ShareIcon class="w-4 h-4" />
-                        <span>共享链接</span>
+                        <ShareIcon class="w-3.5 h-3.5" />
+                        <span>分享</span>
                       </button>
                       <button
                         v-if="hasModelOp('canEdit')"
                         class="menu-item"
                         @click.stop="closeActionMenu"
                       >
-                        <PencilSquareIcon class="w-4 h-4" />
+                        <PencilSquareIcon class="w-3.5 h-3.5" />
                         <span>重命名</span>
                       </button>
-                      <div class="h-px bg-slate-100 my-1"></div>
+                      <button class="menu-item" @click.stop="closeActionMenu">
+                        <ClockIcon class="w-3.5 h-3.5" />
+                        <span>历史版本</span>
+                      </button>
                       <button
                         v-if="hasModelOp('canFile')"
-                        class="menu-item text-rose-500 hover:bg-rose-50"
+                        class="menu-item text-red-500 hover:bg-red-50"
                         @click.stop="closeActionMenu"
                       >
-                        <TrashIcon class="w-4 h-4" />
-                        <span>删除模型</span>
+                        <TrashIcon class="w-3.5 h-3.5" />
+                        <span>删除</span>
                       </button>
                     </div>
                   </Transition>
@@ -281,8 +225,8 @@
             <tr v-else>
               <td colspan="6" class="py-24 text-center">
                 <div class="flex flex-col items-center justify-center opacity-40">
-                  <CubeIcon class="h-16 w-16 mb-4 text-slate-300" />
-                  <p class="text-slate-400 font-medium">暂无匹配的模型数据</p>
+                  <CubeIcon class="h-16 w-16 mb-4 text-gray-300" />
+                  <p class="text-gray-400 font-medium">暂无匹配的模型数据</p>
                 </div>
               </td>
             </tr>
@@ -294,7 +238,7 @@
     <!-- Error State -->
     <div
       v-if="error"
-      class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 z-[100] animate-bounce"
+      class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center space-x-3 z-[100]"
     >
       <ExclamationCircleIcon class="w-5 h-5" />
       <span class="font-bold">{{ error }}</span>
@@ -379,8 +323,16 @@ const fetchModels = async () => {
   error.value = null
   try {
     const apiOrigin = useApiOrigin()
+    const params: Record<string, string> = {}
+    if (searchQuery.value) params.search = searchQuery.value
+    if (memberFilter.value && memberFilter.value !== 'all') {
+      params.member = memberFilter.value
+    }
+    if (sourceFilter.value && sourceFilter.value !== 'all') {
+      params.source = sourceFilter.value
+    }
     const response = await $fetch<{ data: any[] }>(`${apiOrigin}/api/v1/models`, {
-      params: { search: searchQuery.value }
+      params
     })
     models.value = response.data
   } catch (e) {
@@ -398,14 +350,7 @@ const debouncedFetch = () => {
   timeout = setTimeout(fetchModels, 400)
 }
 
-const filteredModels = computed(() => {
-  // We already filter by search in the backend, but we can also do local filtering here for member/source
-  const res = models.value
-  if (memberFilter.value === 'mine') {
-    // Mock logic for "mine"
-  }
-  return res
-})
+const filteredModels = computed(() => models.value)
 
 const formatDate = (date: string) => {
   return dayjs(date).fromNow()
@@ -430,6 +375,7 @@ const toggleMemberMenu = () => {
 const selectMemberFilter = (val: string) => {
   memberFilter.value = val
   memberOpen.value = false
+  fetchModels()
 }
 
 const toggleSourceMenu = () => {
@@ -439,6 +385,7 @@ const toggleSourceMenu = () => {
 const selectSourceFilter = (val: string) => {
   sourceFilter.value = val
   sourceOpen.value = false
+  fetchModels()
 }
 
 const closeModelDetail = () => {
@@ -472,40 +419,35 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.premium-card {
-  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
-}
-
-.status-badge {
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
+/* 强制覆盖搜索框聚焦时的边框颜色与背景色 */
+input.search-input:focus,
+input.search-input:focus-visible {
+  border: 1px solid #00b4b6 !important;
+  background-color: #ffffff !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .menu-item {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 8px;
+  padding: 8px 16px;
   font-size: 13px;
-  font-weight: 500;
-  color: #475569;
+  color: #4b5563;
   transition: all 0.2s;
 }
 
 .menu-item:hover {
-  background: rgba(0, 180, 182, 0.05);
+  background: #f5f7fa;
   color: #00b4b6;
 }
 
 /* Transitions */
 .fade-down-enter-active,
 .fade-down-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 .fade-down-enter-from,
 .fade-down-leave-to {
@@ -515,7 +457,7 @@ onUnmounted(() => {
 
 .fade-in-enter-active,
 .fade-in-leave-active {
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 .fade-in-enter-from,
 .fade-in-leave-to {
@@ -531,10 +473,10 @@ onUnmounted(() => {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #e2e8f0;
+  background: #e5e7eb;
   border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #cbd5e1;
+  background: #d1d5db;
 }
 </style>
