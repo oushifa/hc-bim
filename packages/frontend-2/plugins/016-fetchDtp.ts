@@ -1,3 +1,11 @@
+let cachedDtpToken: string | null = null
+let pendingDtpTokenRequest: Promise<string | null> | null = null
+
+export const clearDtpTokenCache = () => {
+  cachedDtpToken = null
+  pendingDtpTokenRequest = null
+}
+
 /**
  * Plugin to create a dedicated $fetch instance for DTP API calls
  * with authentication support
@@ -41,10 +49,6 @@ export default defineNuxtPlugin(() => {
       }
     }
   }
-
-  // 缓存的DTP token
-  let cachedDtpToken: string | null = null
-  let pendingDtpTokenRequest: Promise<string | null> | null = null
 
   const getDtpToken = async (): Promise<string | null> => {
     if (cachedDtpToken) {
@@ -180,7 +184,7 @@ export default defineNuxtPlugin(() => {
 
       // 如果是401错误，清除缓存并尝试重新获取token
       if (response.status === 401) {
-        cachedDtpToken = null
+        clearDtpTokenCache()
         void getDtpToken()
       }
     }

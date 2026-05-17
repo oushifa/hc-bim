@@ -16,6 +16,7 @@ import { useApolloClient } from '@vue/apollo-composable'
 import { speckleWebAppId } from '~~/lib/auth/helpers/strategies'
 import { randomString } from '~~/lib/common/helpers/random'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
+import { clearDtpTokenCache } from '~~/plugins/016-fetchDtp'
 import {
   activeUserQuery,
   useResolveUserDistinctId,
@@ -593,6 +594,7 @@ export const useAuthManager = (
     SafeLocalStorage.remove(ThirdPartyOaUserLocalStorageKey)
     // 清除 DTP 本地 token
     SafeLocalStorage.remove('dtp-token')
+    clearDtpTokenCache()
 
     // Clear cached custom-role menu/model permissions so the next login fetches fresh perms.
     try {
