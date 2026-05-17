@@ -6,6 +6,9 @@
         v-if="alignState.splitScreenEnabled"
         :split-ratio="alignState.splitRatio"
         :offset="alignState.offset"
+        :drawing="
+          alignState.drawings.find((item) => item.id === alignState.activeDrawingId) || null
+        "
         :camera-sync-enabled="alignState.cameraSyncEnabled"
         @update:split-ratio="alignSetSplitRatio"
       />

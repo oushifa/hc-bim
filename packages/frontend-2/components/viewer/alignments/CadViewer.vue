@@ -9,6 +9,7 @@
     @dragleave="onDragLeave"
     @drop.prevent="onDrop"
     @click="onContainerClick"
+    @dblclick="onContainerDoubleClick"
   >
     <!-- Three.js canvas -->
     <canvas ref="canvasEl" class="w-full h-full block" />
@@ -27,9 +28,9 @@
         >
           <Upload class="w-10 h-10 text-foreground-2" />
           <p class="text-body-sm text-foreground-2 text-center">
-            拖拽 DXF / OBJ / glTF / GLB 文件到此处
+            请在“新增联动”弹窗中选择或上传左屏图纸
             <br />
-            <span class="text-foreground-3">或点击下方按钮选择文件</span>
+            <span class="text-foreground-3">加载后可在此执行三点校准与点位联动</span>
           </p>
         </div>
       </div>
@@ -55,24 +56,12 @@
 
     <!-- Top toolbar -->
     <div class="absolute top-2 left-2 right-2 flex items-center gap-2 z-10">
-      <!-- Upload button -->
-      <button
-        id="cad-upload-btn"
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-body-xs font-medium bg-foundation/90 hover:bg-foundation border border-outline-2 text-foreground transition-colors backdrop-blur-sm shadow-sm"
-        @click="triggerFileInput"
+      <div
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-body-xs font-medium bg-foundation/90 border border-outline-2 text-foreground backdrop-blur-sm shadow-sm"
       >
         <Upload class="w-3.5 h-3.5" />
-        上传 DXF / CAD
-      </button>
-
-      <input
-        ref="fileInputEl"
-        type="file"
-        accept=".dxf,.obj,.gltf,.glb"
-        class="hidden"
-        aria-label="选择 CAD 文件"
-        @change="onFileSelected"
-      />
+        {{ drawingLabel }}
+      </div>
 
       <!-- Fit view -->
       <button
@@ -126,6 +115,29 @@
         class="absolute inset-0 border-2 border-primary rounded-none bg-primary/5 pointer-events-none z-30"
       />
     </Transition>
+
+    <div
+      v-for="marker in projectedCalibrationMarkers"
+      :key="marker.index"
+      class="absolute z-40 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-primary text-body-xs font-semibold text-white shadow-lg pointer-events-none"
+      :style="{ left: `${marker.x}px`, top: `${marker.y}px` }"
+    >
+      {{ marker.index }}
+    </div>
+
+    <div
+      v-if="projectedHighlightMarker"
+      class="absolute z-50 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+      :style="{
+        left: `${projectedHighlightMarker.x}px`,
+        top: `${projectedHighlightMarker.y}px`
+      }"
+    >
+      <div class="absolute inset-0 rounded-full bg-rose-500/25 animate-ping scale-[1.8]" />
+      <div class="relative flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-rose-500 text-white shadow-xl">
+        <Crosshair class="h-4 w-4" />
+      </div>
+    </div>
   </div>
 </template>
 
@@ -141,13 +153,19 @@ import {
   Vector3,
   Vector2,
   Raycaster,
-  Color
+  Color,
+  Mesh,
+  MeshBasicMaterial,
+  SphereGeometry
 } from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { Upload, Maximize2, Trash2, Link2, Crosshair } from 'lucide-vue-next'
 import { parseDxfToGroup } from './DxfLoader'
+import type { AlignmentDrawing } from './api'
+import { useAlignmentApi } from './api'
+import { useInjectedViewerState } from '~~/lib/viewer/composables/setup'
 
 // --------------------------------------------------------------------------
 // Props / emits
@@ -155,17 +173,27 @@ import { parseDxfToGroup } from './DxfLoader'
 interface Props {
   cameraSync?: boolean
   calibrateMode?: boolean
+  drawing?: AlignmentDrawing | null
+  markerPoint?: { x: number; y: number; z: number } | null
+  calibrationMarkers?: Array<{
+    index: 1 | 2 | 3
+    cadPoint?: { x: number; y: number; z: number }
+  }>
 }
 
 const props = withDefaults(defineProps<Props>(), {
   cameraSync: false,
-  calibrateMode: false
+  calibrateMode: false,
+  drawing: null,
+  markerPoint: null,
+  calibrationMarkers: () => []
 })
 
 const emit = defineEmits<{
   (e: 'controls-ready', controls: OrbitControls): void
   (e: 'controls-change'): void
   (e: 'calibrate-pick', point: Vector3): void
+  (e: 'navigate-pick', point: Vector3): void
 }>()
 
 // --------------------------------------------------------------------------
@@ -173,7 +201,9 @@ const emit = defineEmits<{
 // --------------------------------------------------------------------------
 const containerEl = useTemplateRef<HTMLDivElement>('containerEl')
 const canvasEl = useTemplateRef<HTMLCanvasElement>('canvasEl')
-const fileInputEl = useTemplateRef<HTMLInputElement>('fileInputEl')
+const drawingLabel = computed(() => props.drawing?.fileName || '未加载图纸')
+const api = useAlignmentApi()
+const { projectId } = useInjectedViewerState()
 
 // --------------------------------------------------------------------------
 // State
@@ -182,6 +212,11 @@ const hasModel = ref(false)
 const isLoading = ref(false)
 const loadProgress = ref(0)
 const isDragging = ref(false)
+const isThreeReady = ref(false)
+const projectedCalibrationMarkers = ref<
+  Array<{ index: 1 | 2 | 3; x: number; y: number }>
+>([])
+const projectedHighlightMarker = ref<{ x: number; y: number } | null>(null)
 
 type ProjectionType = 'perspective' | 'orthographic'
 
@@ -212,6 +247,28 @@ interface TraversableObject {
   traverse: (cb: (child: DisposableChild) => void) => void
 }
 
+interface PickableChild extends DisposableChild {
+  isLine?: boolean
+  isLineSegments?: boolean
+  isMesh?: boolean
+  matrixWorld?: { elements: number[] }
+  localToWorld?: (vector: Vector3) => Vector3
+  geometry?: DisposableChild['geometry'] & {
+    attributes?: {
+      position?: {
+        count: number
+        getX: (index: number) => number
+        getY: (index: number) => number
+        getZ: (index: number) => number
+      }
+    }
+    index?: {
+      count: number
+      getX: (index: number) => number
+    }
+  }
+}
+
 // --------------------------------------------------------------------------
 // Three.js objects
 // --------------------------------------------------------------------------
@@ -224,9 +281,15 @@ let controls: OrbitControls | null = null
 let currentModel: unknown = null
 let animationFrameId: number | null = null
 let resizeObserver: ResizeObserver | null = null
+let markerMesh: Mesh | null = null
+let currentHighlightPoint: Vector3 | null = null
+let targetHighlightPoint: Vector3 | null = null
+let pendingCameraState: Partial<CameraState> | null = null
 
 const DEFAULT_FOV = 45
 const MIN_CAMERA_DISTANCE = 0.01
+const HIGHLIGHT_MARKER_LERP_ALPHA = 0.18
+const HIGHLIGHT_MARKER_SNAP_DISTANCE = 0.01
 
 const isOrthographic = (
   camera: PerspectiveCamera | OrthographicCamera | null
@@ -331,7 +394,7 @@ const getModelBoundsInfo = (): ModelBoundsInfo | null => {
   }
 }
 
-const applyCameraState = (state: Partial<CameraState>) => {
+const applyCameraStateNow = (state: Partial<CameraState>) => {
   if (!controls || !perspectiveCamera || !orthographicCamera) return
 
   if (state.projection) {
@@ -364,6 +427,16 @@ const applyCameraState = (state: Partial<CameraState>) => {
   }
 
   controls.update()
+}
+
+const applyPendingCameraState = () => {
+  if (!pendingCameraState) return
+  applyCameraStateNow(pendingCameraState)
+}
+
+const applyCameraState = (state: Partial<CameraState>) => {
+  pendingCameraState = { ...state }
+  applyPendingCameraState()
 }
 
 // --------------------------------------------------------------------------
@@ -440,6 +513,8 @@ const initThree = () => {
   const animate = () => {
     animationFrameId = requestAnimationFrame(animate)
     controls?.update()
+    updateProjectedCalibrationMarkers()
+    updateHighlightMarkerAnimation()
     if (renderer && scene && activeCamera) {
       renderer.render(scene, activeCamera)
     }
@@ -460,17 +535,6 @@ const handleResize = () => {
 // --------------------------------------------------------------------------
 // File loading
 // --------------------------------------------------------------------------
-const triggerFileInput = () => {
-  fileInputEl.value?.click()
-}
-
-const onFileSelected = (e: Event) => {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (file)
-    loadFile(file)
-    // Reset input so the same file can be re-selected
-  ;(e.target as HTMLInputElement).value = ''
-}
 
 const onDragOver = () => {
   isDragging.value = true
@@ -545,11 +609,68 @@ const loadFile = async (file: File) => {
     currentModel = object
     hasModel.value = true
     fitToModel()
+    applyPendingCameraState()
   } catch {
     loadProgress.value = 0
   } finally {
     isLoading.value = false
     URL.revokeObjectURL(url)
+  }
+}
+
+const loadDrawingFromServer = async (drawing: AlignmentDrawing | null) => {
+  const currentProjectId = projectId.value
+  if (!isThreeReady.value) return
+  if (!drawing || !currentProjectId) {
+    clearModel()
+    return
+  }
+
+  const ext = drawing.fileName.split('.').pop()?.toLowerCase()
+  clearModel()
+  isLoading.value = true
+  loadProgress.value = 10
+
+  try {
+    let object: unknown
+
+    if (ext === 'dxf') {
+      const text = await api.fetchDrawingBlobText(currentProjectId, drawing.blobId)
+      loadProgress.value = 60
+      object = parseDxfToGroup(text)
+    } else if (ext === 'obj') {
+      const blob = await api.fetchDrawingBlob(currentProjectId, drawing.blobId)
+      const url = URL.createObjectURL(blob)
+      try {
+        const loader = new OBJLoader()
+        object = await new Promise<unknown>((resolve, reject) => {
+          loader.load(url, resolve, undefined, reject)
+        })
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    } else {
+      const blob = await api.fetchDrawingBlob(currentProjectId, drawing.blobId)
+      const url = URL.createObjectURL(blob)
+      try {
+        const loader = new GLTFLoader()
+        const gltf = await new Promise<unknown>((resolve, reject) => {
+          loader.load(url, resolve, undefined, reject)
+        })
+        object = (gltf as { scene: unknown }).scene
+      } finally {
+        URL.revokeObjectURL(url)
+      }
+    }
+
+    scene?.add(object as never)
+    currentModel = object
+    hasModel.value = true
+    loadProgress.value = 100
+    fitToModel()
+    applyPendingCameraState()
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -606,24 +727,280 @@ const clearModel = () => {
 }
 
 // --------------------------------------------------------------------------
-// Calibration click
+// Marker / picking
 // --------------------------------------------------------------------------
-const onContainerClick = (e: MouseEvent) => {
-  if (!props.calibrateMode || !currentModel || !activeCamera || !renderer) return
+const ensureMarker = () => {
+  if (markerMesh || !scene) return
+  markerMesh = new Mesh(
+    new SphereGeometry(0.6, 24, 24),
+    new MeshBasicMaterial({
+      color: '#ff5a5a'
+    })
+  )
+  markerMesh.visible = false
+  scene.add(markerMesh)
+}
+
+const updateMarker = (point: { x: number; y: number; z: number } | null) => {
+  ensureMarker()
+  if (!markerMesh) return
+
+  if (!point) {
+    targetHighlightPoint = null
+    currentHighlightPoint = null
+    markerMesh.visible = false
+    projectedHighlightMarker.value = null
+    return
+  }
+
+  targetHighlightPoint = new Vector3(point.x, point.y, point.z)
+  if (!currentHighlightPoint) {
+    currentHighlightPoint = targetHighlightPoint.clone()
+  }
+}
+
+const projectWorldPointToScreen = (worldPoint: { x: number; y: number; z: number }) => {
+  if (!containerEl.value || !activeCamera) return null
+
+  const rect = containerEl.value.getBoundingClientRect()
+  const projected = new Vector3(worldPoint.x, worldPoint.y, worldPoint.z).project(
+    activeCamera as never
+  )
+
+  if (
+    !Number.isFinite(projected.x) ||
+    !Number.isFinite(projected.y) ||
+    projected.z < -1 ||
+    projected.z > 1
+  ) {
+    return null
+  }
+
+  return {
+    x: ((projected.x + 1) / 2) * rect.width,
+    y: ((1 - projected.y) / 2) * rect.height
+  }
+}
+
+const updateProjectedCalibrationMarkers = () => {
+  if (!containerEl.value || !activeCamera) {
+    projectedCalibrationMarkers.value = []
+    return
+  }
+
+  projectedCalibrationMarkers.value = props.calibrationMarkers
+    .flatMap((marker) => {
+      if (!marker.cadPoint) return []
+
+      const projected = projectWorldPointToScreen(marker.cadPoint)
+      if (!projected) return []
+
+      return [
+        {
+          index: marker.index,
+          x: projected.x,
+          y: projected.y
+        }
+      ]
+    })
+    .sort((a, b) => a.index - b.index)
+}
+
+const syncHighlightMarkerDisplay = () => {
+  ensureMarker()
+  if (!markerMesh || !currentHighlightPoint) {
+    if (markerMesh) markerMesh.visible = false
+    projectedHighlightMarker.value = null
+    return
+  }
+
+  markerMesh.visible = true
+  markerMesh.position.copy(currentHighlightPoint)
+  projectedHighlightMarker.value = projectWorldPointToScreen({
+    x: currentHighlightPoint.x,
+    y: currentHighlightPoint.y,
+    z: currentHighlightPoint.z
+  })
+}
+
+const updateHighlightMarkerAnimation = () => {
+  if (!targetHighlightPoint) {
+    currentHighlightPoint = null
+    syncHighlightMarkerDisplay()
+    return
+  }
+
+  if (!currentHighlightPoint) {
+    currentHighlightPoint = targetHighlightPoint.clone()
+    syncHighlightMarkerDisplay()
+    return
+  }
+
+  currentHighlightPoint.lerp(targetHighlightPoint, HIGHLIGHT_MARKER_LERP_ALPHA)
+  if (
+    currentHighlightPoint.distanceToSquared(targetHighlightPoint) <=
+    HIGHLIGHT_MARKER_SNAP_DISTANCE * HIGHLIGHT_MARKER_SNAP_DISTANCE
+  ) {
+    currentHighlightPoint.copy(targetHighlightPoint)
+  }
+
+  syncHighlightMarkerDisplay()
+}
+
+const pickPointFromEvent = (e: MouseEvent) => {
+  if (!currentModel || !activeCamera || !renderer) return null
 
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  const pointer = { x: e.clientX, y: e.clientY }
   const ndc = new Vector2(
     ((e.clientX - rect.left) / rect.width) * 2 - 1,
     -((e.clientY - rect.top) / rect.height) * 2 + 1
   )
 
   const raycaster = new Raycaster()
+  raycaster.params.Line.threshold = 4
+  raycaster.params.Points.threshold = 8
   raycaster.setFromCamera(ndc, activeCamera as unknown as never)
 
-  const intersects = raycaster.intersectObject(currentModel as never, true)
-  if (intersects.length > 0) {
-    emit('calibrate-pick', intersects[0].point)
+  const projectToScreen = (worldPoint: Vector3) => {
+    const projected = worldPoint.clone().project(activeCamera as never)
+    if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) return null
+
+    return {
+      x: rect.left + ((projected.x + 1) / 2) * rect.width,
+      y: rect.top + ((1 - projected.y) / 2) * rect.height
+    }
   }
+
+  const getScreenDistance = (screenPoint: { x: number; y: number }) =>
+    Math.hypot(screenPoint.x - pointer.x, screenPoint.y - pointer.y)
+
+  const closestPointOnSegment = (
+    segmentStart: { x: number; y: number },
+    segmentEnd: { x: number; y: number }
+  ) => {
+    const abX = segmentEnd.x - segmentStart.x
+    const abY = segmentEnd.y - segmentStart.y
+    const lengthSquared = abX * abX + abY * abY
+    const t =
+      lengthSquared <= Number.EPSILON
+        ? 0
+        : Math.min(
+            1,
+            Math.max(
+              0,
+              ((pointer.x - segmentStart.x) * abX + (pointer.y - segmentStart.y) * abY) /
+                lengthSquared
+            )
+          )
+
+    return {
+      x: segmentStart.x + abX * t,
+      y: segmentStart.y + abY * t,
+      t
+    }
+  }
+
+  const lineThreshold = props.calibrateMode ? 18 : 12
+  const endpointThreshold = props.calibrateMode ? 22 : 16
+  let bestCandidate: { point: Vector3; distance: number } | null = null
+
+  const updateCandidate = (candidate: { point: Vector3; distance: number } | null) => {
+    if (!candidate) return
+    if (!bestCandidate || candidate.distance < bestCandidate.distance) {
+      bestCandidate = candidate
+    }
+  }
+
+  ;(currentModel as TraversableObject).traverse((child) => {
+    const pickableChild = child as PickableChild
+    const positions = pickableChild.geometry?.attributes?.position
+    if (!positions || !pickableChild.localToWorld) return
+
+    const getWorldVertex = (vertexIndex: number) =>
+      pickableChild.localToWorld!(
+        new Vector3(
+          positions.getX(vertexIndex),
+          positions.getY(vertexIndex),
+          positions.getZ(vertexIndex)
+        )
+      )
+
+    const testVertex = (worldVertex: Vector3) => {
+      const screenVertex = projectToScreen(worldVertex)
+      if (!screenVertex) return
+      const distance = getScreenDistance(screenVertex)
+      if (distance <= endpointThreshold) {
+        updateCandidate({ point: worldVertex.clone(), distance })
+      }
+    }
+
+    const testSegment = (startIndex: number, endIndex: number) => {
+      const worldStart = getWorldVertex(startIndex)
+      const worldEnd = getWorldVertex(endIndex)
+      const startScreen = projectToScreen(worldStart)
+      const endScreen = projectToScreen(worldEnd)
+      if (!startScreen || !endScreen) return
+
+      testVertex(worldStart)
+      testVertex(worldEnd)
+
+      const closestScreenPoint = closestPointOnSegment(startScreen, endScreen)
+      const distance = getScreenDistance(closestScreenPoint)
+      if (distance > lineThreshold) return
+
+      const snappedPoint = worldStart.clone().lerp(worldEnd, closestScreenPoint.t)
+      updateCandidate({ point: snappedPoint, distance })
+    }
+
+    if (pickableChild.isLineSegments) {
+      const index = pickableChild.geometry?.index
+      if (index) {
+        for (let i = 0; i < index.count - 1; i += 2) {
+          testSegment(index.getX(i), index.getX(i + 1))
+        }
+      } else {
+        for (let i = 0; i < positions.count - 1; i += 2) {
+          testSegment(i, i + 1)
+        }
+      }
+      return
+    }
+
+    if (pickableChild.isLine) {
+      const index = pickableChild.geometry?.index
+      if (index) {
+        for (let i = 0; i < index.count - 1; i++) {
+          testSegment(index.getX(i), index.getX(i + 1))
+        }
+      } else {
+        for (let i = 0; i < positions.count - 1; i++) {
+          testSegment(i, i + 1)
+        }
+      }
+    }
+  })
+
+  const intersects = raycaster.intersectObject(currentModel as never, true)
+  if (intersects[0]) {
+    updateCandidate({
+      point: intersects[0].point.clone(),
+      distance: 6
+    })
+  }
+
+  return bestCandidate?.point || null
+}
+
+const onContainerClick = (e: MouseEvent) => {
+  if (!props.calibrateMode) return
+  const point = pickPointFromEvent(e)
+  if (point) emit('calibrate-pick', point)
+}
+
+const onContainerDoubleClick = (e: MouseEvent) => {
+  const point = pickPointFromEvent(e)
+  if (point) emit('navigate-pick', point)
 }
 
 // --------------------------------------------------------------------------
@@ -644,13 +1021,50 @@ defineExpose({
 onMounted(() => {
   if (import.meta.client) {
     initThree()
+    isThreeReady.value = true
+    void loadDrawingFromServer(props.drawing || null)
+    updateMarker(props.markerPoint || null)
+    syncHighlightMarkerDisplay()
   }
 })
+
+watch(
+  () => props.drawing?.id,
+  () => {
+    if (!isThreeReady.value) return
+    void loadDrawingFromServer(props.drawing || null)
+  },
+  { immediate: false }
+)
+
+watch(
+  () => props.markerPoint,
+  (point) => {
+    if (!isThreeReady.value) return
+    updateMarker(point || null)
+    syncHighlightMarkerDisplay()
+  },
+  { immediate: false, deep: true }
+)
+
+watch(
+  () => props.calibrationMarkers,
+  () => {
+    if (!isThreeReady.value) return
+    updateProjectedCalibrationMarkers()
+  },
+  { immediate: false, deep: true }
+)
 
 onBeforeUnmount(() => {
   if (animationFrameId !== null) cancelAnimationFrame(animationFrameId)
   resizeObserver?.disconnect()
   controls?.dispose()
+  if (markerMesh && scene) {
+    scene.remove(markerMesh)
+    markerMesh.geometry.dispose()
+    ;(markerMesh.material as MeshBasicMaterial).dispose()
+  }
   clearModel()
   renderer?.dispose()
 })

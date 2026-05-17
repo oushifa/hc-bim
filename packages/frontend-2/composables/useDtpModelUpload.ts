@@ -294,7 +294,7 @@ export const useDtpModelUpload = () => {
     }
 
     return {
-      uploadUrl: uploadUrl.replace(/[`"'\\s]/g, ''),
+      uploadUrl,
       uploadPathPrefix,
       uploadToken
     }
@@ -326,6 +326,7 @@ export const useDtpModelUpload = () => {
     })
 
     const { uploadUrl, uploadPathPrefix, uploadToken } = await getUploadConfig()
+    console.log(uploadUrl)
     const chunkPlan = resolveChunkPlan(file.size)
     const assetName = buildAssetName(file.name)
     const path = `${uploadPathPrefix}${file.name}`
