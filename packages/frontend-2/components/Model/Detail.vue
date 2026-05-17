@@ -12,8 +12,8 @@
               ? 'bg-[#e6f7f8] text-[#00b4b6]'
               : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
           ]"
-          @click="activeTab = 'model'"
           title="模型构件属性查看"
+          @click="activeTab = 'model'"
         >
           <CubeIcon class="w-5 h-5" />
         </button>
@@ -24,8 +24,8 @@
               ? 'bg-[#e6f7f8] text-[#00b4b6]'
               : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
           ]"
-          @click="activeTab = 'filter'"
           title="属性筛选"
+          @click="activeTab = 'filter'"
         >
           <AdjustmentsHorizontalIcon class="w-5 h-5" />
         </button>
@@ -36,8 +36,8 @@
               ? 'bg-[#e6f7f8] text-[#00b4b6]'
               : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
           ]"
-          @click="activeTab = 'comment'"
           title="评论添加"
+          @click="activeTab = 'comment'"
         >
           <ChatBubbleLeftRightIcon class="w-5 h-5" />
         </button>
@@ -48,8 +48,8 @@
               ? 'bg-[#e6f7f8] text-[#00b4b6]'
               : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
           ]"
-          @click="activeTab = 'directory'"
           title="目录组织"
+          @click="activeTab = 'directory'"
         >
           <FolderIcon class="w-5 h-5" />
         </button>
@@ -60,8 +60,8 @@
               ? 'bg-[#e6f7f8] text-[#00b4b6]'
               : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
           ]"
-          @click="activeTab = 'perspective'"
           title="视角管理"
+          @click="activeTab = 'perspective'"
         >
           <CameraIcon class="w-5 h-5" />
         </button>
@@ -72,8 +72,8 @@
               ? 'bg-[#e6f7f8] text-[#00b4b6]'
               : 'text-gray-500 hover:bg-[#f5f7fa] hover:text-[#00b4b6]'
           ]"
-          @click="activeTab = 'compare'"
           title="二三维对比"
+          @click="activeTab = 'compare'"
         >
           <ComputerDesktopIcon class="w-5 h-5" />
         </button>
@@ -205,7 +205,7 @@
                 '标高',
                 '名称',
                 '对象',
-                '数智南北类型'
+                '数据类型'
               ]"
               :key="attr"
               class="flex items-center px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer text-sm"
@@ -444,9 +444,9 @@
     >
       <!-- Back Button -->
       <button
-        @click="goBack"
         class="absolute top-4 left-4 z-20 flex items-center space-x-1 text-black bg-white hover:bg-gray-100 px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors shadow-sm"
         title="返回"
+        @click="goBack"
       >
         <ArrowLeftIcon class="w-4 h-4" />
         <span>返回</span>
@@ -632,7 +632,7 @@
               <span class="flex-1 text-gray-800">常规模型</span>
             </div>
             <div class="flex">
-              <span class="w-24 text-gray-500">数智南北类型</span>
+              <span class="w-24 text-gray-500">数据类型</span>
               <span class="flex-1 text-gray-800 truncate">
                 Objects.Data.DataObject...
               </span>
@@ -673,16 +673,16 @@
           <div class="px-4 py-3 bg-gray-50 border-t border-gray-100 space-y-2">
             <div class="text-xs font-medium text-gray-600 mb-1">添加自定义属性</div>
             <input
+              v-model="newAttrName"
               type="text"
               placeholder="属性名"
               class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-[#00b4b6]"
-              v-model="newAttrName"
             />
             <input
+              v-model="newAttrValue"
               type="text"
               placeholder="属性值"
               class="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-[#00b4b6]"
-              v-model="newAttrValue"
             />
             <button
               class="w-full py-1.5 bg-[#00b4b6] text-white text-xs rounded hover:bg-[#009fa1] transition-colors"

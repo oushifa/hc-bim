@@ -66,6 +66,14 @@
             </MenuItem>
           </div> -->
           <div class="py-1">
+            <!-- <MenuItem v-if="activeUser" v-slot="{ active }">
+              <div
+                class="text-body-xs flex px-2 py-1 text-foreground cursor-pointer transition mx-1 rounded"
+                @click="test"
+              >
+                同步账号
+              </div>
+            </MenuItem> -->
             <MenuItem v-if="activeUser" v-slot="{ active }">
               <NuxtLink
                 :class="[
@@ -126,7 +134,7 @@ import { useGenerateErrorReference } from '~/lib/core/composables/error'
 defineProps<{
   loginUrl?: RouteLocationRaw
 }>()
-
+const { $dtpFetch } = useNuxtApp()
 const { logout } = useAuthManager()
 const { activeUser, isGuest } = useActiveUser()
 const { isDarkTheme, toggleTheme } = useTheme()
@@ -145,5 +153,21 @@ const toggleInviteDialog = () => {
 
 const copySupportReference = async () => {
   await copyReference()
+}
+
+const test = async () => {
+  const data = await $dtpFetch('/v1/oauth/third-party/register', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    },
+    body: JSON.stringify({
+      username: 'srjAdmin',
+      contact: '17338404660',
+      mobile: 13000000000,
+      email: 'srj@163.com'
+    })
+  })
 }
 </script>

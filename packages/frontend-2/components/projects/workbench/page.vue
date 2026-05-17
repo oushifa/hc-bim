@@ -256,6 +256,26 @@
                         <ClockIcon class="h-4 w-4" />
                       </button>
                       <button
+                        v-if="model.raw.permissions.canCreateVersion.authorized"
+                        title="上传新版本"
+                        class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
+                        @click.stop="triggerVersionUploadPicker(model)"
+                      >
+                        <ArrowUpTrayIcon class="h-4 w-4" />
+                      </button>
+                      <button
+                        v-if="model.raw.permissions.canCreateVersion.authorized"
+                        :title="isModelSyncing(model.id) ? '同步中' : '同步模型构件'"
+                        class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                        :disabled="isModelSyncing(model.id)"
+                        @click.stop="syncModelElements(model)"
+                      >
+                        <ArrowPathIcon
+                          class="h-4 w-4"
+                          :class="{ 'animate-spin': isModelSyncing(model.id) }"
+                        />
+                      </button>
+                      <button
                         v-if="hasModelOp('canDownload')"
                         title="数据下载及导出"
                         class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
@@ -289,6 +309,15 @@
       v-if="uploadProject"
       ref="uploadAreaRef"
       :project="uploadProject"
+      class="hidden"
+      @uploading="onModelUploading"
+    />
+    <ProjectCardImportFileArea
+      v-if="uploadProject && selectedVersionUploadModel"
+      ref="versionUploadAreaRef"
+      :key="selectedVersionUploadModel.id"
+      :project="uploadProject"
+      :model="selectedVersionUploadModel.raw"
       class="hidden"
       @uploading="onModelUploading"
     />
@@ -362,6 +391,7 @@ import {
   EyeIcon,
   InboxIcon,
   ArrowUpTrayIcon,
+  ArrowPathIcon,
   PlusIcon,
   MagnifyingGlassIcon,
   EllipsisHorizontalIcon,
@@ -390,6 +420,8 @@ import { gql } from 'graphql-tag'
 import ImportDialog from '~/components/projects/workbench/ImportDialog.vue'
 import ProjectCardImportFileArea from '~/components/project/CardImportFileArea.vue'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
+import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
+import { useDtpModelUpload } from '~~/composables/useDtpModelUpload'
 
 const props = defineProps<{
   projectId: string
@@ -429,7 +461,54 @@ type ModelListItem = {
   raw: ProjectPageLatestItemsModelItemFragment
 }
 
+type SyncLatestVersionResponse = {
+  project?: {
+    model?: {
+      id: string
+      name?: string | null
+      versions?: {
+        items?: Array<{
+          id: string
+          createdAt: string
+          referencedObject?: string | null
+          seedId?: string | null
+        }>
+      }
+    }
+  }
+}
+
+type SyncObjectLite = {
+  id: string
+  childrenIds: string[]
+  raw: Record<string, unknown>
+}
+
+type SyncFlatPayload = {
+  model: {
+    id: string
+    name: string
+    timestamp: string
+  }
+  elements: Array<{
+    id: string
+    parameters: Record<string, string | number | boolean | null>
+  }>
+}
+
+type GeneratedSyncPayloadResponse = {
+  fileName: string
+  payload: SyncFlatPayload
+}
+
 const ROOT_ID = 'all'
+const TREE_CHILD_KEYS = ['elements', 'children', '@elements', '@children', 'objects']
+const UNIT_SYMBOL_MAP: Record<string, string> = {
+  'cubic metre': 'm³',
+  'square metre': 'm²',
+  metre: 'm',
+  millimetre: 'mm'
+}
 const projectName = computed(() => uploadProject.value?.name || '项目工作台')
 
 const activeDir = ref(ROOT_ID)
@@ -444,19 +523,63 @@ const infiniteLoaderId = ref('')
 const loadCacheBuster = ref(0)
 const isModelUploading = ref(false)
 const uploadAreaRef = ref<null | { triggerPicker: () => void }>(null)
+const versionUploadAreaRef = ref<null | { triggerPicker: () => void }>(null)
+const selectedVersionUploadModel = ref<ModelListItem | null>(null)
+const syncingModelIds = ref<Set<string>>(new Set())
+
+const { $dtpFetch } = useNuxtApp()
+const { triggerNotification } = useGlobalToast()
+const { ensureDtpToken } = useDtpModelUpload()
+const apiOrigin = useApiOrigin()
+const dtpFetch = $dtpFetch as <T = unknown>(
+  request: string,
+  options?: {
+    method?: string
+    headers?: HeadersInit
+    body?: BodyInit | Record<string, unknown> | null
+    originPath?: boolean
+  }
+) => Promise<T>
 
 const triggerUploadPicker = () => {
   uploadAreaRef.value?.triggerPicker()
+}
+
+const triggerVersionUploadPicker = async (model: ModelListItem) => {
+  selectedVersionUploadModel.value = model
+  await nextTick()
+  versionUploadAreaRef.value?.triggerPicker()
 }
 
 const onModelUploading = async (payload: FileAreaUploadingPayload) => {
   const wasUploading = isModelUploading.value
   isModelUploading.value = payload.isUploading
   if (wasUploading && !payload.isUploading) {
+    selectedVersionUploadModel.value = null
     loadCacheBuster.value++
     await Promise.all([loadFolders()])
   }
 }
+
+const syncModelLatestVersionQuery = gql`
+  query WorkbenchSyncModelLatestVersion($projectId: String!, $modelId: String!) {
+    project(id: $projectId) {
+      id
+      model(id: $modelId) {
+        id
+        name
+        versions(limit: 1) {
+          items {
+            id
+            createdAt
+            referencedObject
+            seedId
+          }
+        }
+      }
+    }
+  }
+`
 
 const workbenchUploadProjectQuery = gql`
   query WorkbenchUploadProject($projectId: String!) {
@@ -514,6 +637,481 @@ const createFolderMutation = gql`
     }
   }
 `
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null
+
+const pickString = (...values: unknown[]): string | undefined => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim().length) return value
+  }
+  return undefined
+}
+
+const extractRefIds = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return []
+  const refs: string[] = []
+  for (const item of value) {
+    if (isObject(item) && typeof item.referencedId === 'string') {
+      refs.push(item.referencedId)
+    }
+  }
+  return refs
+}
+
+const objectToSyncLite = (id: string, obj: Record<string, unknown>): SyncObjectLite => {
+  const childrenIdsSet = new Set<string>()
+  for (const key of TREE_CHILD_KEYS) {
+    const refs = extractRefIds(obj[key])
+    refs.forEach((refId) => childrenIdsSet.add(refId))
+  }
+
+  return {
+    id,
+    childrenIds: [...childrenIdsSet],
+    raw: obj
+  }
+}
+
+const indexObjectsFromJsonlResponse = async (
+  body: ReadableStream<Uint8Array>
+): Promise<Map<string, SyncObjectLite>> => {
+  const objectMap = new Map<string, SyncObjectLite>()
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  const pushLine = (line: string) => {
+    const firstTab = line.indexOf('\t')
+    if (firstTab <= 0) return
+
+    const id = line.slice(0, firstTab).trim()
+    const jsonPart = line.slice(firstTab + 1)
+    if (!id || !jsonPart) return
+
+    try {
+      const parsed = JSON.parse(jsonPart) as Record<string, unknown>
+      objectMap.set(id, objectToSyncLite(id, parsed))
+    } catch {
+      // 忽略坏行，尽量保留可解析对象
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read()
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done })
+
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+    for (const line of lines) pushLine(line)
+
+    if (done) break
+  }
+
+  if (buffer.trim().length) pushLine(buffer)
+  return objectMap
+}
+
+const collectReachableIds = (
+  rootId: string,
+  map: Map<string, SyncObjectLite>,
+  visited = new Set<string>()
+): Set<string> => {
+  if (visited.has(rootId)) return visited
+  visited.add(rootId)
+  const node = map.get(rootId)
+  for (const childId of node?.childrenIds || []) {
+    collectReachableIds(childId, map, visited)
+  }
+  return visited
+}
+
+const normalizeParameterValue = (
+  value: unknown
+): string | number | boolean | null | undefined => {
+  if (value === null) return null
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value
+  }
+  return undefined
+}
+
+const toFlatPrimitiveRecord = (
+  value: unknown
+): Record<string, string | number | boolean | null> => {
+  const out: Record<string, string | number | boolean | null> = {}
+  if (!isObject(value)) return out
+
+  const walk = (input: unknown, parentKey = '') => {
+    if (Array.isArray(input)) {
+      for (let i = 0; i < input.length; i++) {
+        const nextKey = parentKey ? `${parentKey}[${i}]` : `[${i}]`
+        walk(input[i], nextKey)
+      }
+      return
+    }
+
+    const primitive = normalizeParameterValue(input)
+    if (primitive !== undefined) {
+      if (parentKey) out[parentKey] = primitive
+      return
+    }
+
+    if (!isObject(input)) return
+    for (const [key, nestedValue] of Object.entries(input)) {
+      const nextKey = parentKey ? `${parentKey}.${key}` : key
+      walk(nestedValue, nextKey)
+    }
+  }
+
+  walk(value)
+  return out
+}
+
+const pickParametersSource = (raw: Record<string, unknown>) => {
+  if (isObject(raw.parameters)) return raw.parameters
+  if (isObject(raw.properties)) return raw.properties
+  return undefined
+}
+
+type QuantityValue = {
+  value: number
+  units?: string
+}
+
+const formatNumber = (value: number): string => {
+  const fixed = value.toFixed(2)
+  return fixed.replace(/\.?0+$/, '')
+}
+
+const normalizeUnit = (unit: string): string => {
+  const normalized = unit.trim().toLowerCase()
+  return UNIT_SYMBOL_MAP[normalized] || unit
+}
+
+const formatQuantityValue = ({ value, units }: QuantityValue): string => {
+  const num = formatNumber(value)
+  if (!units || !units.trim().length) return num
+  return `${num} ${normalizeUnit(units)}`
+}
+
+const collectNamedQuantities = (
+  input: unknown,
+  out: Map<string, QuantityValue> = new Map<string, QuantityValue>()
+): Map<string, QuantityValue> => {
+  if (Array.isArray(input)) {
+    for (const item of input) collectNamedQuantities(item, out)
+    return out
+  }
+  if (!isObject(input)) return out
+
+  const maybeName = typeof input.name === 'string' ? input.name : undefined
+  const maybeValue = typeof input.value === 'number' ? input.value : undefined
+  const maybeUnits = typeof input.units === 'string' ? input.units : undefined
+  if (maybeName && maybeValue !== undefined) {
+    out.set(maybeName, { value: maybeValue, units: maybeUnits })
+  }
+
+  for (const value of Object.values(input)) {
+    collectNamedQuantities(value, out)
+  }
+  return out
+}
+
+const pickFirstQuantity = (
+  quantities: Map<string, QuantityValue>,
+  candidates: string[]
+): QuantityValue | undefined => {
+  for (const key of candidates) {
+    const hit = quantities.get(key)
+    if (hit) return hit
+  }
+  return undefined
+}
+
+const IFC_CATEGORY_MAP: Record<string, string> = {
+  IfcWall: 'OST_Walls',
+  IfcSlab: 'OST_Floors',
+  IfcBeam: 'OST_StructuralFraming',
+  IfcColumn: 'OST_StructuralColumns',
+  IfcFooting: 'OST_StructuralFoundation',
+  IfcSite: 'OST_Site',
+  IfcBuilding: 'OST_Buildings',
+  IfcBuildingStorey: 'OST_Levels',
+  IfcRoof: 'OST_Roofs',
+  IfcDoor: 'OST_Doors',
+  IfcWindow: 'OST_Windows',
+  IfcStair: 'OST_Stairs'
+}
+
+const extractReference = (
+  properties: Record<string, unknown> | undefined
+): string | undefined => {
+  if (!properties || !isObject(properties['Property Sets'])) return undefined
+  const propertySets = properties['Property Sets']
+  for (const value of Object.values(propertySets)) {
+    if (!isObject(value)) continue
+    if (typeof value.Reference === 'string' && value.Reference.trim().length) {
+      return value.Reference
+    }
+  }
+  return undefined
+}
+
+const setQuantityField = (
+  out: Record<string, string | number | boolean | null>,
+  label: string,
+  quantities: Map<string, QuantityValue>,
+  candidates: string[]
+) => {
+  const found = pickFirstQuantity(quantities, candidates)
+  if (found) out[label] = formatQuantityValue(found)
+}
+
+const buildDisplayParameters = (
+  raw: Record<string, unknown>
+): Record<string, string | number | boolean | null> => {
+  const out: Record<string, string | number | boolean | null> = {}
+
+  const properties = isObject(raw.properties) ? raw.properties : undefined
+  const attributes = isObject(properties?.Attributes)
+    ? properties.Attributes
+    : undefined
+  const quantities = collectNamedQuantities(
+    isObject(properties?.Quantities) ? properties.Quantities : {}
+  )
+
+  const type = pickString(attributes?.type, raw.ifcType)
+  if (type) out.Type = type
+
+  const typeName = pickString(attributes?.ObjectType)
+  if (typeName) out.TypeName = typeName
+
+  const categoryCandidate =
+    (typeof attributes?.Category === 'string' && attributes.Category) ||
+    (typeof raw.category === 'string' && raw.category) ||
+    (type && IFC_CATEGORY_MAP[type]) ||
+    type
+  if (categoryCandidate) out.Category = categoryCandidate
+
+  const storey = pickString(properties?.['Building Storey'])
+  if (storey) out.Storey = storey
+
+  const reference = extractReference(properties)
+  if (reference) out.Reference = reference
+
+  setQuantityField(out, 'Volume', quantities, ['NetVolume', 'GrossVolume', 'Volume'])
+  setQuantityField(out, 'Area', quantities, [
+    'NetSurfaceArea',
+    'GrossSurfaceArea',
+    'Area',
+    'NetArea',
+    'GrossArea',
+    'NetSideArea',
+    'GrossSideArea',
+    'CrossSectionArea',
+    'OuterSurfaceArea'
+  ])
+  setQuantityField(out, 'Length', quantities, ['Length'])
+  setQuantityField(out, 'Width', quantities, ['Width'])
+  setQuantityField(out, 'Height', quantities, ['Height'])
+
+  return out
+}
+
+const getSyncElementId = (raw: Record<string, unknown>) => {
+  return pickString(raw.originalId, raw.originalID)
+}
+
+const _buildSyncFlatPayload = (params: {
+  modelSeedId: string
+  modelName: string
+  versionCreatedAt: string
+  rootId: string
+  objectMap: Map<string, SyncObjectLite>
+}): SyncFlatPayload => {
+  const reachableIds = collectReachableIds(params.rootId, params.objectMap)
+  const dedupedElements = new Map<
+    string,
+    Record<string, string | number | boolean | null>
+  >()
+
+  for (const id of reachableIds) {
+    if (id === params.rootId) continue
+    const item = params.objectMap.get(id)
+    if (!item) continue
+
+    const elementId = getSyncElementId(item.raw)
+    if (!elementId) continue
+
+    const source = pickParametersSource(item.raw)
+    const displayParameters = buildDisplayParameters(item.raw)
+    const parameters = Object.keys(displayParameters).length
+      ? displayParameters
+      : toFlatPrimitiveRecord(source)
+    if (!Object.keys(parameters).length) continue
+
+    const existing = dedupedElements.get(elementId)
+    if (!existing) {
+      dedupedElements.set(elementId, { ...parameters })
+      continue
+    }
+
+    for (const [key, value] of Object.entries(parameters)) {
+      const hasCurrent = Object.prototype.hasOwnProperty.call(existing, key)
+      if (!hasCurrent || existing[key] === null || existing[key] === '') {
+        existing[key] = value
+      }
+    }
+  }
+
+  return {
+    model: {
+      id: params.modelSeedId,
+      name: params.modelName,
+      timestamp: params.versionCreatedAt
+    },
+    elements: [...dedupedElements.entries()].map(([id, parameters]) => ({
+      id,
+      parameters
+    }))
+  }
+}
+
+const setModelSyncing = (modelId: string, syncing: boolean) => {
+  const next = new Set(syncingModelIds.value)
+  if (syncing) next.add(modelId)
+  else next.delete(modelId)
+  syncingModelIds.value = next
+}
+
+const isModelSyncing = (modelId: string) => syncingModelIds.value.has(modelId)
+
+const _fetchSyncModelLatestVersion = async (model: ModelListItem) => {
+  const response = await apollo.query<SyncLatestVersionResponse>({
+    query: syncModelLatestVersionQuery,
+    variables: {
+      projectId: props.projectId,
+      modelId: model.id
+    },
+    fetchPolicy: 'no-cache'
+  })
+
+  const version = response.data?.project?.model?.versions?.items?.[0]
+  if (!version?.referencedObject) {
+    throw new Error('未找到模型最新版本的 referencedObject')
+  }
+  if (!version.seedId?.trim()) {
+    // throw new Error('未找到模型最新版本的 seedId，请先确认该模型已完成中海同步')
+  }
+
+  return {
+    modelName: response.data?.project?.model?.name || model.name,
+    versionId: version.id,
+    versionCreatedAt: version.createdAt,
+    referencedObject: version.referencedObject,
+    seedId: version.seedId
+  }
+}
+
+const _fetchModelObjectMap = async (referencedObject: string) => {
+  const response = await fetch(
+    `${apiOrigin}/streams/${props.projectId}/objects/${referencedObject}`,
+    {
+      method: 'GET',
+      headers: {
+        Accept: 'text/plain'
+      },
+      credentials: 'same-origin'
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error(`模型对象下载失败 (${response.status})`)
+  }
+  if (!response.body) {
+    throw new Error('模型对象下载结果为空')
+  }
+
+  return await indexObjectsFromJsonlResponse(response.body)
+}
+
+const fetchGeneratedSyncPayload = async (
+  model: ModelListItem
+): Promise<GeneratedSyncPayloadResponse> => {
+  return await $fetch(
+    `/api/projects/${props.projectId}/models/${model.id}/bim-custom-label`,
+    {
+      method: 'GET'
+    }
+  )
+}
+
+const uploadSyncPayload = async (payload: SyncFlatPayload, fileName: string) => {
+  await ensureDtpToken()
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: 'application/json'
+  })
+  const formData = new FormData()
+  formData.append('file', blob, fileName)
+
+  return await dtpFetch<{
+    status?: string
+    messages?: string
+    result?: {
+      originElementCount?: number
+      originValidElementCount?: number
+      importParameterCount?: number
+    }
+  }>('/v1/daas/asset/bim/elements/custom-label-import', {
+    method: 'POST',
+    body: formData
+  })
+}
+
+const syncModelElements = async (model: ModelListItem) => {
+  if (isModelSyncing(model.id)) return
+
+  setModelSyncing(model.id, true)
+
+  try {
+    const generated = await fetchGeneratedSyncPayload(model)
+    const payload = generated.payload
+
+    if (!payload.elements.length) {
+      throw new Error(
+        '未生成可同步的构件参数，请确认模型对象中存在 originalId 与参数数据'
+      )
+    }
+
+    const result = await uploadSyncPayload(payload, generated.fileName)
+    const importParameterCount =
+      result?.result?.importParameterCount ?? payload.elements.length
+    const originValidElementCount =
+      result?.result?.originValidElementCount ?? payload.elements.length
+
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '模型构件同步成功',
+      description: `已同步 ${originValidElementCount} 个构件，导入 ${importParameterCount} 个参数`
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '模型构件同步失败'
+    logger.error(error, '同步模型构件失败')
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '模型构件同步失败',
+      description: message
+    })
+  } finally {
+    setModelSyncing(model.id, false)
+  }
+}
 
 const folderRows = ref<RawTreeItem[]>([])
 const expandedDirIds = ref<Set<string>>(new Set([ROOT_ID]))

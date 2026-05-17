@@ -1,7 +1,7 @@
 <!-- eslint-disable vuejs-accessibility/no-static-element-interactions -->
 <!-- eslint-disable vuejs-accessibility/click-events-have-key-events -->
 <template>
-  <LayoutDialog v-model:open="open" title="模型上传历史" :buttons="buttons">
+  <LayoutDialog v-model:open="open" :title="dialogTitle" :buttons="buttons">
     <LayoutTable
       :columns="[
         { id: 'job', header: 'id', classes: 'col-span-1' },
@@ -155,6 +155,8 @@ const getModelUploadsQuery = graphql(`
 const props = defineProps<{
   projectId: string
   modelId: string
+  title?: string
+  useAuthDownload?: boolean
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
@@ -193,9 +195,10 @@ const {
   resolveCursorFromVariables: (vars) => vars.input.cursor
 })
 
-const { download } = useFileDownload()
+const { download, downloadWithAuth } = useFileDownload()
 
 const items = computed(() => result.value?.project.model.uploads.items)
+const dialogTitle = computed(() => props.title || '模型上传历史')
 
 const buttons = computed((): LayoutDialogButton[] => [
   {
@@ -242,7 +245,8 @@ const getStatusOptions = (item: ProjectPageModelsUploadsDialog_FileUploadFragmen
 }
 
 const onDownload = async (item: ProjectPageModelsUploadsDialog_FileUploadFragment) => {
-  await download({
+  const downloadFn = props.useAuthDownload ? downloadWithAuth : download
+  await downloadFn({
     blobId: item.id,
     fileName: item.fileName,
     projectId: props.projectId

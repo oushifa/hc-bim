@@ -19,7 +19,10 @@
 </template>
 
 <script setup lang="ts">
-import { buildDtpIframeSrc, DTP_TOKEN_STORAGE_KEY } from '~~/composables/useDtpIframeSrc'
+import {
+  buildDtpIframeSrc,
+  DTP_TOKEN_STORAGE_KEY
+} from '~~/composables/useDtpIframeSrc'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 
 definePageMeta({
@@ -35,60 +38,60 @@ const loading = ref(true)
 const { activeUser } = useActiveUser()
 
 /** 确保 DTP token 存在，如果不存在或过期则重新获取 */
-const ensureDtpToken = async (): Promise<boolean> => {
-  if (!import.meta.client) return false
-  
-  const existing = localStorage.getItem(DTP_TOKEN_STORAGE_KEY)
-  if (existing) return true
+// const ensureDtpToken = async (): Promise<boolean> => {
+//   if (!import.meta.client) return false
 
-  const user = activeUser.value
-  const mobile = user?.email
-  if (!mobile) return false
+//   const existing = localStorage.getItem(DTP_TOKEN_STORAGE_KEY)
+//   if (existing) return true
 
-  try {
-    const CryptoJS = await import('crypto-js')
-    const AES_KEY = 'Ze/0w7rnQg7jznntRcuxGQ=='
-    const data = JSON.stringify({ mobile })
-    const dataParsed = CryptoJS.enc.Utf8.parse(data)
-    const keyParsed = CryptoJS.enc.Utf8.parse(AES_KEY)
-    const encrypted = CryptoJS.AES.encrypt(dataParsed, keyParsed, {
-      mode: CryptoJS.mode.ECB,
-      padding: CryptoJS.pad.Pkcs7
-    })
-    const bimpToken = encrypted.toString()
+//   const user = activeUser.value
+//   const mobile = user?.email
+//   if (!mobile) return false
 
-    const { useDtpApiOrigin } = await import('~~/composables/env')
-    const dtpOrigin = useDtpApiOrigin()
-    const loginUrl = `${dtpOrigin}/v1/login/third-party`
-    const response = await fetch(loginUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: JSON.stringify({ token: bimpToken })
-    })
-    
-    if (!response.ok) return false
+//   try {
+//     const CryptoJS = await import('crypto-js')
+//     const AES_KEY = 'Ze/0w7rnQg7jznntRcuxGQ=='
+//     const data = JSON.stringify({ mobile })
+//     const dataParsed = CryptoJS.enc.Utf8.parse(data)
+//     const keyParsed = CryptoJS.enc.Utf8.parse(AES_KEY)
+//     const encrypted = CryptoJS.AES.encrypt(dataParsed, keyParsed, {
+//       mode: CryptoJS.mode.ECB,
+//       padding: CryptoJS.pad.Pkcs7
+//     })
+//     const bimpToken = encrypted.toString()
 
-    const responseData = await response.json()
-    if (responseData?.success && responseData?.code === 200) {
-      const dtpToken = responseData.results?.tokens?.[0] as string | undefined
-      if (dtpToken) {
-        localStorage.setItem(DTP_TOKEN_STORAGE_KEY, dtpToken)
-        return true
-      }
-    }
-    return false
-  } catch (err) {
-    console.warn('DTP token 获取失败:', err)
-    return false
-  }
-}
+//     const { useDtpApiOrigin } = await import('~~/composables/env')
+//     const dtpOrigin = useDtpApiOrigin()
+//     const loginUrl = `${dtpOrigin}/v1/login/third-party`
+//     const response = await fetch(loginUrl, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//         Accept: 'application/json'
+//       },
+//       body: JSON.stringify({ token: bimpToken })
+//     })
+
+//     if (!response.ok) return false
+
+//     const responseData = await response.json()
+//     if (responseData?.success && responseData?.code === 200) {
+//       const dtpToken = responseData.results?.tokens?.[0] as string | undefined
+//       if (dtpToken) {
+//         localStorage.setItem(DTP_TOKEN_STORAGE_KEY, dtpToken)
+//         return true
+//       }
+//     }
+//     return false
+//   } catch (err) {
+//     console.warn('DTP token 获取失败:', err)
+//     return false
+//   }
+// }
 
 onMounted(async () => {
   // 先确保 token 存在
-  await ensureDtpToken()
+  // await ensureDtpToken()
   // 然后构建 iframe URL
   caseCreateIframeSrc.value = buildDtpIframeSrc(CASE_CREATE_BASE_URL)
   loading.value = false

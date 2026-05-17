@@ -953,50 +953,8 @@ const fetchCurrentWorkgroupInfo = async () => {
 
 // 确保本地存在 dtp-token，没有则通过第三方登录接口获取
 const ensureDtpToken = async (): Promise<string | null> => {
-  if (!import.meta.client) return null
-  const existing = localStorage.getItem('dtp-token')
-  if (existing) return existing
-
-  const mobile = activeUser.value?.email
-  if (!mobile) return null
-
-  try {
-    const CryptoJS = await import('crypto-js')
-    const AES_KEY = 'Ze/0w7rnQg7jznntRcuxGQ=='
-    const data = JSON.stringify({ mobile })
-    const dataParsed = CryptoJS.enc.Utf8.parse(data)
-    const keyParsed = CryptoJS.enc.Utf8.parse(AES_KEY)
-    const encrypted = CryptoJS.AES.encrypt(dataParsed, keyParsed, {
-      mode: CryptoJS.mode.ECB,
-      padding: CryptoJS.pad.Pkcs7
-    })
-    const bimpToken = encrypted.toString()
-
-    const dtpOrigin = useDtpApiOrigin()
-    const loginUrl = `${dtpOrigin}/v1/login/third-party`
-    const response = await fetch(loginUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json'
-      },
-      body: JSON.stringify({ token: bimpToken })
-    })
-    if (!response.ok) return null
-
-    const responseData = await response.json()
-    if (responseData?.success && responseData?.code === 200) {
-      const dtpToken = responseData.results?.tokens?.[0] as string | undefined
-      if (dtpToken) {
-        localStorage.setItem('dtp-token', dtpToken)
-        return dtpToken
-      }
-    }
-    return null
-  } catch (err) {
-    console.warn('DTP token 获取失败:', err)
-    return null
-  }
+  const { ensureDtpToken: ensureToken } = useDtpModelUpload()
+  return await ensureToken()
 }
 
 const routeTwinWorkgroupId = computed(() => {

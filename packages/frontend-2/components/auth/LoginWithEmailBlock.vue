@@ -124,73 +124,74 @@ const shouldForceInviteEmail = computed(
 const onSubmit = handleSubmit(async ({ email, password }) => {
   try {
     loading.value = true
-    
+
     // 1. 先调用原有的登录接口
     await loginWithEmail({
       email,
       password,
       challenge: props.challenge
     })
-    
-    // 2. 同时调用第三方登录接口获取DTP token（失败不影响主登录流程）
-    try {
-      // 使用用户输入的手机号
-      const mobile = email
-      
-      // 动态导入crypto-js进行AES加密
-      const CryptoJS = await import('crypto-js')
-      const AES_KEY = 'Ze/0w7rnQg7jznntRcuxGQ=='
-      
-      // 构建要加密的数据（只加密mobile）
-      const data = JSON.stringify({
-        mobile
-      })
-      
-      // 使用AES-ECB-PKCS7加密（按照文档示例代码）
-      const dataParsed = CryptoJS.enc.Utf8.parse(data)
-      const keyParsed = CryptoJS.enc.Utf8.parse(AES_KEY)
-      
-      const encrypted = CryptoJS.AES.encrypt(dataParsed, keyParsed, {
-        mode: CryptoJS.mode.ECB,
-        padding: CryptoJS.pad.Pkcs7
-      })
-      
-      const bimpToken = encrypted.toString()
-      
-      // 使用动态配置的DTP origin，避免CORS问题
-      const dtpOrigin = useDtpApiOrigin()
-      const loginUrl = `${dtpOrigin}/v1/login/third-party`
-      const response = await fetch(loginUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ 
-          token: bimpToken,
-        })
-      })
 
-      if (response.ok) {
-        const responseData = await response.json()
-        
-        // 检查返回结果
-        if (responseData.success && responseData.code === 200) {
-          // 从 results.tokens 数组中获取 token
-          const dtpToken = responseData.results?.tokens?.[0] as string | undefined
-          
-          if (dtpToken) {
-            // 保存DTP token到localStorage，供DTP API使用
-            localStorage.setItem('dtp-token', dtpToken)
-            console.log('DTP token saved successfully')
-          }
-        }
-      }
-    } catch (dtpError) {
-      // DTP登录失败不影响主登录流程
-      console.warn('DTP login failed, but main login succeeded:', dtpError)
-    }
-    
+    // 2. 同时调用第三方登录接口获取DTP token（失败不影响主登录流程）
+    // try {
+    //   // 使用用户输入的手机号
+    //   // const mobile = email
+    //   const mobile = 13000000000
+
+    //   // 动态导入crypto-js进行AES加密
+    //   const CryptoJS = await import('crypto-js')
+    //   const AES_KEY = 'Ze/0w7rnQg7jznntRcuxGQ=='
+
+    //   // 构建要加密的数据（只加密mobile）
+    //   const data = JSON.stringify({
+    //     mobile
+    //   })
+
+    //   // 使用AES-ECB-PKCS7加密（按照文档示例代码）
+    //   const dataParsed = CryptoJS.enc.Utf8.parse(data)
+    //   const keyParsed = CryptoJS.enc.Utf8.parse(AES_KEY)
+
+    //   const encrypted = CryptoJS.AES.encrypt(dataParsed, keyParsed, {
+    //     mode: CryptoJS.mode.ECB,
+    //     padding: CryptoJS.pad.Pkcs7
+    //   })
+
+    //   const bimpToken = encrypted.toString()
+
+    //   // 使用动态配置的DTP origin，避免CORS问题
+    //   const dtpOrigin = useDtpApiOrigin()
+    //   const loginUrl = `${dtpOrigin}/v1/login/third-party`
+    //   const response = await fetch(loginUrl, {
+    //     method: 'POST',
+    //     headers: {
+    //       'Content-Type': 'application/json',
+    //       Accept: 'application/json'
+    //     },
+    //     body: JSON.stringify({
+    //       token: bimpToken
+    //     })
+    //   })
+
+    //   if (response.ok) {
+    //     const responseData = await response.json()
+
+    //     // 检查返回结果
+    //     if (responseData.success && responseData.code === 200) {
+    //       // 从 results.tokens 数组中获取 token
+    //       const dtpToken = responseData.results?.tokens?.[0] as string | undefined
+
+    //       if (dtpToken) {
+    //         // 保存DTP token到localStorage，供DTP API使用
+    //         localStorage.setItem('dtp-token', dtpToken)
+    //         console.log('DTP token saved successfully')
+    //       }
+    //     }
+    //   }
+    // } catch (dtpError) {
+    //   // DTP登录失败不影响主登录流程
+    //   console.warn('DTP login failed, but main login succeeded:', dtpError)
+    // }
+
     // 记录登录成功日志
     track({
       what: {
@@ -220,7 +221,7 @@ const onSubmit = handleSubmit(async ({ email, password }) => {
         source: 'auth.login.form'
       }
     })
-    
+
     triggerNotification({
       type: ToastNotificationType.Danger,
       title: '登录失败',

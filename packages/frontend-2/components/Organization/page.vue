@@ -35,8 +35,8 @@
         <div class="flex-1 overflow-y-auto p-2 space-y-1">
           <div
             v-for="org in orgTree"
-            :key="org.id"
             v-show="shouldShowRow(org)"
+            :key="org.id"
             class="group w-full flex items-center justify-between px-3 py-2 rounded-[8px] text-sm transition-colors cursor-pointer"
             :style="{ paddingLeft: `${org.level * 12 + 12}px` }"
             :class="
@@ -67,7 +67,7 @@
                 </svg>
               </button>
               <div v-else class="w-4 h-4 shrink-0"></div>
-              
+
               <BuildingIcon
                 class="w-4 h-4 shrink-0"
                 :class="activeOrg === org.id ? 'text-[#00b4b6]' : 'text-gray-400'"
@@ -209,7 +209,7 @@
                     >
                       <EllipsisHorizontalIcon class="w-4 h-4" />
                     </button>
-                    
+
                     <!-- 下拉菜单 -->
                     <div
                       v-if="activeActionMenu === user.id"
@@ -420,7 +420,9 @@
           <span class="font-semibold text-[#333]">{{ deleteMemberTarget?.name }}</span>
           ？
         </div>
-        <div class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+        <div
+          class="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
+        >
           ⚠️ 警告：该操作将永久删除该用户账号，且无法恢复！
         </div>
         <div v-if="deleteMemberError" class="text-xs text-red-500">
@@ -456,29 +458,45 @@
           <span class="font-semibold text-[#333]">{{ roleManageTarget?.name }}</span>
           分配角色
         </div>
-        
+
         <div class="flex flex-col gap-2">
           <label class="text-xs text-gray-500 font-medium">
             选择角色
             <span class="text-red-500">*</span>
           </label>
-          <div class="max-h-48 overflow-y-auto border border-gray-200 rounded-[8px] p-2 space-y-1">
+          <div
+            class="max-h-48 overflow-y-auto border border-gray-200 rounded-[8px] p-2 space-y-1"
+          >
             <div
               v-for="role in roleList"
               :key="role.id"
               class="flex items-center px-3 py-2 rounded cursor-pointer transition-colors"
-              :class="selectedRoleId === role.id ? 'bg-[#e6f7f8] border border-[#00b4b6]' : 'hover:bg-gray-50 border border-transparent'"
+              :class="
+                selectedRoleId === role.id
+                  ? 'bg-[#e6f7f8] border border-[#00b4b6]'
+                  : 'hover:bg-gray-50 border border-transparent'
+              "
               @click="selectedRoleId = role.id"
             >
               <div
                 class="w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center"
-                :class="selectedRoleId === role.id ? 'border-[#00b4b6] bg-[#00b4b6]' : 'border-gray-300'"
+                :class="
+                  selectedRoleId === role.id
+                    ? 'border-[#00b4b6] bg-[#00b4b6]'
+                    : 'border-gray-300'
+                "
               >
-                <div v-if="selectedRoleId === role.id" class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                <div
+                  v-if="selectedRoleId === role.id"
+                  class="w-1.5 h-1.5 rounded-full bg-white"
+                ></div>
               </div>
               <span class="text-sm text-[#333]">{{ role.name }}</span>
             </div>
-            <div v-if="roleList.length === 0" class="text-center py-4 text-sm text-gray-400">
+            <div
+              v-if="roleList.length === 0"
+              class="text-center py-4 text-sm text-gray-400"
+            >
               暂无可用角色
             </div>
           </div>
@@ -487,7 +505,7 @@
         <div v-if="roleManageError" class="text-xs text-red-500">
           {{ roleManageError }}
         </div>
-        
+
         <div class="flex justify-end gap-2">
           <button
             type="button"
@@ -517,14 +535,11 @@ import {
   MagnifyingGlassIcon as SearchIcon,
   BuildingOfficeIcon as BuildingIcon,
   EllipsisHorizontalIcon,
-  PencilIcon,
   TrashIcon
 } from '@heroicons/vue/24/outline'
 import { useApolloClient, useMutation, useQuery } from '@vue/apollo-composable'
 import { gql } from 'graphql-tag'
-import { registerAndGetAccessCode } from '~~/lib/auth/services/auth'
-import { randomString } from '~~/lib/common/helpers/random'
-import { useRuntimeConfig } from '#app'
+import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useApiOrigin } from '~~/composables/env'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 
@@ -562,6 +577,12 @@ type DepartmentUser = {
   role?: string | null
   verified?: boolean | null
   email?: string | null
+}
+type ManagedUserRegisterResponse = {
+  id: string
+  email: string
+  name: string
+  created: boolean
 }
 
 const departmentTreeQuery = gql`
@@ -629,18 +650,6 @@ const addDepartmentMemberMutation = gql`
   }
 `
 
-const memberSearchUsersQuery = gql`
-  query OrganizationMemberSearchUsers($query: String!, $limit: Int!, $cursor: String) {
-    users(input: { query: $query, limit: $limit, cursor: $cursor, projectId: null }) {
-      items {
-        id
-        name
-        email
-      }
-    }
-  }
-`
-
 const activeOrg = ref<string | null>(null)
 const searchQuery = ref('')
 const collapsedOrgs = ref<Set<string>>(new Set())
@@ -656,7 +665,7 @@ const newMemberForm = ref({
   phone: ''
 })
 const apolloClient = useApolloClient().client
-const runtimeConfig = useRuntimeConfig()
+const authToken = useAuthCookie()
 const { triggerNotification: triggerToast } = useGlobalToast()
 
 // 角色相关数据
@@ -665,6 +674,39 @@ const userRoleMap = ref<Map<string, string>>(new Map()) // userId -> roleName
 
 const apiOrigin = useApiOrigin()
 const ROLE_API_BASE = `${apiOrigin}/api/v1/custom-roles`
+
+const registerManagedUser = async (params: {
+  name: string
+  phone: string
+}): Promise<ManagedUserRegisterResponse> => {
+  const token = authToken.value
+  if (!token) throw new Error('当前登录状态已失效，请重新登录后重试')
+
+  const response = await fetch(`${apiOrigin}/api/v1/server-users/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      email: params.phone,
+      password: '51World@51',
+      name: params.name
+    })
+  })
+
+  const result = (await response.json().catch(() => ({}))) as
+    | ManagedUserRegisterResponse
+    | { error?: string }
+
+  if (!response.ok) {
+    const message = 'error' in result ? result.error : undefined
+    throw new Error(message || '创建账号失败，请重试')
+  }
+
+  return result as ManagedUserRegisterResponse
+}
 
 const { result: departmentTreeResult, refetch: refetchDepartmentTree } =
   useQuery(departmentTreeQuery)
@@ -732,7 +774,7 @@ const selectTreeRow = (row: OrganizationTreeRow) => {
 
 const toggleCollapse = (row: OrganizationTreeRow) => {
   if (!row.hasChildren) return
-  
+
   if (collapsedOrgs.value.has(row.id)) {
     collapsedOrgs.value.delete(row.id)
   } else {
@@ -749,9 +791,9 @@ const isCollapsed = (rowId: string) => {
 const shouldShowRow = (row: OrganizationTreeRow): boolean => {
   // 检查所有父级是否被折叠
   const orgTreeArray = orgTree.value
-  const rowIndex = orgTreeArray.findIndex(r => r.id === row.id)
+  const rowIndex = orgTreeArray.findIndex((r) => r.id === row.id)
   if (rowIndex === -1) return true
-  
+
   // 向前查找所有层级小于当前行的父级
   for (let i = rowIndex - 1; i >= 0; i--) {
     const parentRow = orgTreeArray[i]
@@ -1009,23 +1051,10 @@ const submitCreateMember = async () => {
   createMemberLoading.value = true
   memberFormError.value = ''
   try {
-    // Step 1: 调用注册接口创建账号（手机号作 email，密码固定）
-    const apiOrigin = runtimeConfig.public.apiOrigin as string
-    const challenge = randomString(10)
-    await registerAndGetAccessCode({
-      apiOrigin,
-      challenge,
-      user: {
-        email: phone,
-        password: '51World@51',
-        name
-      }
-    }).catch((err: unknown) => {
-      // 如果账号已存在，尝试继续查找用户并加入部门
-      const msg = err instanceof Error ? err.message : String(err)
-      if (!msg.includes('already') && !msg.includes('exists') && !msg.includes('已')) {
-        throw err
-      }
+    // Step 1: 通过受控 REST 接口创建或复用账号，直接拿到 userId
+    const registeredUser = await registerManagedUser({
+      name,
+      phone
     })
 
     // Step 2: 同时调用第三方注册接口（使用代理避免CORS）
@@ -1036,7 +1065,7 @@ const submitCreateMember = async () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          Accept: 'application/json'
         },
         body: JSON.stringify({
           username: name,
@@ -1050,28 +1079,10 @@ const submitCreateMember = async () => {
       console.warn('第三方注册失败，但主注册成功:', thirdPartyError)
     }
 
-    // Step 3: 通过手机号搜索用户得到 userId
-    const searchResp = await apolloClient.query({
-      query: memberSearchUsersQuery,
-      variables: { query: phone, limit: 5, cursor: null },
-      fetchPolicy: 'network-only'
-    })
-    const foundUsers =
-      (
-        searchResp.data as {
-          users?: { items?: Array<{ id: string; name: string | null }> | null } | null
-        }
-      ).users?.items || []
-    const matched = foundUsers.find((u) => u.name === name) || foundUsers[0]
-    if (!matched) {
-      memberFormError.value = '创建账号后未找到用户，请重试'
-      return
-    }
-
-    // Step 4: 将用户加入当前部门
+    // Step 3: 将用户加入当前部门
     await addDepartmentMemberMutate({
       departmentId,
-      userIds: [matched.id],
+      userIds: [registeredUser.id],
       title: null
     })
     await refetchDepartmentUsers({ departmentId })
@@ -1102,7 +1113,6 @@ const submitDeleteMember = async () => {
   deleteMemberLoading.value = true
   deleteMemberError.value = ''
   try {
-    const userId = deleteMemberTarget.value.id
     const userName = deleteMemberTarget.value.name
     const userPhone = deleteMemberTarget.value.phone
 
@@ -1118,14 +1128,14 @@ const submitDeleteMember = async () => {
 
     // 刷新部门用户列表
     await refetchDepartmentUsers({ departmentId: activeDepartmentId.value as string })
-    
+
     // 显示成功提示
     triggerToast({
       type: ToastNotificationType.Success,
       title: '删除成功',
       description: `用户 ${userName} 已被永久删除`
     })
-    
+
     closeDeleteMemberDialog()
   } catch (e) {
     deleteMemberError.value = e instanceof Error ? e.message : '删除失败，请重试'
@@ -1154,11 +1164,11 @@ const selectedRoleId = ref<string>('')
 const openRoleManageDialog = (user: MemberRow) => {
   roleManageTarget.value = user
   roleManageError.value = ''
-  
+
   // 查找用户当前的角色
-  const currentRole = roleList.value.find(r => r.name === user.role)
+  const currentRole = roleList.value.find((r) => r.name === user.role)
   selectedRoleId.value = currentRole?.id || ''
-  
+
   roleManageDialogOpen.value = true
   activeActionMenu.value = null // 关闭下拉菜单
 }
@@ -1172,7 +1182,7 @@ const closeRoleManageDialog = () => {
 
 const submitRoleUpdate = async () => {
   if (roleManageLoading.value || !roleManageTarget.value) return
-  
+
   if (!selectedRoleId.value) {
     roleManageError.value = '请选择一个角色'
     return
@@ -1180,11 +1190,11 @@ const submitRoleUpdate = async () => {
 
   roleManageLoading.value = true
   roleManageError.value = ''
-  
+
   try {
     const userId = roleManageTarget.value.id
-    const selectedRole = roleList.value.find(r => r.id === selectedRoleId.value)
-    
+    const selectedRole = roleList.value.find((r) => r.id === selectedRoleId.value)
+
     if (!selectedRole) {
       roleManageError.value = '所选角色不存在'
       return
@@ -1198,7 +1208,7 @@ const submitRoleUpdate = async () => {
         { method: 'GET' }
       )
       currentRoleId = permRes.roleId
-    } catch (e) {
+    } catch {
       console.log('用户可能还没有分配角色')
     }
 
@@ -1220,14 +1230,14 @@ const submitRoleUpdate = async () => {
     // 刷新角色数据
     await loadRoleData()
     await refetchDepartmentUsers({ departmentId: activeDepartmentId.value as string })
-    
+
     // 显示成功提示
     triggerToast({
       type: ToastNotificationType.Success,
       title: '角色更新成功',
       description: `用户 ${roleManageTarget.value.name} 的角色已更新为 ${selectedRole.name}`
     })
-    
+
     closeRoleManageDialog()
   } catch (e) {
     roleManageError.value = e instanceof Error ? e.message : '更新角色失败，请重试'

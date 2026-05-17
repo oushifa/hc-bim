@@ -630,6 +630,7 @@ export function useProjectPendingVersionUpdateTracking(
   const { addFailedJob } = useGlobalFileImportManager()
   const { convertUploadToFailedJob } = useFailedFileImportJobUtils()
   const { userId } = useActiveUser()
+  const { markVersionReadyForSync } = useDtpModelUpload()
   const isEnabled = computed(() => !!(hasLock.value || handler))
   const { onResult: onProjectPendingVersionsUpdate } = useSubscription(
     onProjectPendingVersionsUpdatedSubscription,
@@ -685,6 +686,12 @@ export function useProjectPendingVersionUpdateTracking(
           },
           { fieldNameWhitelist: ['pendingImportedVersions'] }
         )
+
+        void markVersionReadyForSync({
+          fileUploadId: event.id,
+          projectId: unref(projectId),
+          modelId
+        })
       } else if (failure) {
         // Report w/ dialog to uploader user
         if (event.version.userId === userId.value) {

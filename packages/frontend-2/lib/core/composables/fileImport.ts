@@ -211,6 +211,7 @@ export const useFileImportApi = () => {
   } = useRuntimeConfig()
   const apollo = useApolloClient().client
   const { registerActiveUpload, unregisterActiveUpload } = useGlobalFileImportManager()
+  const { syncModelFileAfterSpeckleUpload } = useDtpModelUpload()
 
   const importFileV2: ImportFile = async (params, callbacks) => {
     const { file, projectId, modelId } = params
@@ -295,6 +296,15 @@ export const useFileImportApi = () => {
         '文件导入失败，无法启动文件导入'
       )
       throw new Error(errMsg)
+    }
+
+    if (import.meta.client) {
+      void syncModelFileAfterSpeckleUpload({
+        file,
+        fileUploadId: fileImportStarted,
+        projectId,
+        modelId
+      })
     }
 
     const res: BlobPostResultItem = {
