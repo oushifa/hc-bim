@@ -12,8 +12,9 @@ import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 const DTP_TOKEN_STORAGE_KEY = 'dtp-token'
 const DTP_MODEL_UPLOAD_SYNC_STORAGE_KEY = 'dtp-model-upload-sync'
 const DTP_AES_KEY = 'Ze/0w7rnQg7jznntRcuxGQ=='
-const DTP_MIN_MULTI_PART_CHUNK_SIZE = 8 * 1024 * 1024 + 1
-const DTP_PREFERRED_CHUNK_SIZE = 16 * 1024 * 1024
+const DTP_MIN_NON_LAST_CHUNK_SIZE = 8 * 1024 * 1024
+const DTP_MAX_NON_LAST_CHUNK_SIZE = 10 * 1024 * 1024
+const DTP_TARGET_NON_LAST_CHUNK_SIZE = 9 * 1024 * 1024
 const VERSION_ID_RESOLVE_RETRY_COUNT = 5
 const VERSION_ID_RESOLVE_RETRY_DELAY = 1500
 const VERSION_EXTERNAL_IDS_VERIFY_RETRY_COUNT = 3
@@ -85,27 +86,55 @@ const buildAssetName = (fileName: string) =>
   fileName.replace(/\.[^/.]+$/, '') || fileName
 
 const resolveChunkPlan = (fileSize: number) => {
-  const preferredParts = Math.max(1, Math.ceil(fileSize / DTP_PREFERRED_CHUNK_SIZE))
-  const maxValidMultiParts = Math.max(
-    1,
-    Math.floor(fileSize / DTP_MIN_MULTI_PART_CHUNK_SIZE)
-  )
-  const totalPart = Math.min(preferredParts, maxValidMultiParts)
+  if (fileSize <= DTP_MAX_NON_LAST_CHUNK_SIZE) {
+    return [
+      {
+        part: 0,
+        start: 0,
+        end: fileSize,
+        size: fileSize,
+        lastChunk: true,
+        totalPart: 1
+      }
+    ]
+  }
 
-  return Array.from({ length: totalPart }, (_, part) => {
-    const start = Math.floor((fileSize * part) / totalPart)
-    const end =
-      part === totalPart - 1
-        ? fileSize
-        : Math.floor((fileSize * (part + 1)) / totalPart)
+  const sizes: number[] = []
+  let remaining = fileSize
+
+  while (remaining > DTP_MAX_NON_LAST_CHUNK_SIZE) {
+    sizes.push(DTP_TARGET_NON_LAST_CHUNK_SIZE)
+    remaining -= DTP_TARGET_NON_LAST_CHUNK_SIZE
+  }
+
+  sizes.push(remaining)
+
+  if (
+    sizes.length > 1 &&
+    sizes
+      .slice(0, -1)
+      .some(
+        (size) =>
+          size <= DTP_MIN_NON_LAST_CHUNK_SIZE || size >= DTP_MAX_NON_LAST_CHUNK_SIZE
+      )
+  ) {
+    throw new Error('DTP 分片大小不满足要求：非最后一片必须大于 8M 且小于 10M')
+  }
+
+  let offset = 0
+
+  return sizes.map((size, part) => {
+    const start = offset
+    const end = start + size
+    offset = end
 
     return {
       part,
       start,
       end,
       size: end - start,
-      lastChunk: part === totalPart - 1,
-      totalPart
+      lastChunk: part === sizes.length - 1,
+      totalPart: sizes.length
     }
   })
 }
