@@ -49,19 +49,28 @@ import { useEvictProjectModelFields } from '~~/lib/projects/composables/modelMan
 import { intersection, isUndefined, uniqBy } from 'lodash-es'
 import { FileUploadConvertedStatus } from '~~/lib/core/api/fileImport'
 import { useLock } from '~~/lib/common/composables/singleton'
+import { useScopedState } from '~~/lib/common/composables/scopedState'
 import {
   useFailedFileImportJobUtils,
   useGlobalFileImportManager
 } from '~/lib/core/composables/fileImport'
+import { nanoid } from 'nanoid'
+
+type ProjectVersionUpdateHandler = (
+  data: NonNullable<
+    Get<OnProjectVersionsUpdateSubscription, 'projectVersionsUpdated'>
+  >,
+  cache: ApolloCache<unknown>
+) => void
+
+const useProjectVersionUpdateHandlerRegistry = () =>
+  useScopedState('projectVersionUpdateHandlerRegistry', () =>
+    shallowRef(new Array<{ key: string; instanceId: string; handler: ProjectVersionUpdateHandler }>())
+  )
 
 export function useProjectVersionUpdateTracking(
   projectId: MaybeRef<string>,
-  handler?: (
-    data: NonNullable<
-      Get<OnProjectVersionsUpdateSubscription, 'projectVersionsUpdated'>
-    >,
-    cache: ApolloCache<unknown>
-  ) => void,
+  handler?: ProjectVersionUpdateHandler,
   options?: Partial<{
     silenceToast: boolean
   }>
@@ -69,11 +78,39 @@ export function useProjectVersionUpdateTracking(
   const { silenceToast = false } = options || {}
   const apollo = useApolloClient().client
   const { triggerNotification } = useGlobalToast()
+  const trackingKey = computed(() => `useProjectVersionUpdateTracking-${unref(projectId)}`)
 
-  const { hasLock } = useLock(
-    computed(() => `useProjectVersionUpdateTracking-${unref(projectId)}`)
+  const { hasLock } = useLock(trackingKey)
+  const handlerRegistry = useProjectVersionUpdateHandlerRegistry()
+  const handlerInstanceId = nanoid()
+  const isEnabled = computed(() => !!hasLock.value)
+
+  const unregisterHandler = (key?: string) => {
+    if (!key) return
+    handlerRegistry.value = handlerRegistry.value.filter(
+      (item) => item.key !== key || item.instanceId !== handlerInstanceId
+    )
+  }
+
+  watch(
+    trackingKey,
+    (newKey, oldKey) => {
+      unregisterHandler(oldKey)
+      if (!handler) return
+
+      handlerRegistry.value = handlerRegistry.value.concat({
+        key: newKey,
+        instanceId: handlerInstanceId,
+        handler
+      })
+    },
+    { immediate: true }
   )
-  const isEnabled = computed(() => !!(hasLock.value || handler))
+
+  onBeforeUnmount(() => {
+    unregisterHandler(trackingKey.value)
+  })
+
   const { onResult: onProjectVersionsUpdate } = useSubscription(
     onProjectVersionsUpdateSubscription,
     () => ({
@@ -302,10 +339,11 @@ export function useProjectVersionUpdateTracking(
   })
 
   onProjectVersionsUpdate((res) => {
-    if (!res.data?.projectVersionsUpdated) return
+    if (!res.data?.projectVersionsUpdated || !hasLock.value) return
 
     const event = res.data.projectVersionsUpdated
-    handler?.(event, apollo.cache)
+    const handlers = handlerRegistry.value.filter((item) => item.key === trackingKey.value)
+    handlers.forEach((item) => item.handler(event, apollo.cache))
   })
 }
 
@@ -630,7 +668,8 @@ export function useProjectPendingVersionUpdateTracking(
   const { addFailedJob } = useGlobalFileImportManager()
   const { convertUploadToFailedJob } = useFailedFileImportJobUtils()
   const { userId } = useActiveUser()
-  const { markVersionReadyForSync } = useDtpModelUpload()
+  const { hasPendingVersionMetadataSyncRecord, markVersionReadyForSync } =
+    useDtpModelUpload()
   const isEnabled = computed(() => !!(hasLock.value || handler))
   const { onResult: onProjectPendingVersionsUpdate } = useSubscription(
     onProjectPendingVersionsUpdatedSubscription,
@@ -670,6 +709,8 @@ export function useProjectPendingVersionUpdateTracking(
       const failure = event.version.convertedStatus === FileUploadConvertedStatus.Error
 
       if (success) {
+        if (!hasPendingVersionMetadataSyncRecord(event.id)) return
+
         // Remove from model.pendingVersions
         modifyObjectFields<
           ModelPendingImportedVersionsArgs,

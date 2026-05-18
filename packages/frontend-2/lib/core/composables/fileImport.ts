@@ -205,13 +205,14 @@ const startFileImportMutation = graphql(`
   }
 `)
 
-export const useFileImportApi = () => {
+export const useFileImportApi = (options?: { skipDtpModelSync?: boolean }) => {
   const {
     public: { FF_LEGACY_FILE_IMPORTS_ENABLED }
   } = useRuntimeConfig()
   const apollo = useApolloClient().client
   const { registerActiveUpload, unregisterActiveUpload } = useGlobalFileImportManager()
   const { syncModelFileAfterSpeckleUpload } = useDtpModelUpload()
+  const { skipDtpModelSync = false } = options || {}
 
   const importFileV2: ImportFile = async (params, callbacks) => {
     const { file, projectId, modelId } = params
@@ -298,7 +299,7 @@ export const useFileImportApi = () => {
       throw new Error(errMsg)
     }
 
-    if (import.meta.client) {
+    if (import.meta.client && !skipDtpModelSync) {
       void syncModelFileAfterSpeckleUpload({
         file,
         fileUploadId: fileImportStarted,
@@ -404,6 +405,10 @@ export function useFileImport(params: {
    * Optionally handle errors that occur either on file selection or during upload (NOT during the async import job)
    */
   errorCallback?: Optional<(params: { failedJob: FailedFileImportJob }) => void>
+  /**
+   * Disable automatic DTP model sync after starting Speckle file import.
+   */
+  skipDtpModelSync?: boolean
 }) {
   const {
     project,
@@ -411,12 +416,15 @@ export function useFileImport(params: {
     manuallyTriggerUpload,
     fileUploadedCallback,
     fileSelectedCallback,
-    errorCallback
+    errorCallback,
+    skipDtpModelSync
   } = params
 
   const { maxSizeInBytes, accept } = useFileImportBaseSettings()
   const logger = useLogger()
-  const { importFile } = useFileImportApi()
+  const { importFile } = useFileImportApi({
+    skipDtpModelSync
+  })
   const authToken = useAuthCookie()
   const apiOrigin = useApiOrigin()
 

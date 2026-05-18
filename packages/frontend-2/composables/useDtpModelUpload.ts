@@ -173,6 +173,18 @@ export const useDtpModelUpload = () => {
 
   const getRecord = (fileUploadId: string) => storedRecords.value[fileUploadId]
 
+  const hasPendingVersionMetadataSyncRecord = (fileUploadId: string) => {
+    const record = getRecord(fileUploadId)
+    return !!(
+      record &&
+      record.status === 'uploaded' &&
+      record.projectId &&
+      record.modelId &&
+      record.seedId &&
+      record.assetId
+    )
+  }
+
   const logSyncDebug = (
     message: string,
     payload?: Record<string, unknown>,
@@ -462,7 +474,8 @@ export const useDtpModelUpload = () => {
     })
 
     const target = data.project.model.uploads.items.find(
-      (item) => item.id === params.fileUploadId
+      (item: { id: string; convertedVersionId?: string | null }) =>
+        item.id === params.fileUploadId
     )
     return target?.convertedVersionId || null
   }
@@ -544,6 +557,34 @@ export const useDtpModelUpload = () => {
     return false
   }
 
+  const getVersionExternalIds = async (params: {
+    projectId: string
+    versionId: string
+  }) => {
+    const { data } = await apollo.query<{
+      project?: {
+        id: string
+        version?: {
+          id: string
+          seedId?: string | null
+          assetId?: string | null
+        } | null
+      } | null
+    }>({
+      query: getVersionExternalIdsQuery,
+      variables: {
+        projectId: params.projectId,
+        versionId: params.versionId
+      },
+      fetchPolicy: 'network-only'
+    })
+
+    return {
+      seedId: data?.project?.version?.seedId || null,
+      assetId: data?.project?.version?.assetId || null
+    }
+  }
+
   const trySyncVersionMetadata = async (fileUploadId: string) => {
     const record = getRecord(fileUploadId)
     if (!record?.projectId || !record.versionId || !record.seedId || !record.assetId) {
@@ -559,6 +600,25 @@ export const useDtpModelUpload = () => {
       seedId: record.seedId,
       assetId: record.assetId
     })
+
+    const existingExternalIds = await getVersionExternalIds({
+      projectId: record.projectId,
+      versionId: record.versionId
+    })
+    if (
+      existingExternalIds.seedId === record.seedId &&
+      existingExternalIds.assetId === record.assetId
+    ) {
+      logSyncDebug('版本外部标识已存在，跳过重复回填', {
+        fileUploadId,
+        projectId: record.projectId,
+        versionId: record.versionId,
+        seedId: record.seedId,
+        assetId: record.assetId
+      })
+      removeRecord(fileUploadId)
+      return true
+    }
 
     const { data, errors } = await apollo.mutate<{
       versionMutations?: {
@@ -687,6 +747,74 @@ export const useDtpModelUpload = () => {
     }
   }
 
+  const syncModelFileForVersion = async (params: {
+    file: File
+    fileUploadId: string
+    projectId: string
+    modelId: string
+    versionId: string
+  }): Promise<DtpUploadResult> => {
+    try {
+      logSyncDebug('基于已创建版本启动中海同步任务', params)
+      const uploadResult = await uploadFileToDtp(params)
+      patchRecord(params.fileUploadId, {
+        projectId: params.projectId,
+        modelId: params.modelId,
+        versionId: params.versionId
+      })
+      return uploadResult
+    } catch (error) {
+      const message =
+        (error as FetchError)?.data?.message ||
+        (error instanceof Error ? error.message : '中海模型上传失败')
+
+      patchRecord(params.fileUploadId, {
+        status: 'error',
+        error: message
+      })
+
+      logSyncDebug(
+        '基于已创建版本的中海同步任务失败',
+        {
+          ...params,
+          message
+        },
+        'error'
+      )
+
+      triggerNotification({
+        type: ToastNotificationType.Danger,
+        title: '中海模型同步失败',
+        description: message
+      })
+
+      throw error
+    }
+  }
+
+  const clearVersionMetadataSyncRecord = (fileUploadId: string) => {
+    removeRecord(fileUploadId)
+  }
+
+  const getVersionMetadataSyncRecord = (fileUploadId: string) => {
+    const record = getRecord(fileUploadId)
+    if (!record) return null
+
+    return {
+      projectId: record.projectId,
+      modelId: record.modelId,
+      versionId: record.versionId,
+      seedId: record.seedId,
+      assetId: record.assetId,
+      status: record.status,
+      error: record.error
+    }
+  }
+
+  const syncVersionMetadataForUpload = async (fileUploadId: string) => {
+    return await trySyncVersionMetadata(fileUploadId)
+  }
+
   const markVersionReadyForSync = async (params: {
     fileUploadId: string
     projectId: string
@@ -721,7 +849,12 @@ export const useDtpModelUpload = () => {
 
   return {
     ensureDtpToken,
+    hasPendingVersionMetadataSyncRecord,
     syncModelFileAfterSpeckleUpload,
-    markVersionReadyForSync
+    syncModelFileForVersion,
+    markVersionReadyForSync,
+    clearVersionMetadataSyncRecord,
+    getVersionMetadataSyncRecord,
+    syncVersionMetadataForUpload
   }
 }

@@ -105,6 +105,7 @@ import {
 import { useFileUploadProgressCore } from '~~/lib/form/composables/fileUpload'
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/solid'
 import { connectorsRoute } from '~/lib/common/helpers/route'
+import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import type { Nullable } from '@speckle/shared'
 import { graphql } from '~/lib/common/generated/gql'
 import type {
@@ -154,6 +155,7 @@ const props = defineProps<{
   model?: ProjectCardImportFileArea_ModelFragment
   modelName?: string
   emptyStateVariant?: EmptyStateVariants
+  skipDtpModelSync?: boolean
 }>()
 
 const isRhinoFileImporterEnabled = useIsRhinoFileImporterEnabled()
@@ -170,6 +172,7 @@ const {
 } = useFileImport({
   ...toRefs(props),
   manuallyTriggerUpload: true,
+  skipDtpModelSync: props.skipDtpModelSync,
   fileSelectedCallback: () => {
     if (props.model) {
       // Uploading inside an existing model - trigger upload immediately
@@ -200,13 +203,13 @@ const uploadZone = ref(
 )
 const showNewModelDialog = ref(false)
 
+const { isLoggedIn } = useActiveUser()
 const modelName = computed(() => props.modelName || props.model?.name)
-const accessCheck = computed(() => {
+const isDisabled = computed(() => {
   return props.model
-    ? props.model.permissions.canCreateVersion
-    : props.project.permissions.canCreateModel
+    ? !props.model.permissions.canCreateVersion.authorized
+    : !isLoggedIn.value
 })
-const isDisabled = computed(() => !accessCheck.value.authorized)
 
 const showEmptyState = computed(
   () =>
