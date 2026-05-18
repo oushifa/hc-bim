@@ -237,7 +237,7 @@
                     {{ formatDate(model.updatedAt) }}
                   </td>
                   <td class="px-4 py-3 text-center text-gray-500">
-                    {{ model.raw.lastVersion?.items?.[0]?.seedId || '-' }}
+                    {{ JSON.stringify(model.raw.lastVersion?.items?.[0] || '{}') }}
                   </td>
                   <td class="px-4 py-3 text-center text-gray-500">
                     {{ model.versionsCount || 0 }}
@@ -269,26 +269,60 @@
                       </button>
                       <button
                         v-if="!model.raw.lastVersion?.items?.[0]?.seedId"
-                        :title="isModelSyncing(model.id) ? '同步中' : '同步模型'"
+                        :title="
+                          isModelSyncing({
+                            projectId: props.projectId,
+                            modelId: model.id
+                          })
+                            ? '同步中'
+                            : '同步模型'
+                        "
                         class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                        :disabled="isModelSyncing(model.id)"
+                        :disabled="
+                          isModelSyncing({
+                            projectId: props.projectId,
+                            modelId: model.id
+                          })
+                        "
                         @click.stop="syncModelFile(model)"
                       >
                         <ArrowPathIcon
                           class="h-4 w-4"
-                          :class="{ 'animate-spin': isModelSyncing(model.id) }"
+                          :class="{
+                            'animate-spin': isModelSyncing({
+                              projectId: props.projectId,
+                              modelId: model.id
+                            })
+                          }"
                         />
                       </button>
                       <button
                         v-if="shouldShowTreeJsonSync(model)"
-                        :title="isModelSyncing(model.id) ? '同步中' : '同步构件'"
+                        :title="
+                          isModelSyncing({
+                            projectId: props.projectId,
+                            modelId: model.id
+                          })
+                            ? '同步中'
+                            : '同步构件'
+                        "
                         class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                        :disabled="isModelSyncing(model.id)"
+                        :disabled="
+                          isModelSyncing({
+                            projectId: props.projectId,
+                            modelId: model.id
+                          })
+                        "
                         @click.stop="syncModelElements(model)"
                       >
                         <ArrowPathIcon
                           class="h-4 w-4"
-                          :class="{ 'animate-spin': isModelSyncing(model.id) }"
+                          :class="{
+                            'animate-spin': isModelSyncing({
+                              projectId: props.projectId,
+                              modelId: model.id
+                            })
+                          }"
                         />
                       </button>
                       <button
@@ -423,11 +457,9 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useApolloClient, useQuery } from '@vue/apollo-composable'
 import type {
-  OnProjectVersionsUpdateSubscription,
   ProjectCardImportFileArea_ProjectFragment,
   ProjectPageLatestItemsModelItemFragment
 } from '~/lib/common/generated/gql/graphql'
-import { ProjectVersionsUpdatedMessageType } from '~/lib/common/generated/gql/graphql'
 import {
   latestModelsPaginationQuery,
   latestModelsQuery
@@ -440,13 +472,11 @@ import { gql } from 'graphql-tag'
 import ImportDialog from '~/components/projects/workbench/ImportDialog.vue'
 import ProjectCardImportFileArea from '~/components/project/CardImportFileArea.vue'
 import type { FetchError } from 'ofetch'
-import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
-import { FileUploadConvertedStatus } from '~~/lib/core/api/fileImport'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { useDtpModelUpload } from '~~/composables/useDtpModelUpload'
-import { useProjectVersionUpdateTracking } from '~~/lib/projects/composables/versionManagement'
+import { useWorkbenchUploadSync } from '~~/lib/projects/composables/workbenchUploadSync'
 
 const props = defineProps<{
   projectId: string
@@ -549,12 +579,6 @@ type LatestModelUploadResponse = {
   }
 }
 
-type PendingAutoSyncUpload = {
-  fileName: string
-  modelId: string | null
-  uploadId: string | null
-}
-
 const ROOT_ID = 'all'
 const TREE_CHILD_KEYS = ['elements', 'children', '@elements', '@children', 'objects']
 const UNIT_SYMBOL_MAP: Record<string, string> = {
@@ -579,18 +603,17 @@ const isModelUploading = ref(false)
 const uploadAreaRef = ref<null | { triggerPicker: () => void }>(null)
 const versionUploadAreaRef = ref<null | { triggerPicker: () => void }>(null)
 const selectedVersionUploadModel = ref<ModelListItem | null>(null)
-const syncingModelIds = ref<Set<string>>(new Set())
-const pendingAutoSyncUploads = ref<PendingAutoSyncUpload[]>([])
 
 const { $dtpFetch } = useNuxtApp()
 const { triggerNotification } = useGlobalToast()
-const authToken = useAuthCookie()
+const { ensureDtpToken } = useDtpModelUpload()
 const {
-  ensureDtpToken,
-  syncModelFileForVersion,
-  clearVersionMetadataSyncRecord,
-  getVersionMetadataSyncRecord
-} = useDtpModelUpload()
+  registerPendingUpload,
+  isModelSyncing,
+  setModelSyncing,
+  runFullModelSync,
+  syncModelElementsWithTransformCheck
+} = useWorkbenchUploadSync()
 const apiOrigin = useApiOrigin()
 const dtpFetch = $dtpFetch as <T = unknown>(
   request: string,
@@ -620,7 +643,8 @@ const onModelUploading = async (payload: FileAreaUploadingPayload) => {
     const uploadId = payload.upload.result?.blobId?.trim?.() || null
     const uploadModel = selectedVersionUploadModel.value
     if (fileName && !payload.error && !payload.upload.result?.uploadError) {
-      pendingAutoSyncUploads.value = pendingAutoSyncUploads.value.concat({
+      registerPendingUpload({
+        projectId: props.projectId,
         fileName,
         modelId: uploadModel?.id || null,
         uploadId
@@ -1089,42 +1113,6 @@ const _buildSyncFlatPayload = (params: {
   }
 }
 
-const setModelSyncing = (modelId: string, syncing: boolean) => {
-  const next = new Set(syncingModelIds.value)
-  if (syncing) next.add(modelId)
-  else next.delete(modelId)
-  syncingModelIds.value = next
-}
-
-const isModelSyncing = (modelId: string) => syncingModelIds.value.has(modelId)
-
-const findPendingAutoSyncUploadCandidates = (params: {
-  modelId: string
-  versionMessage?: string | null
-}) => {
-  const { modelId, versionMessage } = params
-  if (!versionMessage?.trim()) return []
-
-  return pendingAutoSyncUploads.value.filter((item) => {
-    if (item.modelId && item.modelId !== modelId) return false
-    return versionMessage.includes(item.fileName)
-  })
-}
-
-const removePendingAutoSyncUpload = (target: PendingAutoSyncUpload) => {
-  const index = pendingAutoSyncUploads.value.findIndex(
-    (item) =>
-      item.fileName === target.fileName &&
-      item.modelId === target.modelId &&
-      item.uploadId === target.uploadId
-  )
-  if (index === -1) return
-
-  const next = pendingAutoSyncUploads.value.slice()
-  next.splice(index, 1)
-  pendingAutoSyncUploads.value = next
-}
-
 const refreshModelList = async () => {
   await Promise.allSettled([
     apollo.refetchQueries({
@@ -1138,7 +1126,7 @@ const shouldShowTreeJsonSync = (model: ModelListItem) => {
   return !!latestVersion?.seedId && latestVersion.treeJson !== 'done'
 }
 
-const fetchLatestModelUpload = async (model: ModelListItem) => {
+const _fetchLatestModelUpload = async (model: ModelListItem) => {
   const response = await apollo.query<LatestModelUploadResponse>({
     query: latestModelUploadQuery,
     variables: {
@@ -1159,138 +1147,11 @@ const fetchLatestModelUpload = async (model: ModelListItem) => {
   return upload
 }
 
-const fetchModelUploadForVersion = async (params: {
-  modelId: string
-  versionId: string
-  uploadId?: string | null
-  fileName?: string
-}) => {
-  const response = await apollo.query<LatestModelUploadResponse>({
-    query: latestModelUploadQuery,
-    variables: {
-      projectId: props.projectId,
-      modelId: params.modelId
-    },
-    fetchPolicy: 'no-cache'
-  })
-
-  const uploads = response.data?.project?.model?.uploads?.items || []
-  const uploadByVersionId = uploads.find(
-    (item) => item.convertedVersionId === params.versionId
-  )
-  const uploadById = params.uploadId
-    ? uploads.find((item) => item.id === params.uploadId)
-    : undefined
-
-  const upload = params.uploadId
-    ? uploadByVersionId?.id === params.uploadId
-      ? uploadByVersionId
-      : uploadById?.convertedVersionId === params.versionId
-      ? uploadById
-      : undefined
-    : uploadByVersionId || uploads.find((item) => item.fileName === params.fileName)
-
-  if (!upload?.id || !upload.fileName) {
-    throw new Error('未找到版本对应的模型上传记录，无法同步中海模型')
-  }
-  if (!upload.uploadComplete) {
-    throw new Error('模型上传尚未完成，暂时无法同步中海模型')
-  }
-
-  return upload
-}
-
-const resolvePendingAutoSyncTarget = async (
-  version: NonNullable<
-    OnProjectVersionsUpdateSubscription['projectVersionsUpdated']
-  >['version']
-) => {
-  if (!version) return undefined
-
-  const candidates = findPendingAutoSyncUploadCandidates({
-    modelId: version.model.id,
-    versionMessage: version.message
-  })
-
-  for (const candidate of candidates) {
-    try {
-      const upload = await fetchModelUploadForVersion({
-        modelId: version.model.id,
-        versionId: version.id,
-        uploadId: candidate.uploadId,
-        fileName: candidate.fileName
-      })
-
-      return {
-        pendingUpload: candidate,
-        upload
-      }
-    } catch {
-      // Try the next candidate. This can happen when multiple versions share the same file name.
-    }
-  }
-
-  return undefined
-}
-
-const fetchModelUploadFile = async (uploadId: string, fileName: string) => {
-  const response = await fetch(
-    `${apiOrigin}/api/stream/${props.projectId}/blob/${uploadId}`,
-    {
-      method: 'GET',
-      credentials: 'same-origin',
-      headers: authToken.value
-        ? { Authorization: `Bearer ${authToken.value}` }
-        : undefined
-    }
-  )
-
-  if (!response.ok) {
-    let message = `下载模型源文件失败 (${response.status})`
-    try {
-      const body = (await response.json()) as { error?: string | { message?: string } }
-      if (typeof body.error === 'string') message = body.error
-      else if (body.error?.message) message = body.error.message
-    } catch {
-      // Ignore non-JSON error bodies
-    }
-    throw new Error(message)
-  }
-
-  const blob = await response.blob()
-  return new File([blob], fileName, {
-    type: blob.type || 'application/octet-stream',
-    lastModified: Date.now()
-  })
-}
-
 const syncModelFile = async (model: ModelListItem) => {
-  try {
-    const upload = await fetchLatestModelUpload(model)
-    if (upload.convertedStatus === FileUploadConvertedStatus.Error) {
-      throw new Error(
-        upload.convertedMessage?.trim() || '模型转换失败，请先处理转换错误'
-      )
-    }
-    if (upload.convertedStatus !== FileUploadConvertedStatus.Completed) {
-      throw new Error('模型尚未转换成功，转换成功后会自动同步中海模型')
-    }
-
-    triggerNotification({
-      type: ToastNotificationType.Info,
-      title: '等待自动同步',
-      description:
-        '模型转换已完成，系统会在版本创建并回填 seedId 后自动同步中海模型与构件'
-    })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '模型同步失败'
-    logger.error(error, '同步模型文件失败')
-    triggerNotification({
-      type: ToastNotificationType.Danger,
-      title: '模型同步失败',
-      description: message
-    })
-  }
+  await runFullModelSync({
+    projectId: props.projectId,
+    modelId: model.id
+  })
 }
 
 const _fetchSyncModelLatestVersion = async (model: ModelListItem) => {
@@ -1415,12 +1276,16 @@ const performModelElementsSync = async (
   }
 }
 
-const syncModelElementsByIdentity = async (
+const _syncModelElementsByIdentity = async (
   model: Pick<ModelListItem, 'id' | 'name'>
 ) => {
-  if (isModelSyncing(model.id)) return false
+  if (isModelSyncing({ projectId: props.projectId, modelId: model.id })) return false
 
-  setModelSyncing(model.id, true)
+  setModelSyncing({
+    projectId: props.projectId,
+    modelId: model.id,
+    syncing: true
+  })
 
   try {
     const { payload, result } = await performModelElementsSync(model)
@@ -1446,116 +1311,13 @@ const syncModelElementsByIdentity = async (
     })
     return false
   } finally {
-    setModelSyncing(model.id, false)
-  }
-}
-
-const syncModelAndElementsByVersion = async (params: {
-  modelId: string
-  modelName: string
-  versionId: string
-  uploadId: string
-  fileName: string
-}) => {
-  if (isModelSyncing(params.modelId)) return false
-
-  setModelSyncing(params.modelId, true)
-
-  try {
-    const file = await fetchModelUploadFile(params.uploadId, params.fileName)
-    const uploadedExternalIds = await syncModelFileForVersion({
-      file,
-      fileUploadId: params.uploadId,
+    setModelSyncing({
       projectId: props.projectId,
-      modelId: params.modelId,
-      versionId: params.versionId
+      modelId: model.id,
+      syncing: false
     })
-    const storedExternalIds = getVersionMetadataSyncRecord(params.uploadId)
-    const externalIds = {
-      seedId: uploadedExternalIds?.seedId || storedExternalIds?.seedId,
-      assetId: uploadedExternalIds?.assetId || storedExternalIds?.assetId
-    }
-
-    await updateVersionExternalIds(params.versionId, externalIds)
-    clearVersionMetadataSyncRecord(params.uploadId)
-
-    await refreshModelList()
-
-    const { payload, result } = await performModelElementsSync(
-      {
-        id: params.modelId,
-        name: params.modelName
-      },
-      {
-        markTreeJsonDone: false
-      }
-    )
-
-    await refreshModelList()
-
-    const importParameterCount =
-      result?.result?.importParameterCount ?? payload.elements.length
-    const originValidElementCount =
-      result?.result?.originValidElementCount ?? payload.elements.length
-
-    triggerNotification({
-      type: ToastNotificationType.Success,
-      title: '模型与构件同步成功',
-      description: `已回填 seedId/assetId，并同步 ${originValidElementCount} 个构件、导入 ${importParameterCount} 个参数`
-    })
-
-    return true
-  } catch (error) {
-    clearVersionMetadataSyncRecord(params.uploadId)
-    const message = error instanceof Error ? error.message : '模型与构件同步失败'
-    logger.error(error, '同步中海模型与构件失败')
-    triggerNotification({
-      type: ToastNotificationType.Danger,
-      title: '模型与构件同步失败',
-      description: message
-    })
-    return false
-  } finally {
-    setModelSyncing(params.modelId, false)
   }
 }
-
-useProjectVersionUpdateTracking(
-  computed(() => props.projectId),
-  (
-    event: NonNullable<OnProjectVersionsUpdateSubscription['projectVersionsUpdated']>
-  ) => {
-    if (event.type !== ProjectVersionsUpdatedMessageType.Created || !event.version) {
-      return
-    }
-    const version = event.version
-
-    void (async () => {
-      const resolved = await resolvePendingAutoSyncTarget(version)
-      if (!resolved) return
-
-      const { pendingUpload, upload } = resolved
-      removePendingAutoSyncUpload(pendingUpload)
-
-      const success = await syncModelAndElementsByVersion({
-        modelId: version.model.id,
-        modelName: version.model.name,
-        versionId: version.id,
-        uploadId: upload.id,
-        fileName: upload.fileName
-      })
-
-      if (!success) {
-        triggerNotification({
-          type: ToastNotificationType.Warning,
-          title: '自动同步已停止重试',
-          description:
-            '当前版本的自动同步已触发一次；如构件同步失败，请在模型列表中手动重试'
-        })
-      }
-    })()
-  }
-)
 
 const uploadSyncPayload = async (payload: SyncFlatPayload, fileName: string) => {
   await ensureDtpToken()
@@ -1578,44 +1340,6 @@ const uploadSyncPayload = async (payload: SyncFlatPayload, fileName: string) => 
     method: 'POST',
     body: formData
   })
-}
-
-const updateVersionExternalIds = async (
-  versionId: string,
-  externalIds?: Partial<{
-    seedId: string
-    assetId: string
-  }>
-) => {
-  if (!externalIds?.seedId && !externalIds?.assetId) {
-    throw new Error('中海上传完成，但未拿到可回填的 seedId/assetId')
-  }
-
-  const { data, errors } = await apollo.mutate<{
-    versionMutations?: {
-      update?: {
-        id: string
-        seedId?: string | null
-        assetId?: string | null
-      } | null
-    } | null
-  }>({
-    mutation: updateVersionTreeJsonMutation,
-    variables: {
-      input: {
-        projectId: props.projectId,
-        versionId,
-        ...(externalIds?.seedId ? { seedId: externalIds.seedId } : {}),
-        ...(externalIds?.assetId ? { assetId: externalIds.assetId } : {})
-      }
-    }
-  })
-
-  if (!data?.versionMutations?.update?.id) {
-    throw new Error(
-      (errors?.[0]?.message as string | undefined) || '回填 seedId/assetId 失败'
-    )
-  }
 }
 
 const markVersionTreeJsonDone = async (
@@ -1655,7 +1379,10 @@ const markVersionTreeJsonDone = async (
 }
 
 const syncModelElements = async (model: ModelListItem) => {
-  await syncModelElementsByIdentity(model)
+  await syncModelElementsWithTransformCheck({
+    projectId: props.projectId,
+    modelId: model.id
+  })
 }
 
 const folderRows = ref<RawTreeItem[]>([])
@@ -1866,7 +1593,7 @@ const displayedModels = computed<ModelListItem[]>(() =>
   displayedModelFragments.value.map((model) => ({
     id: model.id,
     name: model.displayName || model.name,
-    seedId: model.latestVersion.items[0]?.seedId || '',
+    seedId: model.lastVersion?.items?.[0]?.seedId || '',
     updatedAt: model.updatedAt,
     versionsCount: model.versionCount.totalCount,
     commentCount: model.commentThreadCount.totalCount,

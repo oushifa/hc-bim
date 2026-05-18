@@ -35,6 +35,7 @@ type DtpUploadConfig = {
 type DtpUploadResult = {
   assetId: string
   seedId: string
+  assetName: string
 }
 
 type PendingDtpModelUploadRecord = {
@@ -45,6 +46,7 @@ type PendingDtpModelUploadRecord = {
   versionId?: string
   assetId?: string
   seedId?: string
+  assetName?: string
   status: 'pending' | 'uploading' | 'uploaded' | 'synced' | 'error'
   error?: string
   updatedAt: string
@@ -69,6 +71,7 @@ const getVersionExternalIdsQuery = gql`
         id
         seedId
         assetId
+        assetName
         treeJson
       }
     }
@@ -181,7 +184,8 @@ export const useDtpModelUpload = () => {
       record.projectId &&
       record.modelId &&
       record.seedId &&
-      record.assetId
+      record.assetId &&
+      record.assetName
     )
   }
 
@@ -352,10 +356,11 @@ export const useDtpModelUpload = () => {
     const { file, fileUploadId, projectId, modelId } = params
     const existing = getRecord(fileUploadId)
     if (existing?.status === 'uploaded' || existing?.status === 'synced') {
-      if (existing.assetId && existing.seedId) {
+      if (existing.assetId && existing.seedId && existing.assetName) {
         return {
           assetId: existing.assetId,
-          seedId: existing.seedId
+          seedId: existing.seedId,
+          assetName: existing.assetName
         }
       }
     }
@@ -405,6 +410,7 @@ export const useDtpModelUpload = () => {
         result?: Partial<{
           assetId: string
           seedId: string
+          assetName: string
         }>
       }>(uploadUrl, {
         method: 'POST',
@@ -418,13 +424,15 @@ export const useDtpModelUpload = () => {
       if (chunkMeta.lastChunk) {
         const assetId = response?.result?.assetId
         const seedId = response?.result?.seedId
-        if (!assetId || !seedId) {
-          throw new Error('中海上传完成后未返回 assetId 或 seedId')
+        const returnedAssetName = response?.result?.assetName
+        if (!assetId || !seedId || !returnedAssetName) {
+          throw new Error('中海上传完成后未返回 assetId、seedId 或 assetName')
         }
 
         finalResult = {
           assetId,
-          seedId
+          seedId,
+          assetName: returnedAssetName
         }
 
         logSyncDebug('中海上传完成，已拿到外部标识', {
@@ -442,6 +450,7 @@ export const useDtpModelUpload = () => {
     patchRecord(fileUploadId, {
       assetId: finalResult.assetId,
       seedId: finalResult.seedId,
+      assetName: finalResult.assetName,
       status: 'uploaded',
       error: undefined
     })
@@ -450,6 +459,7 @@ export const useDtpModelUpload = () => {
       fileUploadId,
       assetId: finalResult.assetId,
       seedId: finalResult.seedId,
+      assetName: finalResult.assetName,
       status: 'uploaded'
     })
 
@@ -506,6 +516,7 @@ export const useDtpModelUpload = () => {
     versionId: string
     expectedSeedId: string
     expectedAssetId: string
+    expectedAssetName: string
     fileUploadId: string
   }) => {
     for (
@@ -520,6 +531,7 @@ export const useDtpModelUpload = () => {
             id: string
             seedId?: string | null
             assetId?: string | null
+            assetName?: string | null
           } | null
         } | null
       }>({
@@ -533,6 +545,7 @@ export const useDtpModelUpload = () => {
 
       const actualSeedId = data?.project?.version?.seedId || null
       const actualAssetId = data?.project?.version?.assetId || null
+      const actualAssetName = data?.project?.version?.assetName || null
 
       logSyncDebug('回查版本外部标识', {
         fileUploadId: params.fileUploadId,
@@ -540,13 +553,16 @@ export const useDtpModelUpload = () => {
         attempt: attempt + 1,
         expectedSeedId: params.expectedSeedId,
         expectedAssetId: params.expectedAssetId,
+        expectedAssetName: params.expectedAssetName,
         actualSeedId,
-        actualAssetId
+        actualAssetId,
+        actualAssetName
       })
 
       if (
         actualSeedId === params.expectedSeedId &&
-        actualAssetId === params.expectedAssetId
+        actualAssetId === params.expectedAssetId &&
+        actualAssetName === params.expectedAssetName
       ) {
         return true
       }
@@ -568,6 +584,7 @@ export const useDtpModelUpload = () => {
           id: string
           seedId?: string | null
           assetId?: string | null
+          assetName?: string | null
         } | null
       } | null
     }>({
@@ -581,13 +598,20 @@ export const useDtpModelUpload = () => {
 
     return {
       seedId: data?.project?.version?.seedId || null,
-      assetId: data?.project?.version?.assetId || null
+      assetId: data?.project?.version?.assetId || null,
+      assetName: data?.project?.version?.assetName || null
     }
   }
 
   const trySyncVersionMetadata = async (fileUploadId: string) => {
     const record = getRecord(fileUploadId)
-    if (!record?.projectId || !record.versionId || !record.seedId || !record.assetId) {
+    if (
+      !record?.projectId ||
+      !record.versionId ||
+      !record.seedId ||
+      !record.assetId ||
+      !record.assetName
+    ) {
       return false
     }
 
@@ -607,14 +631,16 @@ export const useDtpModelUpload = () => {
     })
     if (
       existingExternalIds.seedId === record.seedId &&
-      existingExternalIds.assetId === record.assetId
+      existingExternalIds.assetId === record.assetId &&
+      existingExternalIds.assetName === record.assetName
     ) {
       logSyncDebug('版本外部标识已存在，跳过重复回填', {
         fileUploadId,
         projectId: record.projectId,
         versionId: record.versionId,
         seedId: record.seedId,
-        assetId: record.assetId
+        assetId: record.assetId,
+        assetName: record.assetName
       })
       removeRecord(fileUploadId)
       return true
@@ -633,7 +659,8 @@ export const useDtpModelUpload = () => {
           projectId: record.projectId,
           versionId: record.versionId,
           seedId: record.seedId,
-          assetId: record.assetId
+          assetId: record.assetId,
+          assetName: record.assetName
         }
       }
     })
@@ -653,7 +680,8 @@ export const useDtpModelUpload = () => {
       projectId: record.projectId,
       versionId: record.versionId,
       seedId: record.seedId,
-      assetId: record.assetId
+      assetId: record.assetId,
+      assetName: record.assetName
     })
 
     const verified = await verifyVersionExternalIdsStored({
@@ -661,7 +689,8 @@ export const useDtpModelUpload = () => {
       projectId: record.projectId,
       versionId: record.versionId,
       expectedSeedId: record.seedId,
-      expectedAssetId: record.assetId
+      expectedAssetId: record.assetId,
+      expectedAssetName: record.assetName
     })
 
     if (!verified) {
@@ -677,7 +706,8 @@ export const useDtpModelUpload = () => {
           projectId: record.projectId,
           versionId: record.versionId,
           seedId: record.seedId,
-          assetId: record.assetId
+          assetId: record.assetId,
+          assetName: record.assetName
         },
         'error'
       )
@@ -689,7 +719,8 @@ export const useDtpModelUpload = () => {
       projectId: record.projectId,
       versionId: record.versionId,
       seedId: record.seedId,
-      assetId: record.assetId
+      assetId: record.assetId,
+      assetName: record.assetName
     })
 
     removeRecord(fileUploadId)
@@ -806,6 +837,7 @@ export const useDtpModelUpload = () => {
       versionId: record.versionId,
       seedId: record.seedId,
       assetId: record.assetId,
+      assetName: record.assetName,
       status: record.status,
       error: record.error
     }

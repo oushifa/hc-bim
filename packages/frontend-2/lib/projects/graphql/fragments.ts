@@ -106,12 +106,6 @@ export const projectPageLatestItemsModelItemFragment = graphql(`
     versionCount: versions(limit: 0) {
       totalCount
     }
-    latestVersion: versions(limit: 1) {
-      items {
-        id
-        seedId
-      }
-    }
     commentThreadCount: commentThreads(limit: 0) {
       totalCount
     }
