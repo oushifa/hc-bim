@@ -190,6 +190,8 @@ graphql(`
       items {
         id
         createdAt
+        seedId
+        treeJson
       }
     }
   }

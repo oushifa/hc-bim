@@ -134,6 +134,8 @@ graphql(`
     sourceApplication
     createdAt
     previewUrl
+    seedId
+    treeJson
     authorUser {
       ...LimitedUserAvatar
     }

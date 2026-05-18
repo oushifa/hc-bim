@@ -264,8 +264,20 @@
                         <ArrowUpTrayIcon class="h-4 w-4" />
                       </button>
                       <button
-                        v-if="model.raw.permissions.canCreateVersion.authorized"
-                        :title="isModelSyncing(model.id) ? '同步中' : '同步模型构件'"
+                        v-if="!model.raw.lastVersion?.items?.[0]?.seedId"
+                        :title="isModelSyncing(model.id) ? '同步中' : '同步模型'"
+                        class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                        :disabled="isModelSyncing(model.id)"
+                        @click.stop="syncModelFile(model)"
+                      >
+                        <ArrowPathIcon
+                          class="h-4 w-4"
+                          :class="{ 'animate-spin': isModelSyncing(model.id) }"
+                        />
+                      </button>
+                      <button
+                        v-if="shouldShowTreeJsonSync(model)"
+                        :title="isModelSyncing(model.id) ? '同步中' : '同步构件'"
                         class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded disabled:opacity-50 disabled:cursor-not-allowed"
                         :disabled="isModelSyncing(model.id)"
                         @click.stop="syncModelElements(model)"
@@ -419,6 +431,8 @@ import type { FileAreaUploadingPayload } from '~/lib/form/helpers/fileUpload'
 import { gql } from 'graphql-tag'
 import ImportDialog from '~/components/projects/workbench/ImportDialog.vue'
 import ProjectCardImportFileArea from '~/components/project/CardImportFileArea.vue'
+import type { FetchError } from 'ofetch'
+import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { useDtpModelUpload } from '~~/composables/useDtpModelUpload'
@@ -454,11 +468,13 @@ type VisibleRow = {
 type ModelListItem = {
   id: string
   name: string
+  seedId: string
   updatedAt: string
   versionsCount: number
   commentCount: number
   previewUrl?: string | null
   raw: ProjectPageLatestItemsModelItemFragment
+  treeJson?: string | null
 }
 
 type SyncLatestVersionResponse = {
@@ -472,6 +488,7 @@ type SyncLatestVersionResponse = {
           createdAt: string
           referencedObject?: string | null
           seedId?: string | null
+          treeJson?: string | null
         }>
       }
     }
@@ -498,7 +515,23 @@ type SyncFlatPayload = {
 
 type GeneratedSyncPayloadResponse = {
   fileName: string
+  versionId: string
   payload: SyncFlatPayload
+}
+
+type LatestModelUploadResponse = {
+  project?: {
+    model?: {
+      id: string
+      uploads?: {
+        items?: Array<{
+          id: string
+          fileName: string
+          uploadComplete: boolean
+        }>
+      }
+    }
+  }
 }
 
 const ROOT_ID = 'all'
@@ -529,7 +562,8 @@ const syncingModelIds = ref<Set<string>>(new Set())
 
 const { $dtpFetch } = useNuxtApp()
 const { triggerNotification } = useGlobalToast()
-const { ensureDtpToken } = useDtpModelUpload()
+const authToken = useAuthCookie()
+const { ensureDtpToken, syncModelFileAfterSpeckleUpload } = useDtpModelUpload()
 const apiOrigin = useApiOrigin()
 const dtpFetch = $dtpFetch as <T = unknown>(
   request: string,
@@ -574,6 +608,7 @@ const syncModelLatestVersionQuery = gql`
             createdAt
             referencedObject
             seedId
+            treeJson
           }
         }
       }
@@ -633,6 +668,35 @@ const createFolderMutation = gql`
     folderMutations {
       create(input: $input) {
         id
+      }
+    }
+  }
+`
+
+const updateVersionTreeJsonMutation = gql`
+  mutation WorkbenchUpdateVersionTreeJson($input: UpdateVersionInput!) {
+    versionMutations {
+      update(input: $input) {
+        id
+        treeJson
+      }
+    }
+  }
+`
+
+const latestModelUploadQuery = gql`
+  query WorkbenchLatestModelUpload($projectId: String!, $modelId: String!) {
+    project(id: $projectId) {
+      id
+      model(id: $modelId) {
+        id
+        uploads(input: { limit: 1 }) {
+          items {
+            id
+            fileName
+            uploadComplete
+          }
+        }
       }
     }
   }
@@ -991,6 +1055,114 @@ const setModelSyncing = (modelId: string, syncing: boolean) => {
 
 const isModelSyncing = (modelId: string) => syncingModelIds.value.has(modelId)
 
+const refreshModelList = async () => {
+  await Promise.allSettled([
+    apollo.refetchQueries({
+      include: [latestModelsQuery, latestModelsPaginationQuery]
+    })
+  ])
+}
+
+const shouldShowTreeJsonSync = (model: ModelListItem) => {
+  const latestVersion = model.raw.lastVersion?.items?.[0]
+  return !!latestVersion?.seedId && latestVersion.treeJson !== 'done'
+}
+
+const fetchLatestModelUpload = async (model: ModelListItem) => {
+  const response = await apollo.query<LatestModelUploadResponse>({
+    query: latestModelUploadQuery,
+    variables: {
+      projectId: props.projectId,
+      modelId: model.id
+    },
+    fetchPolicy: 'no-cache'
+  })
+
+  const upload = response.data?.project?.model?.uploads?.items?.[0]
+  if (!upload?.id || !upload.fileName) {
+    throw new Error('未找到最近一次模型上传记录，无法补同步模型')
+  }
+  if (!upload.uploadComplete) {
+    throw new Error('最近一次模型上传尚未完成，请稍后再试')
+  }
+
+  return upload
+}
+
+const fetchModelUploadFile = async (uploadId: string, fileName: string) => {
+  const response = await fetch(
+    `${apiOrigin}/api/stream/${props.projectId}/blob/${uploadId}`,
+    {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: authToken.value
+        ? { Authorization: `Bearer ${authToken.value}` }
+        : undefined
+    }
+  )
+
+  if (!response.ok) {
+    let message = `下载模型源文件失败 (${response.status})`
+    try {
+      const body = (await response.json()) as { error?: string | { message?: string } }
+      if (typeof body.error === 'string') message = body.error
+      else if (body.error?.message) message = body.error.message
+    } catch {
+      // Ignore non-JSON error bodies
+    }
+    throw new Error(message)
+  }
+
+  const blob = await response.blob()
+  return new File([blob], fileName, {
+    type: blob.type || 'application/octet-stream',
+    lastModified: Date.now()
+  })
+}
+
+const syncModelFile = async (model: ModelListItem) => {
+  if (isModelSyncing(model.id)) return
+
+  setModelSyncing(model.id, true)
+
+  try {
+    const upload = await fetchLatestModelUpload(model)
+    const file = await fetchModelUploadFile(upload.id, upload.fileName)
+
+    await syncModelFileAfterSpeckleUpload({
+      file,
+      fileUploadId: upload.id,
+      projectId: props.projectId,
+      modelId: model.id
+    })
+
+    await refreshModelList()
+    const result = await performModelElementsSync(model)
+    await refreshModelList()
+
+    const importParameterCount =
+      result.result?.result?.importParameterCount ?? result.payload.elements.length
+    const originValidElementCount =
+      result.result?.result?.originValidElementCount ?? result.payload.elements.length
+
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '模型与构件同步成功',
+      description: `已回填 seedId/assetId，并同步 ${originValidElementCount} 个构件、导入 ${importParameterCount} 个参数`
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '模型同步失败'
+    logger.error(error, '同步模型文件失败')
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '模型同步失败',
+      description: message
+    })
+  } finally {
+    setModelSyncing(model.id, false)
+  }
+}
+
 const _fetchSyncModelLatestVersion = async (model: ModelListItem) => {
   const response = await apollo.query<SyncLatestVersionResponse>({
     query: syncModelLatestVersionQuery,
@@ -1043,12 +1215,63 @@ const _fetchModelObjectMap = async (referencedObject: string) => {
 const fetchGeneratedSyncPayload = async (
   model: ModelListItem
 ): Promise<GeneratedSyncPayloadResponse> => {
-  return await $fetch(
-    `/api/projects/${props.projectId}/models/${model.id}/bim-custom-label`,
-    {
-      method: 'GET'
-    }
-  )
+  try {
+    return await $fetch<GeneratedSyncPayloadResponse>(
+      `${apiOrigin}/api/v1/projects/${props.projectId}/models/${model.id}/bim-custom-label`,
+      {
+        method: 'GET',
+        credentials: 'same-origin'
+      }
+    )
+  } catch (error) {
+    const fetchError = error as FetchError<{ error?: string }>
+    const message =
+      fetchError.data?.error ||
+      (typeof fetchError.statusCode === 'number'
+        ? `生成模型构件参数失败 (${fetchError.statusCode})`
+        : '生成模型构件参数失败')
+    throw new Error(message)
+  }
+}
+
+const downloadSyncPayloadSnapshot = (payload: SyncFlatPayload, fileName: string) => {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: 'application/json'
+  })
+  const objectUrl = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = fileName
+  anchor.style.display = 'none'
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(objectUrl)
+}
+
+const performModelElementsSync = async (model: ModelListItem) => {
+  const generated = await fetchGeneratedSyncPayload(model)
+  const payload = generated.payload
+
+  if (!payload.elements.length) {
+    throw new Error(
+      '未生成可同步的构件参数，请确认模型对象中存在 applicationId 与参数数据'
+    )
+  }
+
+  downloadSyncPayloadSnapshot(payload, generated.fileName)
+  const result = await uploadSyncPayload(payload, generated.fileName)
+  if (result?.status !== 'SUCCESS') {
+    throw new Error(
+      result?.messages || '模型构件同步失败，custom-label-import 未返回成功状态'
+    )
+  }
+  await markVersionTreeJsonDone(generated.versionId)
+
+  return {
+    payload,
+    result
+  }
 }
 
 const uploadSyncPayload = async (payload: SyncFlatPayload, fileName: string) => {
@@ -1074,22 +1297,40 @@ const uploadSyncPayload = async (payload: SyncFlatPayload, fileName: string) => 
   })
 }
 
+const markVersionTreeJsonDone = async (versionId: string) => {
+  const { data, errors } = await apollo.mutate<{
+    versionMutations?: {
+      update?: {
+        id: string
+        treeJson?: string | null
+      } | null
+    } | null
+  }>({
+    mutation: updateVersionTreeJsonMutation,
+    variables: {
+      input: {
+        projectId: props.projectId,
+        versionId,
+        treeJson: 'done'
+      }
+    }
+  })
+
+  if (!data?.versionMutations?.update?.id) {
+    throw new Error(
+      (errors?.[0]?.message as string | undefined) || '回填 treeJson 失败'
+    )
+  }
+}
+
 const syncModelElements = async (model: ModelListItem) => {
   if (isModelSyncing(model.id)) return
 
   setModelSyncing(model.id, true)
 
   try {
-    const generated = await fetchGeneratedSyncPayload(model)
-    const payload = generated.payload
-
-    if (!payload.elements.length) {
-      throw new Error(
-        '未生成可同步的构件参数，请确认模型对象中存在 originalId 与参数数据'
-      )
-    }
-
-    const result = await uploadSyncPayload(payload, generated.fileName)
+    const { payload, result } = await performModelElementsSync(model)
+    await refreshModelList()
     const importParameterCount =
       result?.result?.importParameterCount ?? payload.elements.length
     const originValidElementCount =
@@ -1308,17 +1549,20 @@ const {
   () => ({ enabled: !shouldSkipModelsQuery.value })
 )
 
-const displayedModelFragments = computed(() => {
-  if (shouldSkipModelsQuery.value) return []
-  return extraModelsResult.value
-    ? extraModelsResult.value?.project?.models?.items || []
-    : baseModelsResult.value?.project?.models?.items || []
-})
+const displayedModelFragments = computed<ProjectPageLatestItemsModelItemFragment[]>(
+  () => {
+    if (shouldSkipModelsQuery.value) return []
+    return extraModelsResult.value
+      ? extraModelsResult.value?.project?.models?.items || []
+      : baseModelsResult.value?.project?.models?.items || []
+  }
+)
 
 const displayedModels = computed<ModelListItem[]>(() =>
   displayedModelFragments.value.map((model) => ({
     id: model.id,
     name: model.displayName || model.name,
+    seedId: model.latestVersion.items[0]?.seedId || '',
     updatedAt: model.updatedAt,
     versionsCount: model.versionCount.totalCount,
     commentCount: model.commentThreadCount.totalCount,

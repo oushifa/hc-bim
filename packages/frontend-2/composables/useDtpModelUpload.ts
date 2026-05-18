@@ -5,7 +5,7 @@ import type { FetchError } from 'ofetch'
 import {
   GetModelUploadsDocument,
   type GetModelUploadsQuery
-} from '~/lib/common/generated/gql/graphql'
+} from '~~/lib/common/generated/gql/graphql'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 
@@ -16,6 +16,8 @@ const DTP_MIN_MULTI_PART_CHUNK_SIZE = 8 * 1024 * 1024 + 1
 const DTP_PREFERRED_CHUNK_SIZE = 16 * 1024 * 1024
 const VERSION_ID_RESOLVE_RETRY_COUNT = 5
 const VERSION_ID_RESOLVE_RETRY_DELAY = 1500
+const VERSION_EXTERNAL_IDS_VERIFY_RETRY_COUNT = 3
+const VERSION_EXTERNAL_IDS_VERIFY_RETRY_DELAY = 1000
 
 type DtpTokenIdentity = Partial<{
   loginId: string
@@ -54,6 +56,20 @@ const updateVersionExternalIdsMutation = gql`
       update(input: $input) {
         id
         message
+      }
+    }
+  }
+`
+
+const getVersionExternalIdsQuery = gql`
+  query GetVersionExternalIds($projectId: String!, $versionId: String!) {
+    project(id: $projectId) {
+      id
+      version(id: $versionId) {
+        id
+        seedId
+        assetId
+        treeJson
       }
     }
   }
@@ -156,6 +172,14 @@ export const useDtpModelUpload = () => {
       )
 
   const getRecord = (fileUploadId: string) => storedRecords.value[fileUploadId]
+
+  const logSyncDebug = (
+    message: string,
+    payload?: Record<string, unknown>,
+    level: 'info' | 'warn' | 'error' = 'info'
+  ) => {
+    logger[level](`[DTP Model Sync] ${message}`, payload || {})
+  }
 
   const upsertRecord = (
     fileUploadId: string,
@@ -293,11 +317,18 @@ export const useDtpModelUpload = () => {
       throw new Error('获取中海上传配置失败')
     }
 
-    return {
+    const config = {
       uploadUrl,
       uploadPathPrefix,
       uploadToken
     }
+
+    logSyncDebug('获取中海上传配置成功', {
+      uploadUrl: config.uploadUrl,
+      uploadPathPrefix: config.uploadPathPrefix
+    })
+
+    return config
   }
 
   const uploadFileToDtp = async (params: {
@@ -326,10 +357,21 @@ export const useDtpModelUpload = () => {
     })
 
     const { uploadUrl, uploadPathPrefix, uploadToken } = await getUploadConfig()
-    console.log(uploadUrl)
     const chunkPlan = resolveChunkPlan(file.size)
     const assetName = buildAssetName(file.name)
     const path = `${uploadPathPrefix}${file.name}`
+
+    logSyncDebug('开始上传模型到中海', {
+      fileUploadId,
+      projectId,
+      modelId,
+      fileName: file.name,
+      fileSize: file.size,
+      uploadUrl,
+      path,
+      totalPart: chunkPlan.length,
+      chunkSizes: chunkPlan.map((item) => item.size)
+    })
 
     let finalResult: DtpUploadResult | null = null
 
@@ -372,6 +414,12 @@ export const useDtpModelUpload = () => {
           assetId,
           seedId
         }
+
+        logSyncDebug('中海上传完成，已拿到外部标识', {
+          fileUploadId,
+          assetId,
+          seedId
+        })
       }
     }
 
@@ -384,6 +432,13 @@ export const useDtpModelUpload = () => {
       seedId: finalResult.seedId,
       status: 'uploaded',
       error: undefined
+    })
+
+    logSyncDebug('中海上传结果已写入本地待同步记录', {
+      fileUploadId,
+      assetId: finalResult.assetId,
+      seedId: finalResult.seedId,
+      status: 'uploaded'
     })
 
     return finalResult
@@ -419,11 +474,74 @@ export const useDtpModelUpload = () => {
   }) => {
     for (let attempt = 0; attempt < VERSION_ID_RESOLVE_RETRY_COUNT; attempt++) {
       const versionId = await queryConvertedVersionId(params)
+      logSyncDebug('查询 Speckle 转换后的版本 ID', {
+        fileUploadId: params.fileUploadId,
+        projectId: params.projectId,
+        modelId: params.modelId,
+        attempt: attempt + 1,
+        versionId
+      })
       if (versionId) return versionId
       await sleep(VERSION_ID_RESOLVE_RETRY_DELAY)
     }
 
     return null
+  }
+
+  const verifyVersionExternalIdsStored = async (params: {
+    projectId: string
+    versionId: string
+    expectedSeedId: string
+    expectedAssetId: string
+    fileUploadId: string
+  }) => {
+    for (
+      let attempt = 0;
+      attempt < VERSION_EXTERNAL_IDS_VERIFY_RETRY_COUNT;
+      attempt++
+    ) {
+      const { data } = await apollo.query<{
+        project?: {
+          id: string
+          version?: {
+            id: string
+            seedId?: string | null
+            assetId?: string | null
+          } | null
+        } | null
+      }>({
+        query: getVersionExternalIdsQuery,
+        variables: {
+          projectId: params.projectId,
+          versionId: params.versionId
+        },
+        fetchPolicy: 'network-only'
+      })
+
+      const actualSeedId = data?.project?.version?.seedId || null
+      const actualAssetId = data?.project?.version?.assetId || null
+
+      logSyncDebug('回查版本外部标识', {
+        fileUploadId: params.fileUploadId,
+        versionId: params.versionId,
+        attempt: attempt + 1,
+        expectedSeedId: params.expectedSeedId,
+        expectedAssetId: params.expectedAssetId,
+        actualSeedId,
+        actualAssetId
+      })
+
+      if (
+        actualSeedId === params.expectedSeedId &&
+        actualAssetId === params.expectedAssetId
+      ) {
+        return true
+      }
+
+      await sleep(VERSION_EXTERNAL_IDS_VERIFY_RETRY_DELAY)
+    }
+
+    return false
   }
 
   const trySyncVersionMetadata = async (fileUploadId: string) => {
@@ -433,6 +551,14 @@ export const useDtpModelUpload = () => {
     }
 
     if (record.status === 'synced') return true
+
+    logSyncDebug('开始回填版本外部标识', {
+      fileUploadId,
+      projectId: record.projectId,
+      versionId: record.versionId,
+      seedId: record.seedId,
+      assetId: record.assetId
+    })
 
     const { data, errors } = await apollo.mutate<{
       versionMutations?: {
@@ -462,6 +588,50 @@ export const useDtpModelUpload = () => {
       throw new Error(errMsg)
     }
 
+    logSyncDebug('版本外部标识写入请求成功，准备回查确认', {
+      fileUploadId,
+      projectId: record.projectId,
+      versionId: record.versionId,
+      seedId: record.seedId,
+      assetId: record.assetId
+    })
+
+    const verified = await verifyVersionExternalIdsStored({
+      fileUploadId,
+      projectId: record.projectId,
+      versionId: record.versionId,
+      expectedSeedId: record.seedId,
+      expectedAssetId: record.assetId
+    })
+
+    if (!verified) {
+      const errMsg = '版本外部标识写入后回查失败，seedId/assetId 未确认落库'
+      patchRecord(fileUploadId, {
+        status: 'error',
+        error: errMsg
+      })
+      logSyncDebug(
+        '版本外部标识回查失败',
+        {
+          fileUploadId,
+          projectId: record.projectId,
+          versionId: record.versionId,
+          seedId: record.seedId,
+          assetId: record.assetId
+        },
+        'error'
+      )
+      throw new Error(errMsg)
+    }
+
+    logSyncDebug('版本外部标识回查成功，确认已落库', {
+      fileUploadId,
+      projectId: record.projectId,
+      versionId: record.versionId,
+      seedId: record.seedId,
+      assetId: record.assetId
+    })
+
     removeRecord(fileUploadId)
     return true
   }
@@ -473,8 +643,23 @@ export const useDtpModelUpload = () => {
     modelId: string
   }) => {
     try {
+      logSyncDebug('启动 Speckle 上传后的中海同步任务', params)
       await uploadFileToDtp(params)
-      await trySyncVersionMetadata(params.fileUploadId)
+      const synced = await trySyncVersionMetadata(params.fileUploadId)
+
+      if (!synced) {
+        logSyncDebug('首次回填未命中版本 ID，开始主动轮询 Speckle 转换结果', {
+          fileUploadId: params.fileUploadId,
+          projectId: params.projectId,
+          modelId: params.modelId
+        })
+
+        await markVersionReadyForSync({
+          fileUploadId: params.fileUploadId,
+          projectId: params.projectId,
+          modelId: params.modelId
+        })
+      }
     } catch (error) {
       const message =
         (error as FetchError)?.data?.message ||
@@ -484,6 +669,15 @@ export const useDtpModelUpload = () => {
         status: 'error',
         error: message
       })
+
+      logSyncDebug(
+        '中海同步任务失败',
+        {
+          ...params,
+          message
+        },
+        'error'
+      )
 
       triggerNotification({
         type: ToastNotificationType.Danger,
@@ -506,6 +700,13 @@ export const useDtpModelUpload = () => {
     if (!existing) return null
 
     patchRecord(fileUploadId, {
+      projectId,
+      modelId,
+      versionId
+    })
+
+    logSyncDebug('Speckle 转换完成，已关联版本 ID', {
+      fileUploadId,
       projectId,
       modelId,
       versionId

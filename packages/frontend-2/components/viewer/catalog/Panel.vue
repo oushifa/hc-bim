@@ -5,54 +5,6 @@
         <div>目录组织</div>
       </div>
     </template>
-    <template #actions>
-      <div class="flex items-center gap-0.5">
-        <div v-tippy="canCreateViewOrGroup?.errorMessage" class="flex items-center gap-1">
-          <FormButton
-            v-tippy="getTooltipProps('创建目录')"
-            size="sm"
-            color="subtle"
-            :icon-left="Plus"
-            hide-text
-            name="addCatalog"
-            :disabled="isSaving"
-            @click="openCreateCatalogDialog"
-          />
-          <FormButton
-            v-tippy="getTooltipProps('删除当前目录')"
-            size="sm"
-            color="danger"
-            :icon-left="Trash"
-            hide-text
-            name="deleteCatalog"
-            :disabled="!activeCatalogId || isSaving"
-            @click="onDeleteCatalog"
-          />
-        </div>
-      </div>
-    </template>
-    <template v-if="searchMode" #fullTitle>
-      <div class="self-center w-full pr-1 flex gap-2 items-center">
-        <FormTextInput
-          v-bind="bind"
-          name="search"
-          placeholder="搜索视图..."
-          color="foundation"
-          auto-focus
-          size="sm"
-          wrapper-classes="flex-1 -ml-1"
-          v-on="on"
-        />
-        <FormButton
-          size="sm"
-          color="subtle"
-          :icon-left="X"
-          hide-text
-          name="disableSearch"
-          @click="setSearchMode(false)"
-        />
-      </div>
-    </template>
     <div class="p-1 flex overflow-hidden items-start">
       <div class="flex-grow overflow-auto">
         <LayoutTabsHorizontal
@@ -61,16 +13,33 @@
         ></LayoutTabsHorizontal>
       </div>
       <div class="flex-shrink-0">
-        <FormButton
-          v-tippy="getTooltipProps('创建根节点')"
-          size="sm"
-          color="subtle"
-          :icon-left="Plus"
-          hide-text
-          name="addRootNode"
-          :disabled="isSaving"
-          @click="openCreateRootNodeDialog"
-        />
+        <div class="flex items-center gap-0.5">
+          <div
+            v-tippy="canCreateViewOrGroup?.errorMessage"
+            class="flex items-center gap-1"
+          >
+            <FormButton
+              v-tippy="getTooltipProps('创建目录')"
+              size="sm"
+              color="subtle"
+              :icon-left="Plus"
+              hide-text
+              name="addCatalog"
+              :disabled="isSaving"
+              @click="openCreateCatalogDialog"
+            />
+            <FormButton
+              v-tippy="getTooltipProps('删除当前目录')"
+              size="sm"
+              color="danger"
+              :icon-left="Trash"
+              hide-text
+              name="deleteCatalog"
+              :disabled="!activeCatalogId || isSaving"
+              @click="onDeleteCatalog"
+            />
+          </div>
+        </div>
       </div>
     </div>
     <div
@@ -81,9 +50,19 @@
         class="h-1/2 min-h-0 overflow-y-auto simple-scrollbar rounded border border-outline-3"
       >
         <div
-          class="px-2 py-1 text-body-2xs text-foreground-2 border-b border-outline-3"
+          class="px-2 py-1 text-body-2xs text-foreground-2 border-b border-outline-3 flex items-center justify-between"
         >
           目录节点
+          <FormButton
+            v-tippy="getTooltipProps('创建根节点')"
+            size="sm"
+            color="subtle"
+            :icon-left="Plus"
+            hide-text
+            name="addRootNode"
+            :disabled="isSaving"
+            @click="openCreateRootNodeDialog"
+          />
         </div>
         <div class="p-1">
           <LayoutTree
@@ -95,11 +74,11 @@
             <template #title="{ node, selected }">
               <div class="flex items-center justify-between w-full h-full pr-1">
                 <span class="truncate" :title="node.title">{{ node.title }}</span>
-                <div 
+                <div
                   class="flex items-center gap-0.5 transition-opacity duration-150 opacity-0 group-hover:opacity-100"
                   :class="{ 'opacity-100': selected }"
                 >
-                  <button 
+                  <button
                     type="button"
                     class="p-1 rounded-sm text-foreground-2 hover:text-[#00b4b6] hover:bg-[#e6f7f8] transition-colors"
                     title="添加子节点"
@@ -108,7 +87,7 @@
                   >
                     <Plus class="w-3.5 h-3.5" />
                   </button>
-                  <button 
+                  <button
                     type="button"
                     class="p-1 rounded-sm text-foreground-2 hover:text-danger hover:bg-danger-muted transition-colors"
                     title="删除节点"
@@ -143,7 +122,7 @@
         <FormTextInput
           v-model="newCatalogName"
           name="catalogName"
-          placeholder="例如：目录3"
+          placeholder="目录名称"
           color="foundation"
         />
       </div>
@@ -160,7 +139,7 @@
         <FormTextInput
           v-model="newNodeName"
           name="nodeName"
-          placeholder="例如：节点1"
+          placeholder="节点名称"
           color="foundation"
         />
       </div>
@@ -170,7 +149,10 @@
 <script setup lang="ts">
 import { Plus, X, Trash } from 'lucide-vue-next'
 import { graphql } from '~/lib/common/generated/gql'
-import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
+import {
+  useInjectedViewer,
+  useInjectedViewerState
+} from '~/lib/viewer/composables/setup'
 import { useDebouncedTextInput } from '@speckle/ui-components'
 import { useKeepAliveScrollState } from '~/lib/common/composables/dom'
 import { useFilterUtilities } from '~/lib/viewer/composables/filtering/filtering'
@@ -178,7 +160,10 @@ import { useGlobalToast } from '~/lib/common/composables/toast'
 import type { LayoutDialogButton, LayoutPageTabItem } from '@speckle/ui-components'
 import { LayoutTabsHorizontal } from '#components'
 import CatalogModel from './CatalogModel.vue'
-import { useViewerCatalogs, type ViewerCatalogNode } from '~/lib/viewer/composables/catalog'
+import {
+  useViewerCatalogs,
+  type ViewerCatalogNode
+} from '~/lib/viewer/composables/catalog'
 import { mapApplicationIdsToIds } from '~/lib/viewer/helpers/catalogHelpers'
 import { useFilteringDataStore } from '~~/lib/viewer/composables/filtering/dataStore'
 
@@ -205,11 +190,15 @@ defineEmits<{
 const {
   resources: {
     response: { project }
+  },
+  viewer: {
+    metadata: { worldTree }
   }
 } = useInjectedViewerState()
 const { on, bind, value: search } = useDebouncedTextInput()
 const { isolateObjects, hideObjects, resetHiddenAndIsolations } = useFilterUtilities()
-const { fetchCatalogs, createCatalog, updateCatalog, deleteCatalog } = useViewerCatalogs()
+const { fetchCatalogs, createCatalog, updateCatalog, deleteCatalog } =
+  useViewerCatalogs()
 const { triggerNotification } = useGlobalToast()
 const dataStore = useFilteringDataStore()
 const projectId = computed(() => project.value?.id)
@@ -228,6 +217,21 @@ type CatalogTreeNode = {
   key: string
   title: string
   children?: CatalogTreeNode[]
+}
+
+type WorldTreeJsonNode = {
+  id: string
+  name: string
+  visible: boolean
+  children: WorldTreeJsonNode[]
+}
+
+type ViewerWorldTreeNode = {
+  model?: {
+    id?: string
+    raw?: Record<string, unknown>
+  }
+  children?: ViewerWorldTreeNode[]
 }
 
 type CatalogTabItem = LayoutPageTabItem & {
@@ -253,6 +257,37 @@ onMounted(async () => {
       console.error('Failed to load catalogs', e)
     }
   }
+  console.log(convertedTree.value)
+})
+
+const convertedTree = computed(() => {
+  const mapWorldTreeNode = (node: ViewerWorldTreeNode): WorldTreeJsonNode[] => {
+    const raw = node.model?.raw || {}
+    const applicationId =
+      typeof raw.applicationId === 'string' && raw.applicationId.length
+        ? raw.applicationId
+        : undefined
+    const children = Array.isArray(node.children)
+      ? node.children.flatMap(mapWorldTreeNode)
+      : []
+
+    if (!applicationId) return children
+
+    return [
+      {
+        id: applicationId,
+        name:
+          typeof raw.name === 'string' && raw.name.length ? raw.name : applicationId,
+        visible: typeof raw.visible === 'boolean' ? raw.visible : true,
+        children
+      }
+    ]
+  }
+
+  const rootNode = worldTree.value?.root as ViewerWorldTreeNode | undefined
+  if (!rootNode) return []
+
+  return mapWorldTreeNode(rootNode)
 })
 
 const saveToNode = async ({
@@ -262,18 +297,21 @@ const saveToNode = async ({
   isolatedApplicationIds: string[]
   hiddenApplicationIds: string[]
 }) => {
+  console.log(worldTree.value)
+  console.log(convertedTree.value)
+  return convertedTree.value
   const targetNodeId = selectedTreeNodeId.value
   const currentCatalogId = activeCatalogId.value
   if (!targetNodeId || !currentCatalogId || !projectId.value || isSaving.value) return
 
-  const catalogIndex = catalogs.value.findIndex(
-    (item) => item.id === currentCatalogId
-  )
+  const catalogIndex = catalogs.value.findIndex((item) => item.id === currentCatalogId)
   if (catalogIndex < 0) return
 
   isSaving.value = true
   const currentCatalog = catalogs.value[catalogIndex]
-  const existingChildren = Array.isArray(currentCatalog.childrens) ? currentCatalog.childrens : []
+  const existingChildren = Array.isArray(currentCatalog.childrens)
+    ? currentCatalog.childrens
+    : []
   const updateNodeById = (
     nodes: RawCatalogNode[],
     nodeId: string
@@ -350,9 +388,10 @@ const mapCatalogChildrenToTreeNodes = (nodes: RawCatalogNode[]): CatalogTreeNode
   return nodes.map((node) => ({
     key: node.id,
     title: node.title,
-    children: Array.isArray(node.childrens) && node.childrens.length
-      ? mapCatalogChildrenToTreeNodes(node.childrens)
-      : undefined
+    children:
+      Array.isArray(node.childrens) && node.childrens.length
+        ? mapCatalogChildrenToTreeNodes(node.childrens)
+        : undefined
   }))
 }
 
@@ -362,7 +401,6 @@ const activeTreeData = computed<CatalogTreeNode[]>(() => {
   return mapCatalogChildrenToTreeNodes(children)
 })
 
-const searchMode = ref(false)
 const showCreateCatalogDialog = ref(false)
 const showCreateNodeDialog = ref(false)
 const newCatalogName = ref('')
@@ -389,8 +427,14 @@ const findNodeById = (
 const applyNodeFilters = (node: RawCatalogNode) => {
   resetHiddenAndIsolations()
   nextTick(() => {
-    const isolatedObjectIds = mapApplicationIdsToIds(node.isolatedApplicationIds || [], dataStore)
-    const hiddenObjectIds = mapApplicationIdsToIds(node.hiddenApplicationIds || [], dataStore)
+    const isolatedObjectIds = mapApplicationIdsToIds(
+      node.isolatedApplicationIds || [],
+      dataStore
+    )
+    const hiddenObjectIds = mapApplicationIdsToIds(
+      node.hiddenApplicationIds || [],
+      dataStore
+    )
     isolateObjects(isolatedObjectIds, { replace: true })
     hideObjects(hiddenObjectIds, { replace: true })
   })
@@ -505,15 +549,15 @@ const onAddNode = async () => {
   const currentCatalogId = activeCatalogId.value
   if (!currentCatalogId) return
 
-  const catalogIndex = catalogs.value.findIndex(
-    (item) => item.id === currentCatalogId
-  )
+  const catalogIndex = catalogs.value.findIndex((item) => item.id === currentCatalogId)
   if (catalogIndex < 0) return
 
   isSaving.value = true
 
   const currentCatalog = catalogs.value[catalogIndex]
-  const existingChildren = Array.isArray(currentCatalog.childrens) ? currentCatalog.childrens : []
+  const existingChildren = Array.isArray(currentCatalog.childrens)
+    ? currentCatalog.childrens
+    : []
 
   const nextNode: RawCatalogNode = {
     id: `${currentCatalogId}-node-${Date.now()}`,
@@ -565,7 +609,7 @@ const onAddNode = async () => {
       targetNodeId,
       nextNode
     )
-    
+
     if (!insertionResult.inserted) return
     updatedNodes = insertionResult.updatedNodes
   }
@@ -585,10 +629,10 @@ const onAddNode = async () => {
     catalogs.value = nextCatalogs
     activeCatalogItem.value = updatedCatalog
     showCreateNodeDialog.value = false
-    
+
     // Automatically select the new node or expand parents
     selectedTreeKeys.value = [nextNode.id]
-    
+
     triggerNotification({
       type: 'success',
       title: '节点创建成功'
@@ -644,9 +688,7 @@ const onDeleteSpecificNode = async (nodeId: string) => {
 
   if (!window.confirm('确认要删除选中的节点及其所有子节点吗？此操作不可撤销。')) return
 
-  const catalogIndex = catalogs.value.findIndex(
-    (item) => item.id === currentCatalogId
-  )
+  const catalogIndex = catalogs.value.findIndex((item) => item.id === currentCatalogId)
   if (catalogIndex < 0) return
 
   isSaving.value = true
@@ -721,15 +763,5 @@ const onDeleteSpecificNode = async (nodeId: string) => {
   } finally {
     isSaving.value = false
   }
-}
-
-const setSearchMode = (val: boolean) => {
-  if (val) {
-    searchMode.value = true
-  } else {
-    searchMode.value = false
-  }
-
-  search.value = ''
 }
 </script>

@@ -1,3 +1,5 @@
+import { useActiveUser } from '~~/lib/auth/composables/activeUser'
+
 let cachedDtpToken: string | null = null
 let pendingDtpTokenRequest: Promise<string | null> | null = null
 
@@ -12,6 +14,7 @@ export const clearDtpTokenCache = () => {
  */
 export default defineNuxtPlugin(() => {
   const dtpApiOrigin = useDtpApiOrigin()
+  const { activeUser } = useActiveUser()
 
   const getRequestUrl = (request: RequestInfo | URL) =>
     typeof request === 'string'
@@ -69,7 +72,10 @@ export default defineNuxtPlugin(() => {
 
     pendingDtpTokenRequest = (async () => {
       try {
-        const mobile = 13000000000
+        const mobile = activeUser.value?.email?.trim()
+        if (!mobile) {
+          return null
+        }
 
         const CryptoJS = await import('crypto-js')
         const AES_KEY = 'Ze/0w7rnQg7jznntRcuxGQ=='
