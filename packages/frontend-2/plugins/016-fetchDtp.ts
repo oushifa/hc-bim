@@ -23,6 +23,10 @@ export default defineNuxtPlugin(() => {
       ? request.toString()
       : request.url
 
+  const getDtpBaseOrigin = () =>
+    new URL(dtpApiBase.toString(), globalThis.location?.origin || 'http://localhost')
+      .origin
+
   // Guard: if DTP API origin is not configured, skip plugin init to avoid
   // `new URL('')` throwing "Invalid URL" and crashing SSR for the whole app.
   if (!dtpApiOrigin || !dtpApiOrigin.trim()) {
@@ -141,8 +145,10 @@ export default defineNuxtPlugin(() => {
     }
   }
 
-  // 初始化时获取token
-  void getDtpToken()
+  // 仅在客户端预取 token，避免服务端对相对 DTP 地址发起无效请求。
+  if (import.meta.client) {
+    void getDtpToken()
+  }
 
   // Create a dedicated fetch instance for DTP API
   const dtpFetch = $fetch.create({
@@ -159,7 +165,7 @@ export default defineNuxtPlugin(() => {
           ? new URL(requestUrl)
           : new URL(requestUrl, globalThis.location?.origin || 'http://localhost')
         ctx.request = `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`
-        options.baseURL = new URL(dtpApiBase.toString()).origin
+        options.baseURL = getDtpBaseOrigin()
       }
 
       const headers = new Headers(options.headers as HeadersInit | undefined)
