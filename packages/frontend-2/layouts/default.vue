@@ -1,8 +1,8 @@
 <template>
   <div class="bg-[#E7EBEB]">
     <HeaderNavBar />
-    <div class="h-dvh w-dvh overflow-hidden flex flex-col">
-      <div class="relative flex h-[calc(100vh-1.25rem)]">
+    <div class="h-dvh w-full overflow-hidden flex flex-col">
+      <div class="relative flex w-full h-[calc(100vh-1.25rem)]">
         <DashboardSidebar />
         <div class="size-full bg-[#E7EBEB] pt-[4.5rem] ml-3.5 mr-3.5 mt-2">
           <div
@@ -13,7 +13,7 @@
               class="w-full h-full simple-scrollbar pt-0 lg:pt-0"
               :class="isTwinSceneRoute ? 'overflow-hidden' : 'overflow-y-auto'"
             >
-              <div class="px-0 md:px-0 h-full">
+              <div class="px-0 md:px-0 w-full h-full">
                 <slot />
               </div>
             </main>

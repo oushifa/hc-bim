@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="h-full">
     <div
       class="h-full flex flex-col bg-white/80 backdrop-blur-md rounded-[26px] shadow-sm overflow-hidden"
     >
