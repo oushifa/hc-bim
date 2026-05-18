@@ -52,6 +52,7 @@
                 <!-- Tree Item -->
                 <template v-else-if="item.type === 'tree-item'">
                   <ViewerModelsVirtualTreeItem
+                    :hide-isolate="true"
                     :item="item"
                     @toggle-expansion="toggleTreeItemExpansion"
                     @item-click="handleItemClick"
@@ -89,6 +90,8 @@ import {
   type UnifiedVirtualItem
 } from '~~/lib/viewer/composables/tree'
 import { useVirtualList, useDebounceFn, useThrottleFn } from '@vueuse/core'
+import { mapIdsToApplicationIds } from '~~/lib/viewer/helpers/catalogHelpers'
+import { useFilteringDataStore } from '~~/lib/viewer/composables/filtering/dataStore'
 
 type ModelItem = NonNullable<Get<ViewerLoadedResourcesQuery, 'project.models.items[0]'>>
 
@@ -419,14 +422,18 @@ watch(
   },
   { immediate: true }
 )
-import { mapIdsToApplicationIds } from '~~/lib/viewer/helpers/catalogHelpers'
-import { useFilteringDataStore } from '~~/lib/viewer/composables/filtering/dataStore'
 
 const dataStore = useFilteringDataStore()
 
 const saveTreeToNode = () => {
-  const isolatedApplicationIds = mapIdsToApplicationIds(filters.isolatedObjectIds.value, dataStore)
-  const hiddenApplicationIds = mapIdsToApplicationIds(filters.hiddenObjectIds.value, dataStore)
+  const isolatedApplicationIds = mapIdsToApplicationIds(
+    filters.isolatedObjectIds.value,
+    dataStore
+  )
+  const hiddenApplicationIds = mapIdsToApplicationIds(
+    filters.hiddenObjectIds.value,
+    dataStore
+  )
   emit('onSave', {
     isolatedApplicationIds,
     hiddenApplicationIds

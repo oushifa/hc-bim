@@ -135,6 +135,7 @@ graphql(`
     createdAt
     previewUrl
     seedId
+    assetName
     treeJson
     authorUser {
       ...LimitedUserAvatar

@@ -5,6 +5,17 @@
         <div>目录组织</div>
       </div>
     </template>
+    <template #actions>
+      <FormButton
+        v-tippy="getTooltipProps('同步目录')"
+        size="sm"
+        :icon-left="RefreshCcw"
+        hide-text
+        name="deleteCatalog"
+        :disabled="!activeCatalogId || isSaving"
+        @click="onSyncCatalog"
+      />
+    </template>
     <div class="p-1 flex overflow-hidden items-start">
       <div class="flex-grow overflow-auto">
         <LayoutTabsHorizontal
@@ -147,16 +158,16 @@
   </ViewerLayoutSidePanel>
 </template>
 <script setup lang="ts">
-import { Plus, X, Trash } from 'lucide-vue-next'
+import { Plus, Trash, RefreshCcw } from 'lucide-vue-next'
 import { graphql } from '~/lib/common/generated/gql'
 import {
-  useInjectedViewer,
-  useInjectedViewerState
+  useInjectedViewerState,
+  useInjectedViewerLoadedResources
 } from '~/lib/viewer/composables/setup'
 import { useDebouncedTextInput } from '@speckle/ui-components'
 import { useKeepAliveScrollState } from '~/lib/common/composables/dom'
 import { useFilterUtilities } from '~/lib/viewer/composables/filtering/filtering'
-import { useGlobalToast } from '~/lib/common/composables/toast'
+import { ToastNotificationType, useGlobalToast } from '~/lib/common/composables/toast'
 import type { LayoutDialogButton, LayoutPageTabItem } from '@speckle/ui-components'
 import { LayoutTabsHorizontal } from '#components'
 import CatalogModel from './CatalogModel.vue'
@@ -195,13 +206,14 @@ const {
     metadata: { worldTree }
   }
 } = useInjectedViewerState()
-const { on, bind, value: search } = useDebouncedTextInput()
 const { isolateObjects, hideObjects, resetHiddenAndIsolations } = useFilterUtilities()
 const { fetchCatalogs, createCatalog, updateCatalog, deleteCatalog } =
   useViewerCatalogs()
 const { triggerNotification } = useGlobalToast()
 const dataStore = useFilteringDataStore()
+const { modelsAndVersionIds } = useInjectedViewerLoadedResources()
 const projectId = computed(() => project.value?.id)
+const { $dtpFetch } = useNuxtApp()
 
 const isSaving = ref(false)
 
@@ -219,23 +231,23 @@ type CatalogTreeNode = {
   children?: CatalogTreeNode[]
 }
 
-type WorldTreeJsonNode = {
+type CatalogTabItem = LayoutPageTabItem & {
+  childrens?: RawCatalogNode[]
+}
+
+type CatalogTreeSourceNode = {
+  id: string
+  title: string
+  hiddenApplicationIds?: string[]
+  childrens?: CatalogTreeSourceNode[]
+  treeData?: CatalogTreeSourceNode[]
+}
+
+type DptTreeNode = {
   id: string
   name: string
   visible: boolean
-  children: WorldTreeJsonNode[]
-}
-
-type ViewerWorldTreeNode = {
-  model?: {
-    id?: string
-    raw?: Record<string, unknown>
-  }
-  children?: ViewerWorldTreeNode[]
-}
-
-type CatalogTabItem = LayoutPageTabItem & {
-  childrens?: RawCatalogNode[]
+  children: DptTreeNode[]
 }
 
 const catalogs = ref<CatalogTabItem[]>([])
@@ -257,38 +269,114 @@ onMounted(async () => {
       console.error('Failed to load catalogs', e)
     }
   }
-  console.log(convertedTree.value)
 })
 
-const convertedTree = computed(() => {
-  const mapWorldTreeNode = (node: ViewerWorldTreeNode): WorldTreeJsonNode[] => {
-    const raw = node.model?.raw || {}
-    const applicationId =
-      typeof raw.applicationId === 'string' && raw.applicationId.length
-        ? raw.applicationId
-        : undefined
-    const children = Array.isArray(node.children)
-      ? node.children.flatMap(mapWorldTreeNode)
-      : []
+const convertToDptTree = (tree: CatalogTreeSourceNode[]): DptTreeNode[] => {
+  return tree.map((item) => {
+    const hideObject =
+      item.hiddenApplicationIds?.flatMap((applicationId): DptTreeNode[] => {
+        const foundNodes = worldTree.value?.findId(applicationId) || []
+        const node = foundNodes[0]
+        const raw = node?.model?.raw as
+          | { applicationId?: string; name?: string }
+          | undefined
+        if (!raw?.applicationId || !raw?.name) return []
 
-    if (!applicationId) return children
+        return [
+          {
+            id: raw.applicationId,
+            name: raw.name,
+            visible: true,
+            children: []
+          }
+        ]
+      }) || []
+    const convertedChildren = convertToDptTree(item.treeData || item.childrens || [])
+    return {
+      id: item.id,
+      name: item.title,
+      visible: true,
+      children: [...convertedChildren, ...hideObject]
+    }
+  })
+}
 
-    return [
-      {
-        id: applicationId,
-        name:
-          typeof raw.name === 'string' && raw.name.length ? raw.name : applicationId,
-        visible: typeof raw.visible === 'boolean' ? raw.visible : true,
-        children
-      }
-    ]
+const onSyncCatalog = async () => {
+  if (!projectId.value || isSaving.value) return
+
+  isSaving.value = true
+  try {
+    const treeData = await fetchCatalogs(projectId.value)
+    const dptTree = convertToDptTree(treeData)
+    const timestamp = new Date().toISOString()
+    const catalogData = {
+      models: modelsAndVersionIds.value.flatMap(({ model, versionId }) => {
+        const loadedVersion =
+          model.loadedVersion.items.find((item) => item.id === versionId) ||
+          model.loadedVersion.items[0]
+        const seedId = loadedVersion?.seedId?.trim()
+        const name = loadedVersion?.assetName?.trim() || model.name?.trim()
+        if (!seedId || !name) return []
+
+        return [
+          {
+            model: {
+              id: seedId,
+              name,
+              timestamp
+            },
+            tree: {
+              id: projectId.value,
+              name,
+              visible: true,
+              children: dptTree
+            }
+          }
+        ]
+      })
+    }
+
+    if (!catalogData.models.length) {
+      triggerNotification({
+        type: ToastNotificationType.Danger,
+        title: '同步失败',
+        description: '未找到可同步的模型 seedId'
+      })
+      return
+    }
+
+    const file = new File(
+      [JSON.stringify(catalogData, null, 2)],
+      `catalog-${projectId.value}-${Date.now()}.json`,
+      { type: 'application/json' }
+    )
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await $dtpFetch<{
+      status?: string
+      messages?: string
+      result?: Record<string, unknown>
+    }>('/v1/daas/asset/bim/elements/custom-import', {
+      method: 'POST',
+      body: formData
+    })
+
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '同步成功',
+      description: response?.messages || '目录树已同步到 BIM 自定义构件树'
+    })
+  } catch (error) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '同步失败',
+      description: error instanceof Error ? error.message : '目录同步失败'
+    })
+  } finally {
+    isSaving.value = false
   }
-
-  const rootNode = worldTree.value?.root as ViewerWorldTreeNode | undefined
-  if (!rootNode) return []
-
-  return mapWorldTreeNode(rootNode)
-})
+}
 
 const saveToNode = async ({
   isolatedApplicationIds,
@@ -297,9 +385,6 @@ const saveToNode = async ({
   isolatedApplicationIds: string[]
   hiddenApplicationIds: string[]
 }) => {
-  console.log(worldTree.value)
-  console.log(convertedTree.value)
-  return convertedTree.value
   const targetNodeId = selectedTreeNodeId.value
   const currentCatalogId = activeCatalogId.value
   if (!targetNodeId || !currentCatalogId || !projectId.value || isSaving.value) return

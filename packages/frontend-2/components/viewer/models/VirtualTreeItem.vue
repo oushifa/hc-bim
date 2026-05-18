@@ -49,6 +49,7 @@
           @click="toggleTreeItemVisibility()"
         />
         <ViewerIsolateButton
+          v-if="!props.hideIsolate"
           :is-isolated="isTreeItemIsolated"
           @click="toggleTreeItemIsolation()"
         />
@@ -75,6 +76,7 @@ import type { UnifiedVirtualItem } from '~~/lib/viewer/composables/tree'
 
 const props = defineProps<{
   item: UnifiedVirtualItem
+  hideIsolate?: boolean
 }>()
 
 const emit = defineEmits<{
