@@ -1,8 +1,10 @@
 <template>
   <div
     class="flex w-full flex-col min-h-0 h-[calc(100dvh-4.5rem)] max-h-[calc(100dvh-4.5rem)]"
+    @wheel.stop
+    @touchmove.stop
   >
-    <div class="relative min-h-0 flex-1 bg-gray-50">
+    <div class="relative min-h-0 flex-1 bg-gray-50 overflow-hidden">
       <iframe
         v-if="iframeSrc"
         :src="iframeSrc"
