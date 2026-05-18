@@ -62,11 +62,11 @@
             <span class="text-sm text-gray-600 whitespace-nowrap">状态：</span>
             <div class="relative w-32" @click.stop>
               <div
-                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between"
+                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between text-gray-600"
                 :class="
                   statusFilter
-                    ? 'border-[#00b4b6] bg-white text-gray-700'
-                    : 'border-transparent bg-gray-50 text-gray-400'
+                    ? 'border-[#00b4b6] bg-white'
+                    : 'border-transparent bg-gray-50'
                 "
                 @click="toggleFilterDropdown('status')"
               >
@@ -76,31 +76,37 @@
                   :class="openFilterDropdown === 'status' ? 'rotate-180' : ''"
                 />
               </div>
-              <div
-                v-if="openFilterDropdown === 'status'"
-                class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-50 overflow-hidden"
-              >
+              <Transition name="fade-down">
                 <div
-                  v-for="opt in statusFilterOptions"
-                  :key="opt.value"
-                  class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
-                  :class="statusFilter === opt.value ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
-                  @click="statusFilter = opt.value; openFilterDropdown = null"
+                  v-if="openFilterDropdown === 'status'"
+                  class="absolute top-full left-0 mt-1 w-full bg-white border border-[#00b4b6] rounded-[8px] shadow-lg z-50 overflow-hidden py-1"
                 >
-                  {{ opt.label }}
+                  <div
+                    v-for="opt in statusFilterOptions"
+                    :key="opt.value"
+                    class="w-full px-3 py-2 text-sm cursor-pointer transition-colors text-left"
+                    :class="
+                      statusFilter === opt.value
+                        ? 'bg-[#00b4b6] text-white'
+                        : 'text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6]'
+                    "
+                    @click="statusFilter = opt.value; openFilterDropdown = null"
+                  >
+                    {{ opt.label }}
+                  </div>
                 </div>
-              </div>
+              </Transition>
             </div>
           </div>
           <div class="flex items-center space-x-2">
             <span class="text-sm text-gray-600 whitespace-nowrap">构件数据：</span>
             <div class="relative w-32" @click.stop>
               <div
-                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between"
+                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between text-gray-600"
                 :class="
                   componentDataFilter
-                    ? 'border-[#00b4b6] bg-white text-gray-700'
-                    : 'border-transparent bg-gray-50 text-gray-400'
+                    ? 'border-[#00b4b6] bg-white'
+                    : 'border-transparent bg-gray-50'
                 "
                 @click="toggleFilterDropdown('component')"
               >
@@ -110,20 +116,26 @@
                   :class="openFilterDropdown === 'component' ? 'rotate-180' : ''"
                 />
               </div>
-              <div
-                v-if="openFilterDropdown === 'component'"
-                class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-50 overflow-hidden"
-              >
+              <Transition name="fade-down">
                 <div
-                  v-for="opt in componentDataFilterOptions"
-                  :key="opt.value"
-                  class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
-                  :class="componentDataFilter === opt.value ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
-                  @click="componentDataFilter = opt.value; openFilterDropdown = null"
+                  v-if="openFilterDropdown === 'component'"
+                  class="absolute top-full left-0 mt-1 w-full bg-white border border-[#00b4b6] rounded-[8px] shadow-lg z-50 overflow-hidden py-1"
                 >
-                  {{ opt.label }}
+                  <div
+                    v-for="opt in componentDataFilterOptions"
+                    :key="opt.value"
+                    class="w-full px-3 py-2 text-sm cursor-pointer transition-colors text-left"
+                    :class="
+                      componentDataFilter === opt.value
+                        ? 'bg-[#00b4b6] text-white'
+                        : 'text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6]'
+                    "
+                    @click="componentDataFilter = opt.value; openFilterDropdown = null"
+                  >
+                    {{ opt.label }}
+                  </div>
                 </div>
-              </div>
+              </Transition>
             </div>
           </div>
         </template>
@@ -134,11 +146,11 @@
             <span class="text-sm text-gray-600 whitespace-nowrap">上架状态：</span>
             <div class="relative w-32" @click.stop>
               <div
-                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between"
+                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between text-gray-600"
                 :class="
                   publishStatusFilter
-                    ? 'border-[#00b4b6] bg-white text-gray-700'
-                    : 'border-transparent bg-gray-50 text-gray-400'
+                    ? 'border-[#00b4b6] bg-white'
+                    : 'border-transparent bg-gray-50'
                 "
                 @click="toggleFilterDropdown('publish')"
               >
@@ -148,31 +160,37 @@
                   :class="openFilterDropdown === 'publish' ? 'rotate-180' : ''"
                 />
               </div>
-              <div
-                v-if="openFilterDropdown === 'publish'"
-                class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-50 overflow-hidden"
-              >
+              <Transition name="fade-down">
                 <div
-                  v-for="opt in publishStatusFilterOptions"
-                  :key="opt.value"
-                  class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
-                  :class="publishStatusFilter === opt.value ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
-                  @click="publishStatusFilter = opt.value; openFilterDropdown = null"
+                  v-if="openFilterDropdown === 'publish'"
+                  class="absolute top-full left-0 mt-1 w-full bg-white border border-[#00b4b6] rounded-[8px] shadow-lg z-50 overflow-hidden py-1"
                 >
-                  {{ opt.label }}
+                  <div
+                    v-for="opt in publishStatusFilterOptions"
+                    :key="opt.value"
+                    class="w-full px-3 py-2 text-sm cursor-pointer transition-colors text-left"
+                    :class="
+                      publishStatusFilter === opt.value
+                        ? 'bg-[#00b4b6] text-white'
+                        : 'text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6]'
+                    "
+                    @click="publishStatusFilter = opt.value; openFilterDropdown = null"
+                  >
+                    {{ opt.label }}
+                  </div>
                 </div>
-              </div>
+              </Transition>
             </div>
           </div>
           <div class="flex items-center space-x-2">
             <span class="text-sm text-gray-600 whitespace-nowrap">分类：</span>
-            <div class="relative w-32" @click.stop>
+            <div class="relative w-48" @click.stop>
               <div
-                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between"
+                class="px-3 py-1.5 border rounded-[8px] text-sm focus:outline-none cursor-pointer transition-colors flex items-center justify-between text-gray-600"
                 :class="
                   categoryFilter
-                    ? 'border-[#00b4b6] bg-white text-gray-700'
-                    : 'border-transparent bg-gray-50 text-gray-400'
+                    ? 'border-[#00b4b6] bg-white'
+                    : 'border-transparent bg-gray-50'
                 "
                 @click="toggleFilterDropdown('category')"
               >
@@ -182,27 +200,37 @@
                   :class="openFilterDropdown === 'category' ? 'rotate-180' : ''"
                 />
               </div>
-              <div
-                v-if="openFilterDropdown === 'category'"
-                class="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-50 max-h-60 overflow-y-auto"
-              >
+              <Transition name="fade-down">
                 <div
-                  class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
-                  :class="!categoryFilter ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
-                  @click="categoryFilter = ''; openFilterDropdown = null"
+                  v-if="openFilterDropdown === 'category'"
+                  class="absolute top-full left-0 mt-1 w-full bg-white border border-[#00b4b6] rounded-[8px] shadow-lg z-50 max-h-60 overflow-y-auto py-1"
                 >
-                  全部
+                  <div
+                    class="w-full px-3 py-2 text-sm cursor-pointer transition-colors text-left"
+                    :class="
+                      !categoryFilter
+                        ? 'bg-[#00b4b6] text-white'
+                        : 'text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6]'
+                    "
+                    @click="categoryFilter = ''; openFilterDropdown = null"
+                  >
+                    全部
+                  </div>
+                  <div
+                    v-for="cat in flatCategoryList"
+                    :key="cat.id"
+                    class="w-full px-3 py-2 text-sm cursor-pointer transition-colors text-left"
+                    :class="
+                      categoryFilter === cat.name
+                        ? 'bg-[#00b4b6] text-white'
+                        : 'text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6]'
+                    "
+                    @click="categoryFilter = cat.name; openFilterDropdown = null"
+                  >
+                    {{ cat.name }}
+                  </div>
                 </div>
-                <div
-                  v-for="cat in flatCategoryList"
-                  :key="cat.id"
-                  class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors"
-                  :class="categoryFilter === cat.name ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
-                  @click="categoryFilter = cat.name; openFilterDropdown = null"
-                >
-                  {{ cat.name }}
-                </div>
-              </div>
+              </Transition>
             </div>
           </div>
         </template>
@@ -1968,5 +1996,16 @@ const selectPageSize = async (size: number) => {
 .focus-brand.focus-error:focus,
 .focus-brand.focus-error:focus-visible {
   border-color: #f87171 !important;
+}
+
+/* 筛选下拉展开/收起过渡（与 LightModel 保持一致） */
+.fade-down-enter-active,
+.fade-down-leave-active {
+  transition: all 0.2s ease;
+}
+.fade-down-enter-from,
+.fade-down-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>

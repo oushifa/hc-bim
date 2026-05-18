@@ -1074,37 +1074,79 @@ const openAddTwinWorkgroupModal = () => {
 const confirmAddTwinWorkgroup = async () => {
   const name = newTwinWorkgroupName.value.trim().slice(0, 10)
   if (!name) return
-  
+
   try {
     const { $dtpFetch } = useNuxtApp()
-    
-    // 调用创建组接口
+
+    // 1）调用创建组接口
     const data = await $dtpFetch('/v1/team/create', {
       method: 'POST',
       body: {
         teamName: name
       }
     })
-    
+
     const responseData = data as any
-    if (responseData && responseData.success && responseData.results) {
-      // 从返回结果中获取 teamId
-      const teamId = responseData.results.teamId
-      
-      // 重新获取工作组列表
-      await fetchWorkgroupList()
-      
-      // 设置新创建的组为当前组
-      if (teamId) {
-        activeTwinWorkgroupId.value = teamId
+    if (!(responseData && responseData.success)) {
+      console.error('创建工作组响应异常:', responseData)
+      return
+    }
+
+    addTwinWorkgroupOpen.value = false
+
+    // 2）重新拉 /v1/team/unit/list，取“非 Personal 单位 teamList 的最后一项”作为新建工作组
+    //    （create 接口不返回 teamId，依赖 unit/list 里按 joinTime 顺序尾部即为最新创建项）
+    let newTeamId: string | undefined
+    try {
+      const listData = await $dtpFetch('/v1/team/unit/list', {
+        method: 'GET'
+      })
+      const listResp = listData as any
+      if (listResp && listResp.success && Array.isArray(listResp.results)) {
+        const nonPersonalUnit = listResp.results.find(
+          (u: any) =>
+            u &&
+            u.unitType !== 'Personal' &&
+            Array.isArray(u.teamList) &&
+            u.teamList.length > 0
+        )
+        const teamList = nonPersonalUnit?.teamList
+        if (Array.isArray(teamList) && teamList.length > 0) {
+          newTeamId = teamList[teamList.length - 1]?.teamId
+        }
       }
-      
-      addTwinWorkgroupOpen.value = false
-      
-      // 跳转到新组的页面
-      if (teamId) {
-        void navigateTo(twinSceneCasesRoute(teamId))
-      }
+    } catch (listErr) {
+      console.error('创建后拉取单位列表失败:', listErr)
+    }
+
+    if (!newTeamId) {
+      console.error('未能从单位列表中定位新建工作组的 teamId')
+      return
+    }
+
+    // 3）调 /v1/team/switch 将后端会话切到新组
+    //    （不走 selectTwinWorkgroup，避免 fetchCurrentWorkgroupInfo 里 Personal 自动切走逻辑干扰）
+    try {
+      await $dtpFetch('/v1/team/switch', {
+        method: 'PUT',
+        body: { teamId: newTeamId }
+      })
+    } catch (switchErr) {
+      console.error('创建后切换工作组失败:', switchErr)
+      return
+    }
+
+    // 4）刷新工作组列表（供侧边栏下拉使用）+ 同步本地 active 状态
+    await fetchWorkgroupList()
+    activeTwinWorkgroupId.value = newTeamId
+    twinWorkgroupDropdownOpen.value = false
+
+    // 5）跳转到新组的子页（保持当前子页，否则默认 cases）
+    const sub = route.path.match(/\/twin-scene\/[^/]+\/(cases|members|settings)/)
+    if (sub?.[1]) {
+      void navigateTo(`/twin-scene/${newTeamId}/${sub[1]}`)
+    } else {
+      void navigateTo(twinSceneCasesRoute(newTeamId))
     }
   } catch (error) {
     console.error('创建工作组失败:', error)
@@ -1120,8 +1162,20 @@ const toggleModelMenu = () => {
 }
 
 // 点击3D孪生场景编辑按钮时切换展开状态
-const toggleTwinSceneMenu = () => {
-  isTwinSceneMenuExpanded.value = !showTwinSceneMenu.value
+const toggleTwinSceneMenu = async () => {
+  const next = !showTwinSceneMenu.value
+  isTwinSceneMenuExpanded.value = next
+  // 每次“展开”时主动拉一次当前工作组信息（/v1/team/workingTeam/info），
+  // 避免仅靠 watch 错过调用（例如 showTwinSceneMenu 由 immediate 已触发过后不再变化）
+  if (next && import.meta.client) {
+    try {
+      await ensureDtpToken()
+    } catch (e) {
+      console.error('ensureDtpToken 失败:', e)
+    }
+    void fetchCurrentWorkgroupInfo()
+    void fetchWorkgroupList()
+  }
 }
 
 // 监听路由变化，当导航时重置手动展开状态为 null（自动模式）
