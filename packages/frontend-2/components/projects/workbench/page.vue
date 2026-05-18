@@ -207,7 +207,7 @@
                 <tr class="bg-[#f8f9fa] text-gray-500 text-sm border-b border-gray-200">
                   <th class="px-4 py-3 font-medium">模型名称</th>
                   <th class="px-4 py-3 font-medium">更新时间</th>
-                  <th class="px-4 py-3 font-medium text-center">seedId</th>
+                  <!-- <th class="px-4 py-3 font-medium text-center">seedId</th> -->
                   <th class="px-4 py-3 font-medium text-center">版本数</th>
                   <th class="px-4 py-3 font-medium text-right">操作</th>
                 </tr>
@@ -236,9 +236,9 @@
                   <td class="px-4 py-3 text-gray-500">
                     {{ formatDate(model.updatedAt) }}
                   </td>
-                  <td class="px-4 py-3 text-center text-gray-500">
+                  <!-- <td class="px-4 py-3 text-center text-gray-500">
                     {{ JSON.stringify(model.raw.lastVersion?.items?.[0] || '{}') }}
-                  </td>
+                  </td> -->
                   <td class="px-4 py-3 text-center text-gray-500">
                     {{ model.versionsCount || 0 }}
                   </td>
