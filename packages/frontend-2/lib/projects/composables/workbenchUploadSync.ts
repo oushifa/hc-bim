@@ -246,6 +246,7 @@ export const useWorkbenchUploadSync = () => {
       headers?: HeadersInit
       body?: BodyInit | Record<string, unknown> | null
       originPath?: boolean
+      prefix?: string
     }
   ) => Promise<T>
 
@@ -846,11 +847,6 @@ export const useWorkbenchUploadSync = () => {
         status: 'error',
         error: message,
         retryCount: (taskMap.value[taskId]?.retryCount || 0) + 1
-      })
-      triggerNotification({
-        type: ToastNotificationType.Warning,
-        title: '自动同步已停止重试',
-        description: `${message}；如需继续，请返回工作台手动重试`
       })
       return false
     } finally {

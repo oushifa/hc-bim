@@ -622,6 +622,7 @@ const dtpFetch = $dtpFetch as <T = unknown>(
     headers?: HeadersInit
     body?: BodyInit | Record<string, unknown> | null
     originPath?: boolean
+    prefix?: string
   }
 ) => Promise<T>
 

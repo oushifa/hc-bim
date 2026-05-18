@@ -163,6 +163,7 @@ export const useDtpModelUpload = () => {
       headers?: HeadersInit
       body?: BodyInit | Record<string, unknown> | null
       originPath?: boolean
+      prefix?: string
     }
   ) => Promise<T>
 
@@ -418,7 +419,7 @@ export const useDtpModelUpload = () => {
           Authorization: `Bearer ${uploadToken}`
         },
         body: formData,
-        originPath: true
+        prefix: '/__dtp-static'
       })
 
       if (chunkMeta.lastChunk) {

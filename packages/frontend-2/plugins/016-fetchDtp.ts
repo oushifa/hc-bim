@@ -3,6 +3,24 @@ import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 let cachedDtpToken: string | null = null
 let pendingDtpTokenRequest: Promise<string | null> | null = null
 
+type DtpFetchOptions = {
+  originPath?: boolean
+  prefix?: string
+}
+
+const DEFAULT_DTP_PREFIX = '/__dtp'
+const FALLBACK_ORIGIN = 'http://localhost'
+
+const trimTrailingSlashes = (value: string) => value.replace(/\/+$/, '')
+const ensureLeadingSlash = (value: string) =>
+  value.startsWith('/') ? value : `/${value}`
+
+const joinUrlPath = (base: string, path: string) => {
+  const normalizedBase = trimTrailingSlashes(base)
+  const normalizedPath = ensureLeadingSlash(path)
+  return `${normalizedBase}${normalizedPath}`
+}
+
 export const clearDtpTokenCache = () => {
   cachedDtpToken = null
   pendingDtpTokenRequest = null
@@ -13,8 +31,10 @@ export const clearDtpTokenCache = () => {
  * with authentication support
  */
 export default defineNuxtPlugin(() => {
-  const dtpApiOrigin = useDtpApiOrigin()
   const { activeUser } = useActiveUser()
+  const dtpApiOrigin = useDtpApiOrigin()?.trim() || DEFAULT_DTP_PREFIX
+
+  const getCurrentOrigin = () => globalThis.location?.origin || FALLBACK_ORIGIN
 
   const getRequestUrl = (request: RequestInfo | URL) =>
     typeof request === 'string'
@@ -23,37 +43,44 @@ export default defineNuxtPlugin(() => {
       ? request.toString()
       : request.url
 
-  const getDtpBaseOrigin = () =>
-    new URL(dtpApiBase.toString(), globalThis.location?.origin || 'http://localhost')
-      .origin
+  const getResolvedRequestUrl = (request: RequestInfo | URL) =>
+    new URL(getRequestUrl(request), getCurrentOrigin())
 
-  // Guard: if DTP API origin is not configured, skip plugin init to avoid
-  // `new URL('')` throwing "Invalid URL" and crashing SSR for the whole app.
-  if (!dtpApiOrigin || !dtpApiOrigin.trim()) {
-    return {
-      provide: {
-        dtpFetch: $fetch
-      }
+  const getDtpBaseOrigin = () => {
+    if (dtpApiOrigin.startsWith('http://') || dtpApiOrigin.startsWith('https://')) {
+      return new URL(dtpApiOrigin).origin
     }
+
+    return getCurrentOrigin()
   }
 
-  let dtpApiBase: URL | string
-  // Support relative origin (e.g., '/__dtp' for proxied requests)
-  if (dtpApiOrigin.startsWith('/')) {
-    dtpApiBase = dtpApiOrigin
-  } else {
-    try {
-      dtpApiBase = new URL(dtpApiOrigin)
-    } catch {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[fetchDtp] Invalid NUXT_PUBLIC_DTP_API_ORIGIN: "${dtpApiOrigin}", falling back to default $fetch.`
-      )
+  const getDtpBaseURL = () => {
+    if (dtpApiOrigin.startsWith('http://') || dtpApiOrigin.startsWith('https://')) {
+      return trimTrailingSlashes(dtpApiOrigin)
+    }
+
+    return trimTrailingSlashes(dtpApiOrigin) || DEFAULT_DTP_PREFIX
+  }
+
+  const resolvePrefixedRequest = (request: RequestInfo | URL, prefix: string) => {
+    const resolvedUrl = getResolvedRequestUrl(request)
+    const requestPath = `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`
+    const normalizedPrefix = prefix.trim()
+
+    if (
+      normalizedPrefix.startsWith('http://') ||
+      normalizedPrefix.startsWith('https://')
+    ) {
+      const prefixUrl = new URL(normalizedPrefix)
       return {
-        provide: {
-          dtpFetch: $fetch
-        }
+        baseURL: prefixUrl.origin,
+        request: joinUrlPath(prefixUrl.pathname || '/', requestPath)
       }
+    }
+
+    return {
+      baseURL: getCurrentOrigin(),
+      request: joinUrlPath(ensureLeadingSlash(normalizedPrefix), requestPath)
     }
   }
 
@@ -97,7 +124,7 @@ export default defineNuxtPlugin(() => {
         })
 
         const bimpToken = encrypted.toString()
-        const loginUrl = `${dtpApiOrigin}/v1/login/third-party`
+        const loginUrl = `${getDtpBaseURL()}/v1/login/third-party`
         const response = await fetch(loginUrl, {
           method: 'POST',
           headers: {
@@ -152,20 +179,36 @@ export default defineNuxtPlugin(() => {
 
   // Create a dedicated fetch instance for DTP API
   const dtpFetch = $fetch.create({
-    baseURL: dtpApiBase.toString(),
+    baseURL: getDtpBaseURL(),
     async onRequest(ctx) {
       const { options } = ctx
-      const requestOptions = options as typeof options & {
-        originPath?: boolean
-      }
+      const requestOptions = options as typeof options & DtpFetchOptions
 
-      if (requestOptions.originPath) {
-        const requestUrl = getRequestUrl(ctx.request)
-        const resolvedUrl = requestUrl.startsWith('http')
-          ? new URL(requestUrl)
-          : new URL(requestUrl, globalThis.location?.origin || 'http://localhost')
+      if (requestOptions.prefix?.trim()) {
+        const resolvedRequest = resolvePrefixedRequest(
+          ctx.request,
+          requestOptions.prefix
+        )
+        ctx.request = resolvedRequest.request
+        options.baseURL = resolvedRequest.baseURL
+      } else if (requestOptions.originPath) {
+        const resolvedUrl = getResolvedRequestUrl(ctx.request)
         ctx.request = `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`
         options.baseURL = getDtpBaseOrigin()
+      } else {
+        const resolvedUrl = getResolvedRequestUrl(ctx.request)
+        const requestPath = `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`
+        const normalizedBaseURL = getDtpBaseURL()
+        const basePath = normalizedBaseURL.startsWith('http')
+          ? new URL(normalizedBaseURL).pathname
+          : normalizedBaseURL
+
+        if (basePath && basePath !== '/') {
+          ctx.request = joinUrlPath(basePath, requestPath)
+          options.baseURL = getDtpBaseOrigin()
+        } else {
+          ctx.request = requestPath
+        }
       }
 
       const headers = new Headers(options.headers as HeadersInit | undefined)
@@ -185,6 +228,8 @@ export default defineNuxtPlugin(() => {
       }
 
       options.headers = headers
+      delete requestOptions.originPath
+      delete requestOptions.prefix
     },
     onResponse() {
       // Handle response if needed
