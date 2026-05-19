@@ -11,6 +11,7 @@ export type ViewerCatalogNode = {
 export type ViewerCatalog = {
   id: string
   projectId: string
+  modelId: string
   authorId: string | null
   title: string
   treeData: ViewerCatalogNode[]
@@ -32,16 +33,23 @@ export function useViewerCatalogs() {
     return headers
   }
 
-  const fetchCatalogs = async (projectId: string): Promise<ViewerCatalog[]> => {
+  const fetchCatalogs = async (
+    projectId: string,
+    modelId: string
+  ): Promise<ViewerCatalog[]> => {
     const res = await $fetch<{ data: ViewerCatalog[] }>(
       `${config.public.apiOrigin}/api/projects/${projectId}/viewer-catalogs`,
-      { headers: getHeaders() }
+      {
+        headers: getHeaders(),
+        query: { modelId }
+      }
     )
     return res.data
   }
 
   const createCatalog = async (
     projectId: string,
+    modelId: string,
     title: string,
     treeData: ViewerCatalogNode[] = []
   ): Promise<ViewerCatalog> => {
@@ -50,6 +58,7 @@ export function useViewerCatalogs() {
       {
         method: 'POST',
         headers: getHeaders(),
+        query: { modelId },
         body: { title, treeData }
       }
     )
@@ -58,6 +67,7 @@ export function useViewerCatalogs() {
 
   const updateCatalog = async (
     projectId: string,
+    modelId: string,
     catalogId: string,
     payload: { title?: string; treeData?: ViewerCatalogNode[] }
   ): Promise<ViewerCatalog> => {
@@ -66,6 +76,7 @@ export function useViewerCatalogs() {
       {
         method: 'PUT',
         headers: getHeaders(),
+        query: { modelId },
         body: payload
       }
     )
@@ -74,13 +85,15 @@ export function useViewerCatalogs() {
 
   const deleteCatalog = async (
     projectId: string,
+    modelId: string,
     catalogId: string
   ): Promise<void> => {
     await $fetch(
       `${config.public.apiOrigin}/api/projects/${projectId}/viewer-catalogs/${catalogId}`,
       {
         method: 'DELETE',
-        headers: getHeaders()
+        headers: getHeaders(),
+        query: { modelId }
       }
     )
   }

@@ -12,14 +12,15 @@
         :icon-left="RefreshCcw"
         hide-text
         name="deleteCatalog"
-        :disabled="!activeCatalogId || isSaving"
+        :disabled="!activeCatalogId || !currentModelId || isSaving"
         @click="onSyncCatalog"
       />
     </template>
     <div class="p-1 flex overflow-hidden items-start">
       <div class="flex-grow overflow-auto">
         <LayoutTabsHorizontal
-          v-model:active-item="activeCatalogItem"
+          v-if="catalogs.length"
+          v-model:active-item="activeCatalogTabItem"
           :items="catalogs"
         ></LayoutTabsHorizontal>
       </div>
@@ -94,7 +95,7 @@
                     class="p-1 rounded-sm text-foreground-2 hover:text-[#00b4b6] hover:bg-[#e6f7f8] transition-colors"
                     title="添加子节点"
                     :disabled="isSaving"
-                    @click.stop="openCreateChildNodeDialog(node.key)"
+                    @click.stop="openCreateChildNodeDialog(String(node.key))"
                   >
                     <Plus class="w-3.5 h-3.5" />
                   </button>
@@ -103,7 +104,7 @@
                     class="p-1 rounded-sm text-foreground-2 hover:text-danger hover:bg-danger-muted transition-colors"
                     title="删除节点"
                     :disabled="isSaving"
-                    @click.stop="onDeleteSpecificNode(node.key)"
+                    @click.stop="onDeleteSpecificNode(String(node.key))"
                   >
                     <Trash class="w-3.5 h-3.5" />
                   </button>
@@ -164,7 +165,6 @@ import {
   useInjectedViewerState,
   useInjectedViewerLoadedResources
 } from '~/lib/viewer/composables/setup'
-import { useDebouncedTextInput } from '@speckle/ui-components'
 import { useKeepAliveScrollState } from '~/lib/common/composables/dom'
 import { useFilterUtilities } from '~/lib/viewer/composables/filtering/filtering'
 import { ToastNotificationType, useGlobalToast } from '~/lib/common/composables/toast'
@@ -213,6 +213,13 @@ const { triggerNotification } = useGlobalToast()
 const dataStore = useFilteringDataStore()
 const { modelsAndVersionIds } = useInjectedViewerLoadedResources()
 const projectId = computed(() => project.value?.id)
+const currentModelId = computed(() => modelsAndVersionIds.value[0]?.model.id?.trim())
+const scopedLoadedModel = computed(() => {
+  const modelId = currentModelId.value
+  if (!modelId) return undefined
+
+  return modelsAndVersionIds.value.find(({ model }) => model.id === modelId)
+})
 const { $dtpFetch } = useNuxtApp()
 
 const isSaving = ref(false)
@@ -251,25 +258,31 @@ type DptTreeNode = {
 }
 
 const catalogs = ref<CatalogTabItem[]>([])
-const activeCatalogItem = ref<any>(undefined)
+const activeCatalogItem = ref<CatalogTabItem | undefined>(undefined)
 
-onMounted(async () => {
-  if (projectId.value) {
-    try {
-      const fetched = await fetchCatalogs(projectId.value)
-      catalogs.value = fetched.map((c) => ({
-        title: c.title,
-        id: c.id,
-        childrens: c.treeData as RawCatalogNode[]
-      }))
-      if (catalogs.value.length > 0) {
-        activeCatalogItem.value = catalogs.value[0]
-      }
-    } catch (e) {
-      console.error('Failed to load catalogs', e)
-    }
+const loadCatalogs = async () => {
+  if (!projectId.value || !currentModelId.value) {
+    catalogs.value = []
+    activeCatalogItem.value = undefined
+    return
   }
-})
+
+  try {
+    const fetched = await fetchCatalogs(projectId.value, currentModelId.value)
+    catalogs.value = fetched.map((c) => ({
+      title: c.title,
+      id: c.id,
+      childrens: c.treeData as RawCatalogNode[]
+    }))
+    activeCatalogItem.value = catalogs.value[0]
+  } catch {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '目录加载失败',
+      description: '请检查网络连接后重试'
+    })
+  }
+}
 
 const convertToDptTree = (tree: CatalogTreeSourceNode[]): DptTreeNode[] => {
   return tree.map((item) => {
@@ -302,52 +315,55 @@ const convertToDptTree = (tree: CatalogTreeSourceNode[]): DptTreeNode[] => {
 }
 
 const onSyncCatalog = async () => {
-  if (!projectId.value || isSaving.value) return
+  if (!projectId.value || !currentModelId.value || isSaving.value) return
 
   isSaving.value = true
   try {
-    const treeData = await fetchCatalogs(projectId.value)
-    const dptTree = convertToDptTree(treeData)
-    const timestamp = new Date().toISOString()
-    const catalogData = {
-      models: modelsAndVersionIds.value.flatMap(({ model, versionId }) => {
-        const loadedVersion =
-          model.loadedVersion.items.find((item) => item.id === versionId) ||
-          model.loadedVersion.items[0]
-        const seedId = loadedVersion?.seedId?.trim()
-        const name = loadedVersion?.assetName?.trim() || model.name?.trim()
-        if (!seedId || !name) return []
-
-        return [
-          {
-            model: {
-              id: seedId,
-              name,
-              timestamp
-            },
-            tree: {
-              id: projectId.value,
-              name,
-              visible: true,
-              children: dptTree
-            }
-          }
-        ]
-      })
+    const currentModel = scopedLoadedModel.value
+    if (!currentModel) {
+      throw new Error('未找到当前模型')
     }
 
-    if (!catalogData.models.length) {
+    const treeData = await fetchCatalogs(projectId.value, currentModelId.value)
+    const dptTree = convertToDptTree(treeData)
+    const timestamp = new Date().toISOString()
+    const { model, versionId } = currentModel
+    const loadedVersion =
+      model.loadedVersion.items.find((item) => item.id === versionId) ||
+      model.loadedVersion.items[0]
+    const seedId = loadedVersion?.seedId?.trim()
+    const name = loadedVersion?.assetName?.trim() || model.name?.trim()
+
+    if (!seedId || !name) {
       triggerNotification({
         type: ToastNotificationType.Danger,
         title: '同步失败',
-        description: '未找到可同步的模型 seedId'
+        description: '未找到当前模型的 seedId'
       })
       return
     }
 
+    const catalogData = {
+      models: [
+        {
+          model: {
+            id: seedId,
+            name,
+            timestamp
+          },
+          tree: {
+            id: model.id,
+            name,
+            visible: true,
+            children: dptTree
+          }
+        }
+      ]
+    }
+
     const file = new File(
       [JSON.stringify(catalogData, null, 2)],
-      `catalog-${projectId.value}-${Date.now()}.json`,
+      `catalog-${projectId.value}-${currentModelId.value}-${Date.now()}.json`,
       { type: 'application/json' }
     )
     const formData = new FormData()
@@ -361,6 +377,10 @@ const onSyncCatalog = async () => {
       method: 'POST',
       body: formData
     })
+
+    if (response?.status !== 'SUCCESS') {
+      throw new Error(response?.messages || '目录同步失败')
+    }
 
     triggerNotification({
       type: ToastNotificationType.Success,
@@ -387,7 +407,14 @@ const saveToNode = async ({
 }) => {
   const targetNodeId = selectedTreeNodeId.value
   const currentCatalogId = activeCatalogId.value
-  if (!targetNodeId || !currentCatalogId || !projectId.value || isSaving.value) return
+  if (
+    !targetNodeId ||
+    !currentCatalogId ||
+    !projectId.value ||
+    !currentModelId.value ||
+    isSaving.value
+  )
+    return
 
   const catalogIndex = catalogs.value.findIndex((item) => item.id === currentCatalogId)
   if (catalogIndex < 0) return
@@ -435,7 +462,7 @@ const saveToNode = async ({
   }
 
   try {
-    await updateCatalog(projectId.value, currentCatalogId, {
+    await updateCatalog(projectId.value, currentModelId.value, currentCatalogId, {
       treeData: result.updatedNodes as ViewerCatalogNode[]
     })
 
@@ -449,15 +476,14 @@ const saveToNode = async ({
     catalogs.value = nextCatalogs
     activeCatalogItem.value = updatedCatalog
     triggerNotification({
-      type: 'success',
+      type: ToastNotificationType.Success,
       title: '视图状态保存成功'
     })
-  } catch (e: any) {
-    console.error('Failed to update catalog node', e)
+  } catch (e: unknown) {
     triggerNotification({
-      type: 'error',
+      type: ToastNotificationType.Danger,
       title: '保存失败',
-      description: e.message || '网络连接错误'
+      description: e instanceof Error ? e.message : '网络连接错误'
     })
   } finally {
     isSaving.value = false
@@ -467,6 +493,13 @@ const saveToNode = async ({
 const activeCatalogId = computed(
   () => activeCatalogItem.value?.id || catalogs.value[0]?.id
 )
+
+const activeCatalogTabItem = computed<LayoutPageTabItem>({
+  get: () => activeCatalogItem.value || catalogs.value[0]!,
+  set: (value) => {
+    activeCatalogItem.value = value as CatalogTabItem
+  }
+})
 
 const mapCatalogChildrenToTreeNodes = (nodes: RawCatalogNode[]): CatalogTreeNode[] => {
   if (!Array.isArray(nodes)) return []
@@ -597,11 +630,16 @@ const openCreateChildNodeDialog = (parentId: string) => {
 
 const onAddCatalog = async () => {
   const title = newCatalogName.value.trim()
-  if (!title || !projectId.value || isSaving.value) return
+  if (!title || !projectId.value || !currentModelId.value || isSaving.value) return
 
   try {
     isSaving.value = true
-    const newCatalog = await createCatalog(projectId.value, title, [])
+    const newCatalog = await createCatalog(
+      projectId.value,
+      currentModelId.value,
+      title,
+      []
+    )
     const nextCatalog: CatalogTabItem = {
       id: newCatalog.id,
       title: newCatalog.title,
@@ -612,15 +650,14 @@ const onAddCatalog = async () => {
     activeCatalogItem.value = nextCatalog
     showCreateCatalogDialog.value = false
     triggerNotification({
-      type: 'success',
+      type: ToastNotificationType.Success,
       title: '目录创建成功'
     })
-  } catch (e: any) {
-    console.error('Failed to create catalog', e)
+  } catch (e: unknown) {
     triggerNotification({
-      type: 'error',
+      type: ToastNotificationType.Danger,
       title: '目录创建失败',
-      description: e.message || '请检查网络连接'
+      description: e instanceof Error ? e.message : '请检查网络连接'
     })
   } finally {
     isSaving.value = false
@@ -629,7 +666,7 @@ const onAddCatalog = async () => {
 
 const onAddNode = async () => {
   const title = newNodeName.value.trim()
-  if (!title || !projectId.value || isSaving.value) return
+  if (!title || !projectId.value || !currentModelId.value || isSaving.value) return
 
   const currentCatalogId = activeCatalogId.value
   if (!currentCatalogId) return
@@ -700,7 +737,7 @@ const onAddNode = async () => {
   }
 
   try {
-    await updateCatalog(projectId.value, currentCatalogId, {
+    await updateCatalog(projectId.value, currentModelId.value, currentCatalogId, {
       treeData: updatedNodes as ViewerCatalogNode[]
     })
 
@@ -719,15 +756,14 @@ const onAddNode = async () => {
     selectedTreeKeys.value = [nextNode.id]
 
     triggerNotification({
-      type: 'success',
+      type: ToastNotificationType.Success,
       title: '节点创建成功'
     })
-  } catch (e: any) {
-    console.error('Failed to add catalog node', e)
+  } catch (e: unknown) {
     triggerNotification({
-      type: 'error',
+      type: ToastNotificationType.Danger,
       title: '节点创建失败',
-      description: e.message || '网络或服务器错误'
+      description: e instanceof Error ? e.message : '网络或服务器错误'
     })
   } finally {
     isSaving.value = false
@@ -736,13 +772,15 @@ const onAddNode = async () => {
 
 const onDeleteCatalog = async () => {
   const currentCatalogId = activeCatalogId.value
-  if (!currentCatalogId || !projectId.value || isSaving.value) return
+  if (!currentCatalogId || !projectId.value || !currentModelId.value || isSaving.value)
+    return
 
+  // eslint-disable-next-line no-alert
   if (!window.confirm('确认要删除当前目录吗？此操作不可撤销。')) return
 
   try {
     isSaving.value = true
-    await deleteCatalog(projectId.value, currentCatalogId)
+    await deleteCatalog(projectId.value, currentModelId.value, currentCatalogId)
 
     catalogs.value = catalogs.value.filter((c) => c.id !== currentCatalogId)
     if (catalogs.value.length > 0) {
@@ -752,15 +790,14 @@ const onDeleteCatalog = async () => {
     }
 
     triggerNotification({
-      type: 'success',
+      type: ToastNotificationType.Success,
       title: '目录已删除'
     })
-  } catch (e: any) {
-    console.error('Failed to delete catalog', e)
+  } catch (e: unknown) {
     triggerNotification({
-      type: 'error',
+      type: ToastNotificationType.Danger,
       title: '删除目录失败',
-      description: e.message || '网络或服务器错误'
+      description: e instanceof Error ? e.message : '网络或服务器错误'
     })
   } finally {
     isSaving.value = false
@@ -769,8 +806,16 @@ const onDeleteCatalog = async () => {
 
 const onDeleteSpecificNode = async (nodeId: string) => {
   const currentCatalogId = activeCatalogId.value
-  if (!currentCatalogId || !nodeId || !projectId.value || isSaving.value) return
+  if (
+    !currentCatalogId ||
+    !nodeId ||
+    !projectId.value ||
+    !currentModelId.value ||
+    isSaving.value
+  )
+    return
 
+  // eslint-disable-next-line no-alert
   if (!window.confirm('确认要删除选中的节点及其所有子节点吗？此操作不可撤销。')) return
 
   const catalogIndex = catalogs.value.findIndex((item) => item.id === currentCatalogId)
@@ -816,7 +861,7 @@ const onDeleteSpecificNode = async (nodeId: string) => {
   }
 
   try {
-    await updateCatalog(projectId.value, currentCatalogId, {
+    await updateCatalog(projectId.value, currentModelId.value, currentCatalogId, {
       treeData: result.updatedNodes as ViewerCatalogNode[]
     })
 
@@ -835,18 +880,25 @@ const onDeleteSpecificNode = async (nodeId: string) => {
     }
 
     triggerNotification({
-      type: 'success',
+      type: ToastNotificationType.Success,
       title: '节点已删除'
     })
-  } catch (e: any) {
-    console.error('Failed to delete catalog node', e)
+  } catch (e: unknown) {
     triggerNotification({
-      type: 'error',
+      type: ToastNotificationType.Danger,
       title: '删除节点失败',
-      description: e.message || '网络或服务器错误'
+      description: e instanceof Error ? e.message : '网络或服务器错误'
     })
   } finally {
     isSaving.value = false
   }
 }
+
+watch(
+  [projectId, currentModelId],
+  () => {
+    loadCatalogs()
+  },
+  { immediate: true }
+)
 </script>
