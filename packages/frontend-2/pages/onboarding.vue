@@ -1,8 +1,5 @@
 <template>
   <HeaderWithEmptyPage empty-header>
-    <template #header-left>
-      <HeaderLogoBlock no-link />
-    </template>
     <template #header-right>
       <div class="flex gap-2 items-center">
         <!-- <FormButton

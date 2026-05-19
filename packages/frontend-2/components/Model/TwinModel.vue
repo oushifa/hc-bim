@@ -431,9 +431,10 @@
               <ChevronRightIcon class="w-4 h-4" />
             </button>
           </div>
-          <div class="relative" @click.stop>
-            <div
-              class="px-3 py-1 border border-[#00b4b6] rounded-[8px] text-sm text-gray-700 bg-white cursor-pointer transition-colors hover:bg-[#00b4b6]/5 flex items-center justify-between min-w-[88px]"
+          <div ref="pageSizeSelectRef" class="relative" @click.stop>
+            <button
+              type="button"
+              class="px-3 py-1 border border-[#00b4b6] rounded-[8px] text-sm text-gray-600 bg-white cursor-pointer transition-colors hover:bg-[#00b4b6]/5 flex items-center justify-between min-w-[88px]"
               @click="pageSizeDropdownOpen = !pageSizeDropdownOpen"
             >
               <span class="truncate">{{ currentPageSize }}/页</span>
@@ -441,21 +442,28 @@
                 class="w-4 h-4 text-[#00b4b6] transition-transform shrink-0 ml-2"
                 :class="pageSizeDropdownOpen ? 'rotate-180' : ''"
               />
-            </div>
-            <div
-              v-if="pageSizeDropdownOpen"
-              class="absolute right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-[8px] shadow-lg z-50 overflow-hidden min-w-[88px]"
-            >
+            </button>
+            <Transition name="fade-down">
               <div
-                v-for="size in pageSizeOptions"
-                :key="size"
-                class="px-3 py-2 text-sm cursor-pointer hover:bg-[#00b4b6]/10 transition-colors whitespace-nowrap"
-                :class="currentPageSize === size ? 'text-[#00b4b6] bg-[#00b4b6]/5 font-medium' : 'text-gray-600'"
-                @click="selectPageSize(size)"
+                v-if="pageSizeDropdownOpen"
+                class="absolute right-0 bottom-full mb-1 w-full bg-white border border-[#00b4b6] rounded-[8px] shadow-lg z-50 overflow-hidden py-1 min-w-[88px]"
               >
-                {{ size }}/页
+                <button
+                  v-for="size in pageSizeOptions"
+                  :key="size"
+                  type="button"
+                  class="w-full px-3 py-2 text-sm cursor-pointer transition-colors text-left whitespace-nowrap"
+                  :class="
+                    currentPageSize === size
+                      ? 'bg-[#00b4b6] text-white'
+                      : 'text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6]'
+                  "
+                  @click="selectPageSize(size)"
+                >
+                  {{ size }}/页
+                </button>
               </div>
-            </div>
+            </Transition>
           </div>
         </div>
       </div>
@@ -1720,18 +1728,35 @@ const handleVersionToggle = async (version: any) => {
 }
 
 // 点击外部关闭分类下拉
+let handleClickOutside: ((e: MouseEvent) => void) | null = null
+
 onMounted(async () => {
-  document.addEventListener('click', () => {
+  handleClickOutside = (e: MouseEvent) => {
     officialCategoryDropdownOpen.value = false
     openFilterDropdown.value = null
-    pageSizeDropdownOpen.value = false
-  })
+    
+    // 页大小下拉框
+    if (
+      pageSizeSelectRef.value &&
+      !pageSizeSelectRef.value.contains(e.target as Node)
+    ) {
+      pageSizeDropdownOpen.value = false
+    }
+  }
+  
+  document.addEventListener('click', handleClickOutside)
   
   // 先获取团队列表
   await fetchTeamList()
   
   // 组件挂载时自动加载用户模型数据
   await fetchUserModels()
+})
+
+onUnmounted(() => {
+  if (handleClickOutside) {
+    document.removeEventListener('click', handleClickOutside)
+  }
 })
 
 const activeTab = ref<'user' | 'official'>('user')
@@ -1974,6 +1999,7 @@ const onPageSizeChange = async () => {
 // 页大小下拉框
 const pageSizeOptions = [20, 50, 100]
 const pageSizeDropdownOpen = ref(false)
+const pageSizeSelectRef = ref<HTMLElement | null>(null)
 const selectPageSize = async (size: number) => {
   pageSizeDropdownOpen.value = false
   if (currentPageSize.value === size) return
