@@ -109,7 +109,7 @@
                 <div v-if="showWorkspaceLinks && hasMenu('/twin-scene')" class="relative">
                   <button
                     type="button"
-                    class="w-full text-left px-2.5 py-4 mb-2 rounded-[8px] flex items-center transition-colors"
+                    class="w-full text-left px-2.5 py-3.5 mb-2 rounded-[8px] flex items-center transition-colors"
                     :class="[
                       isTwinSceneSectionActive
                         ? 'bg-[#e6f7f8] text-[#00b4b6]'

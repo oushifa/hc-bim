@@ -159,7 +159,7 @@
               </template>
               <template v-else-if="models.length > 0">
                 <tr
-                  v-for="model in filteredModels"
+                  v-for="model in models"
                   :key="model.id"
                   class="hover:bg-[#fcfcfc] transition-colors cursor-pointer relative"
                   @click="openModelDetail(model)"
@@ -492,13 +492,15 @@ const fetchModels = async () => {
       {
         params: {
           search: searchQuery.value,
+          member: memberFilter.value,
+          source: sourceFilter.value,
           page: currentPage.value,
           pageSize: currentPageSize.value
         }
       }
     )
     models.value = response.data || []
-    totalRecords.value = response.total ?? models.value.length
+    totalRecords.value = response.total ?? 0
   } catch {
     error.value = '连接服务器失败'
   } finally {
@@ -515,8 +517,6 @@ const debouncedFetch = () => {
     fetchModels()
   }, 400)
 }
-
-const filteredModels = computed(() => models.value)
 
 const formatDate = (date: string) => {
   return dayjs(date).fromNow()
@@ -645,6 +645,7 @@ const toggleMemberMenu = () => {
 const selectMemberFilter = (val: string) => {
   memberFilter.value = val
   memberOpen.value = false
+  currentPage.value = 1
   fetchModels()
 }
 
@@ -655,6 +656,7 @@ const toggleSourceMenu = () => {
 const selectSourceFilter = (val: string) => {
   sourceFilter.value = val
   sourceOpen.value = false
+  currentPage.value = 1
   fetchModels()
 }
 
