@@ -289,7 +289,11 @@ const convertToDptTree = (tree: CatalogTreeSourceNode[]): DptTreeNode[] => {
     const hideObject =
       item.hiddenApplicationIds?.flatMap((applicationId): DptTreeNode[] => {
         const foundNodes = worldTree.value?.findId(applicationId) || []
-        const node = foundNodes[0]
+        let node = foundNodes[0]
+        if (!node) {
+          const foundNodes = worldTree.value?.findApplicationId(applicationId) || []
+          node = foundNodes[0]
+        }
         const raw = node?.model?.raw as
           | { applicationId?: string; name?: string }
           | undefined
@@ -366,6 +370,14 @@ const onSyncCatalog = async () => {
       `catalog-${projectId.value}-${currentModelId.value}-${Date.now()}.json`,
       { type: 'application/json' }
     )
+
+    // const downloadUrl = URL.createObjectURL(file)
+    // const downloadLink = document.createElement('a')
+    // downloadLink.href = downloadUrl
+    // downloadLink.download = file.name
+    // downloadLink.click()
+    // URL.revokeObjectURL(downloadUrl)
+
     const formData = new FormData()
     formData.append('file', file)
 
