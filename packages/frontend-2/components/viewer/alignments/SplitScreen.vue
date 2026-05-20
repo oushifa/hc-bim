@@ -47,7 +47,8 @@
           v-if="isDragging"
           class="absolute left-3 top-1/2 -translate-y-1/2 whitespace-nowrap rounded border border-outline-2 bg-foundation px-2 py-0.5 text-body-xs text-foreground shadow-md pointer-events-none"
         >
-          {{ Math.round(leftWidthPercent) }}% / {{ Math.round(100 - leftWidthPercent) }}%
+          {{ Math.round(leftWidthPercent) }}% /
+          {{ Math.round(100 - leftWidthPercent) }}%
         </div>
       </Transition>
     </div>
@@ -58,7 +59,9 @@
     >
       <Transition name="slide-down">
         <div
-          v-if="alignState.calibration.active || alignState.calibration.awaitingCompletion"
+          v-if="
+            alignState.calibration.active || alignState.calibration.awaitingCompletion
+          "
           class="absolute left-1/2 top-2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-body-xs font-medium text-amber-400 backdrop-blur-sm pointer-events-none"
         >
           <Crosshair class="h-3.5 w-3.5" />
@@ -66,19 +69,27 @@
             alignState.calibration.awaitingCompletion
               ? '三点已采集完成，请点击完成校准'
               : alignState.calibration.step === 'cad'
-              ? `第 ${Math.min(alignState.calibration.pointIndex + 1, 3)} 个点：请先点击左侧 CAD`
-              : `第 ${Math.min(alignState.calibration.pointIndex + 1, 3)} 个点：请点击右侧 BIM 对应位置`
+              ? `第 ${Math.min(
+                  alignState.calibration.pointIndex + 1,
+                  3
+                )} 个点：请先点击左侧 CAD`
+              : `第 ${Math.min(
+                  alignState.calibration.pointIndex + 1,
+                  3
+                )} 个点：请点击右侧 BIM 对应位置`
           }}
         </div>
       </Transition>
 
       <Transition name="slide-down">
         <div
-          v-if="!alignState.calibration.active && !alignState.calibration.awaitingCompletion"
+          v-if="
+            !alignState.calibration.active && !alignState.calibration.awaitingCompletion
+          "
           class="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-3 py-1 text-body-xs font-medium text-primary backdrop-blur-sm pointer-events-none"
         >
           <MapPinned class="h-3.5 w-3.5" />
-          左屏双击右聚焦，右屏双击左 marker
+          左屏双击右聚焦并刷新 marker，右屏双击左侧定位
         </div>
       </Transition>
 
@@ -403,11 +414,14 @@ const onCadCalibratePick = (point: Vector3) => {
 
 const onCadNavigatePick = (point: Vector3) => {
   if (alignState.calibration.active || alignState.calibration.awaitingCompletion) return
+  if (alignState.calibration.points.length < 3) return
+  setHighlightedCadPoint({ x: point.x, y: point.y, z: point.z })
   focusSpeckleAtPoint(transformCadToSpecklePoint(point, props.offset))
 }
 
 const onSpeckleClick = (event: MouseEvent) => {
-  if (!alignState.calibration.active || alignState.calibration.step !== 'speckle') return
+  if (!alignState.calibration.active || alignState.calibration.step !== 'speckle')
+    return
   const pickedPoint = pickSpecklePoint(event)
   if (!pickedPoint) return
 

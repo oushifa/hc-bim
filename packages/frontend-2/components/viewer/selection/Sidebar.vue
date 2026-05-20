@@ -98,8 +98,20 @@
           v-for="(object, index) in objectsLimited"
           :key="(object.id as string)"
           :object="object"
+          :custom-attributes="
+            object.applicationId
+              ? customAttributesByApplicationId[object.applicationId] || []
+              : []
+          "
+          :custom-attributes-loading="
+            object.applicationId
+              ? !!customAttributesLoadingByApplicationId[object.applicationId]
+              : false
+          "
           :root="true"
           :unfold="index === 0 && !isSmallerOrEqualSm"
+          @add-custom-attribute="openAddAttributeDialog(object)"
+          @delete-custom-attribute="onDeleteCustomAttribute(object, $event)"
         />
       </div>
       <div v-if="itemCount <= objects.length" class="mb-2">
@@ -112,12 +124,44 @@
         <p class="text-foreground-2 text-body-3xs">按住 "shift" 键可选择多个对象</p>
       </template>
     </ViewerSidebar>
+
+    <LayoutDialog
+      v-model:open="showAddAttributeDialog"
+      max-width="sm"
+      :buttons="addAttributeDialogButtons"
+    >
+      <template #header>添加自定义属性</template>
+      <div class="space-y-2">
+        <div class="text-body-xs text-foreground-2">
+          {{
+            activeAttributeTarget?.name ||
+            activeAttributeTarget?.applicationId ||
+            '当前构件'
+          }}
+        </div>
+        <FormTextInput
+          v-model="newAttributeName"
+          name="attributeName"
+          placeholder="属性名"
+          color="foundation"
+        />
+        <FormTextInput
+          v-model="newAttributeValue"
+          name="attributeValue"
+          placeholder="属性值"
+          color="foundation"
+        />
+      </div>
+    </LayoutDialog>
   </ViewerCommentsPortalOrDiv>
 </template>
 <script setup lang="ts">
 import { onKeyStroke, useBreakpoints, useEventListener } from '@vueuse/core'
 import type { CSSProperties } from 'vue'
-import { useInjectedViewerState } from '~~/lib/viewer/composables/setup'
+import {
+  useInjectedViewerLoadedResources,
+  useInjectedViewerState
+} from '~~/lib/viewer/composables/setup'
 import { getTargetObjectIds } from '~~/lib/object-sidebar/helpers'
 import { containsAll } from '~~/lib/common/helpers/utils'
 import { useSelectionUtilities } from '~~/lib/viewer/composables/ui'
@@ -127,9 +171,17 @@ import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useIsSmallerOrEqualThanBreakpoint } from '~~/composables/browser'
 import { modelRoute } from '~/lib/common/helpers/route'
 import { TailwindBreakpoints } from '~~/lib/common/helpers/tailwind'
+import { ToastNotificationType, useGlobalToast } from '~/lib/common/composables/toast'
+import { useTreeManagement } from '~/lib/viewer/composables/tree'
+import {
+  useViewerObjectCustomAttributes,
+  type ViewerObjectCustomAttribute
+} from '~/lib/viewer/composables/objectCustomAttributes'
 import type { LayoutMenuItem } from '~~/lib/layout/helpers/components'
+import type { LayoutDialogButton } from '@speckle/ui-components'
 import { Ellipsis } from 'lucide-vue-next'
 import { useEmbed } from '~/lib/viewer/composables/setup/embed'
+import type { SpeckleObject } from '~~/lib/viewer/helpers/sceneExplorer'
 
 enum ActionTypes {
   OpenInNewTab = 'open-in-new-tab'
@@ -137,15 +189,23 @@ enum ActionTypes {
 
 const {
   projectId,
+  resources: {
+    response: { resourceItems }
+  },
   viewer: {
-    metadata: { filteringState }
+    metadata: { filteringState, worldTree }
   },
   ui: { diff, measurement, threads, filters },
   urlHashState: { focusedThreadId }
 } = useInjectedViewerState()
+const { modelsAndVersionIds } = useInjectedViewerLoadedResources()
 const { objects, clearSelection } = useSelectionUtilities()
 const { hideObjects, showObjects, isolateObjects, unIsolateObjects } =
   useFilterUtilities()
+const { fetchAttributes, createAttribute, deleteAttribute } =
+  useViewerObjectCustomAttributes()
+const { getRootNodesForModel, findObjectInNodes } = useTreeManagement()
+const { triggerNotification } = useGlobalToast()
 
 const { isSmallerOrEqualSm } = useIsSmallerOrEqualThanBreakpoint()
 const breakpoints = useBreakpoints(TailwindBreakpoints)
@@ -159,8 +219,18 @@ const sidebarOpen = ref(false)
 const sidebarWidth = ref(280)
 const showSubMenu = ref(false)
 const showQuickCard = ref(false)
+const showAddAttributeDialog = ref(false)
 const quickCardContainerRef = ref<HTMLElement>()
 const quickCardPanelRef = ref<HTMLElement>()
+const activeAttributeTarget = ref<SpeckleObject | null>(null)
+const newAttributeName = ref('')
+const newAttributeValue = ref('')
+const submittingAttribute = ref(false)
+const customAttributesByApplicationId = ref<
+  Record<string, ViewerObjectCustomAttribute[]>
+>({})
+const customAttributesLoadingByApplicationId = ref<Record<string, boolean>>({})
+const modelIdByApplicationId = ref<Record<string, string>>({})
 
 const quickCardPanelPosition = ref({
   top: 0,
@@ -214,6 +284,26 @@ const quickCardFields: QuickCardField[] = [
     aliases: ['其他尺寸参数', '尺寸参数', 'otherdimensions', 'otherdimension']
   }
 ]
+
+const addAttributeDialogButtons = computed((): LayoutDialogButton[] => [
+  {
+    text: '取消',
+    props: { color: 'outline' },
+    onClick: () => {
+      showAddAttributeDialog.value = false
+    }
+  },
+  {
+    text: '添加',
+    disabled:
+      submittingAttribute.value ||
+      !newAttributeName.value.trim() ||
+      !newAttributeValue.value.trim(),
+    onClick: () => {
+      void onCreateCustomAttribute()
+    }
+  }
+])
 
 const normalizedText = (value: string) => {
   return value.toLowerCase().replace(/[\s_.:/\\()[\]{}（）-]/g, '')
@@ -364,6 +454,179 @@ const objectsUniqueByAppId = computed(() => {
   })
 })
 
+const resolveModelIdForObject = (object: SpeckleObject) => {
+  const applicationId =
+    typeof object.applicationId === 'string' ? object.applicationId.trim() : ''
+  if (!applicationId) return undefined
+
+  const cachedModelId = modelIdByApplicationId.value[applicationId]
+  if (cachedModelId) return cachedModelId
+
+  const objectId = typeof object.id === 'string' ? object.id : ''
+  if (!objectId) return undefined
+
+  for (const { model } of modelsAndVersionIds.value) {
+    const rootNodes = getRootNodesForModel(
+      model.id,
+      worldTree.value || null,
+      resourceItems.value as { objectId: string; modelId?: string }[],
+      modelsAndVersionIds.value
+    )
+
+    if (findObjectInNodes(rootNodes, objectId)) {
+      modelIdByApplicationId.value = {
+        ...modelIdByApplicationId.value,
+        [applicationId]: model.id
+      }
+      return model.id
+    }
+  }
+
+  return undefined
+}
+
+const ensureCustomAttributesLoaded = async (object: SpeckleObject) => {
+  const applicationId =
+    typeof object.applicationId === 'string' ? object.applicationId.trim() : ''
+  if (!projectId.value || !applicationId) return
+
+  const modelId = resolveModelIdForObject(object)
+  if (!modelId) return
+
+  customAttributesLoadingByApplicationId.value = {
+    ...customAttributesLoadingByApplicationId.value,
+    [applicationId]: true
+  }
+
+  try {
+    const attributes = await fetchAttributes(projectId.value, modelId, applicationId)
+    customAttributesByApplicationId.value = {
+      ...customAttributesByApplicationId.value,
+      [applicationId]: attributes
+    }
+  } catch {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '加载自定义属性失败'
+    })
+  } finally {
+    customAttributesLoadingByApplicationId.value = {
+      ...customAttributesLoadingByApplicationId.value,
+      [applicationId]: false
+    }
+  }
+}
+
+const resetAddAttributeDialog = () => {
+  newAttributeName.value = ''
+  newAttributeValue.value = ''
+  activeAttributeTarget.value = null
+}
+
+const openAddAttributeDialog = (object: SpeckleObject) => {
+  const applicationId =
+    typeof object.applicationId === 'string' ? object.applicationId.trim() : ''
+  const modelId = resolveModelIdForObject(object)
+  if (!applicationId || !modelId) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '当前构件缺少可用作用域'
+    })
+    return
+  }
+
+  activeAttributeTarget.value = object
+  newAttributeName.value = ''
+  newAttributeValue.value = ''
+  showAddAttributeDialog.value = true
+}
+
+const onCreateCustomAttribute = async () => {
+  if (!projectId.value || !activeAttributeTarget.value || submittingAttribute.value)
+    return
+
+  const applicationId =
+    typeof activeAttributeTarget.value.applicationId === 'string'
+      ? activeAttributeTarget.value.applicationId.trim()
+      : ''
+  const modelId = resolveModelIdForObject(activeAttributeTarget.value)
+  const name = newAttributeName.value.trim()
+  const value = newAttributeValue.value.trim()
+
+  if (!applicationId || !modelId || !name || !value) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '请填写完整的属性名和属性值'
+    })
+    return
+  }
+
+  try {
+    submittingAttribute.value = true
+    const attribute = await createAttribute(projectId.value, modelId, {
+      applicationId,
+      name,
+      value
+    })
+
+    customAttributesByApplicationId.value = {
+      ...customAttributesByApplicationId.value,
+      [applicationId]: [
+        ...(customAttributesByApplicationId.value[applicationId] || []),
+        attribute
+      ]
+    }
+
+    showAddAttributeDialog.value = false
+    resetAddAttributeDialog()
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '已添加自定义属性'
+    })
+  } catch {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '添加自定义属性失败'
+    })
+  } finally {
+    submittingAttribute.value = false
+  }
+}
+
+const onDeleteCustomAttribute = async (object: SpeckleObject, attributeId: string) => {
+  if (!projectId.value || !attributeId) return
+
+  const applicationId =
+    typeof object.applicationId === 'string' ? object.applicationId.trim() : ''
+  const modelId = resolveModelIdForObject(object)
+  if (!applicationId || !modelId) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '当前构件缺少可用作用域'
+    })
+    return
+  }
+
+  try {
+    await deleteAttribute(projectId.value, modelId, attributeId)
+    customAttributesByApplicationId.value = {
+      ...customAttributesByApplicationId.value,
+      [applicationId]: (
+        customAttributesByApplicationId.value[applicationId] || []
+      ).filter((attribute) => attribute.id !== attributeId)
+    }
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '已删除自定义属性'
+    })
+  } catch {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '删除自定义属性失败'
+    })
+  }
+}
+
 const shouldRenderSidebar = computed(() => {
   return (!isSmallerOrEqualSm.value || sidebarOpen.value) && !measurement.enabled.value
 })
@@ -458,6 +721,8 @@ const trackAndClearSelection = () => {
 const onClose = () => {
   sidebarOpen.value = false
   trackAndClearSelection()
+  showAddAttributeDialog.value = false
+  resetAddAttributeDialog()
 }
 
 const forceClose = () => {
@@ -495,6 +760,43 @@ watch([sidebarOpen, shouldRenderSidebar], ([isOpen, shouldRender]) => {
     showQuickCard.value = false
   }
 })
+
+watch(
+  objectsUniqueByAppId,
+  (newObjects) => {
+    const nextApplicationIds = new Set(
+      newObjects
+        .map((object) =>
+          typeof object.applicationId === 'string' ? object.applicationId.trim() : ''
+        )
+        .filter(Boolean)
+    )
+
+    customAttributesByApplicationId.value = Object.fromEntries(
+      Object.entries(customAttributesByApplicationId.value).filter(([appId]) =>
+        nextApplicationIds.has(appId)
+      )
+    )
+    customAttributesLoadingByApplicationId.value = Object.fromEntries(
+      Object.entries(customAttributesLoadingByApplicationId.value).filter(([appId]) =>
+        nextApplicationIds.has(appId)
+      )
+    )
+    modelIdByApplicationId.value = Object.fromEntries(
+      Object.entries(modelIdByApplicationId.value).filter(([appId]) =>
+        nextApplicationIds.has(appId)
+      )
+    )
+
+    for (const object of newObjects) {
+      const applicationId =
+        typeof object.applicationId === 'string' ? object.applicationId.trim() : ''
+      if (!applicationId) continue
+      void ensureCustomAttributesLoaded(object)
+    }
+  },
+  { immediate: true }
+)
 
 if (import.meta.client) {
   useEventListener(window, 'resize', () => {

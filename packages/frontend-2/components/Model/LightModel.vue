@@ -22,7 +22,9 @@
               placeholder="搜索模型..."
               :class="[
                 'w-48 border rounded-[8px] py-1.5 pl-3 pr-8 text-sm focus:outline-none focus:ring-0 focus:border-[#00b4b6] focus:bg-white text-[#333] transition-all',
-                searchQuery ? 'border-[#00b4b6] bg-white' : 'border-transparent bg-gray-50'
+                searchQuery
+                  ? 'border-[#00b4b6] bg-white'
+                  : 'border-transparent bg-gray-50'
               ]"
               @input="debouncedFetch"
             />
@@ -38,7 +40,9 @@
                 type="button"
                 :class="[
                   'w-full px-3 py-1.5 border rounded-[8px] text-sm flex items-center justify-between cursor-pointer transition-colors text-gray-600',
-                  memberFilter !== 'all' ? 'border-[#00b4b6] bg-white' : 'border-transparent bg-gray-50'
+                  memberFilter !== 'all'
+                    ? 'border-[#00b4b6] bg-white'
+                    : 'border-transparent bg-gray-50'
                 ]"
                 @click="toggleMemberMenu"
               >
@@ -80,7 +84,9 @@
                 type="button"
                 :class="[
                   'w-full px-3 py-1.5 border rounded-[8px] text-sm flex items-center justify-between cursor-pointer transition-colors text-gray-600',
-                  sourceFilter !== 'all' ? 'border-[#00b4b6] bg-white' : 'border-transparent bg-gray-50'
+                  sourceFilter !== 'all'
+                    ? 'border-[#00b4b6] bg-white'
+                    : 'border-transparent bg-gray-50'
                 ]"
                 @click="toggleSourceMenu"
               >
@@ -148,13 +154,27 @@
             <tbody class="text-sm text-[#333] divide-y divide-gray-100">
               <template v-if="loading">
                 <tr v-for="i in 5" :key="i" class="animate-pulse">
-                  <td class="px-4 py-3"><div class="h-10 w-48 bg-gray-200 rounded-lg"></div></td>
-                  <td class="px-4 py-3"><div class="h-4 w-24 bg-gray-200 rounded"></div></td>
-                  <td class="px-4 py-3"><div class="h-4 w-24 bg-gray-200 rounded"></div></td>
-                  <td class="px-4 py-3"><div class="h-4 w-12 bg-gray-200 rounded"></div></td>
-                  <td class="px-4 py-3"><div class="h-4 w-12 bg-gray-200 rounded mx-auto"></div></td>
-                  <td class="px-4 py-3"><div class="h-4 w-12 bg-gray-200 rounded mx-auto"></div></td>
-                  <td class="px-4 py-3"><div class="h-4 w-8 bg-gray-200 rounded ml-auto"></div></td>
+                  <td class="px-4 py-3">
+                    <div class="h-10 w-48 bg-gray-200 rounded-lg"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="h-4 w-24 bg-gray-200 rounded"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="h-4 w-24 bg-gray-200 rounded"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="h-4 w-12 bg-gray-200 rounded"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="h-4 w-12 bg-gray-200 rounded mx-auto"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="h-4 w-12 bg-gray-200 rounded mx-auto"></div>
+                  </td>
+                  <td class="px-4 py-3">
+                    <div class="h-4 w-8 bg-gray-200 rounded ml-auto"></div>
+                  </td>
                 </tr>
               </template>
               <template v-else-if="models.length > 0">
@@ -174,7 +194,9 @@
                         </div>
                         <CubeIcon v-else class="h-4 w-4 text-gray-400" />
                       </div>
-                      <span class="font-medium whitespace-pre-line">{{ model.title }}</span>
+                      <span class="font-medium whitespace-pre-line">
+                        {{ model.title }}
+                      </span>
                     </div>
                   </td>
                   <td class="px-4 py-3 text-gray-500">
@@ -184,11 +206,17 @@
                     {{ formatDate(model.updateTime) }}
                   </td>
                   <td class="px-4 py-3">
-                    <span v-if="model.status" class="text-red-500 text-xs">{{ model.status }}</span>
+                    <span v-if="model.status" class="text-red-500 text-xs">
+                      {{ model.status }}
+                    </span>
                     <span v-else class="text-green-600 text-xs">正常</span>
                   </td>
-                  <td class="px-4 py-3 text-center text-gray-500">{{ model.comments }}</td>
-                  <td class="px-4 py-3 text-center text-gray-500">{{ model.versions }}</td>
+                  <td class="px-4 py-3 text-center text-gray-500">
+                    {{ model.comments }}
+                  </td>
+                  <td class="px-4 py-3 text-center text-gray-500">
+                    {{ model.versions }}
+                  </td>
                   <td class="px-4 py-3 text-right relative">
                     <button
                       class="text-gray-400 hover:text-gray-600 p-1 action-menu-trigger"
@@ -203,7 +231,10 @@
                           :style="actionMenuStyle"
                           class="fixed w-40 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-[1000] overflow-hidden text-left action-menu-portal"
                         >
-                          <button class="menu-item" @click.stop="downloadModelSource(model)">
+                          <button
+                            class="menu-item"
+                            @click.stop="downloadModelSource(model)"
+                          >
                             <ArrowDownTrayIcon class="w-3.5 h-3.5" />
                             <span>导出模型数据</span>
                           </button>
@@ -372,7 +403,6 @@ import {
   PencilSquareIcon,
   TrashIcon,
   ClockIcon,
-  ChatBubbleLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ExclamationCircleIcon
@@ -382,6 +412,7 @@ import {
   GetModelUploadsDocument,
   type GetModelUploadsQuery
 } from '~~/lib/common/generated/gql/graphql'
+import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import { useApiOrigin } from '~~/composables/env'
 import { useFileDownload } from '~~/lib/core/composables/fileUpload'
@@ -470,6 +501,8 @@ const visiblePages = computed<(number | string)[]>(() => {
 const router = useRouter()
 const apollo = useApolloClient().client
 const { downloadWithAuth } = useFileDownload()
+const apiOrigin = useApiOrigin()
+const authToken = useAuthCookie()
 const { triggerNotification } = useGlobalToast()
 
 const memberOptions = [
@@ -531,6 +564,53 @@ const openUploadsDialog = (model: Model) => {
   uploadsDialogOpen.value = true
 }
 
+const downloadCustomAttributesExcel = async (model: Model) => {
+  const response = await fetch(
+    `${apiOrigin}/api/v1/projects/${model.projectId}/models/${model.id}/custom-attributes-excel`,
+    {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: authToken.value
+        ? {
+            Authorization: `Bearer ${authToken.value}`
+          }
+        : undefined
+    }
+  )
+
+  if (!response.ok) {
+    let message = `导出自定义属性失败 (${response.status})`
+    try {
+      const body = (await response.json()) as {
+        message?: string
+        statusMessage?: string
+      }
+      if (body.message) message = body.message
+      else if (body.statusMessage) message = body.statusMessage
+    } catch {
+      // ignore non-json body
+    }
+    throw new Error(message)
+  }
+
+  const blob = await response.blob()
+  const disposition = response.headers.get('content-disposition') || ''
+  const fileNameMatch =
+    disposition.match(/filename\*=UTF-8''([^;]+)/i) ||
+    disposition.match(/filename="?([^"]+)"?/i)
+  const fileName = fileNameMatch?.[1]
+    ? decodeURIComponent(fileNameMatch[1])
+    : `${(model.title || model.id).trim() || model.id}-自定义属性.xlsx`
+  const objectUrl = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = fileName
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+  URL.revokeObjectURL(objectUrl)
+}
+
 const downloadModelSource = async (model: Model) => {
   closeActionMenu()
 
@@ -567,6 +647,7 @@ const downloadModelSource = async (model: Model) => {
           fileName: upload.fileName,
           projectId: model.projectId
         })
+        await downloadCustomAttributesExcel(model)
         return
       }
     } catch (e) {
@@ -583,6 +664,15 @@ const downloadModelSource = async (model: Model) => {
       title: '暂无可下载源文件',
       description: '该模型当前没有可下载的源文件。'
     })
+    try {
+      await downloadCustomAttributesExcel(model)
+    } catch (e) {
+      triggerNotification({
+        type: ToastNotificationType.Danger,
+        title: '自定义属性导出失败',
+        description: ensureError(e).message
+      })
+    }
     return
   }
 
@@ -592,6 +682,7 @@ const downloadModelSource = async (model: Model) => {
       fileName: model.sourceFileName,
       projectId: model.projectId
     })
+    await downloadCustomAttributesExcel(model)
   } catch (e) {
     triggerNotification({
       type: ToastNotificationType.Danger,
@@ -685,15 +776,15 @@ const handleClickOutside = (e: MouseEvent) => {
   if (sourceSelectRef.value && !sourceSelectRef.value.contains(e.target as Node)) {
     sourceOpen.value = false
   }
-  if (
-    pageSizeSelectRef.value &&
-    !pageSizeSelectRef.value.contains(e.target as Node)
-  ) {
+  if (pageSizeSelectRef.value && !pageSizeSelectRef.value.contains(e.target as Node)) {
     pageSizeDropdownOpen.value = false
   }
   if (activeActionMenu.value) {
     const target = e.target as HTMLElement
-    if (!target.closest('.action-menu-portal') && !target.closest('.action-menu-trigger')) {
+    if (
+      !target.closest('.action-menu-portal') &&
+      !target.closest('.action-menu-trigger')
+    ) {
       closeActionMenu()
     }
   }

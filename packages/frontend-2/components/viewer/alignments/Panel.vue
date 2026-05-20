@@ -210,7 +210,7 @@
           </div>
 
           <div class="rounded-lg border border-dashed border-outline-2 bg-foundation-2 px-3 py-3 text-body-3xs text-foreground-3">
-            校准后左屏双击可驱动右屏聚焦，右屏双击会在左屏显示定位 marker。
+            校准后双击左屏会同步右屏聚焦并刷新左侧 marker，双击右屏会在左屏显示定位 marker。
           </div>
 
           <div class="flex flex-wrap gap-2">
@@ -592,7 +592,7 @@ const handleSubmit = async () => {
       description: null,
       drawingId: editorForm.drawingId,
       drawingName: drawing?.fileName || null,
-      splitRatio: 0.5,
+      splitRatio: state.splitRatio,
       calibrationPoints: state.calibration.points,
       transform: { ...state.offset },
       sectionBox: getCurrentSectionBoxSnapshot() || cloneSectionBox(editorForm.sectionBox),

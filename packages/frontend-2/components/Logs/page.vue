@@ -280,8 +280,16 @@ const getDisplayUserName = (event: RawLogEvent) => {
   )
 }
 
-const toModelLogItem = (event: RawLogEvent, index: number): ModelLogItem => {
+const getModelActionLabel = (event: RawLogEvent) => {
   const action = event.what?.action || event.action || '-'
+  if (action === 'model.upload.dtp') {
+    return event.result?.status === 'fail' ? '模型上传失败' : '模型上传成功'
+  }
+  return action
+}
+
+const toModelLogItem = (event: RawLogEvent, index: number): ModelLogItem => {
+  const action = getModelActionLabel(event)
   const payload = asRecord(event.what?.payloadSummary)
   const metadata = asRecord(event.metadata)
 
@@ -291,13 +299,16 @@ const toModelLogItem = (event: RawLogEvent, index: number): ModelLogItem => {
     user: getDisplayUserName(event),
     action,
     target: String(
-      event.what?.targetId ||
+      payload.target ||
+        payload.assetName ||
+        payload.fileName ||
+        event.what?.targetId ||
         payload.targetId ||
         payload.target ||
         metadata.target ||
         '-'
     ),
-    version: String(payload.version || metadata.version || '-'),
+    version: String(payload.version || payload.versionId || metadata.version || '-'),
     ip: event.who?.ip || '-'
   }
 }

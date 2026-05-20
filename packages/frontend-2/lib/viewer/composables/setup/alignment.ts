@@ -150,7 +150,7 @@ export function useAlignmentState() {
     cancelCalibration()
     alignmentState.activeConfigId = config?.id || null
     alignmentState.activeDrawingId = config?.drawingId || null
-    alignmentState.splitRatio = 0.5
+    alignmentState.splitRatio = config?.splitRatio ?? 0.5
     alignmentState.highlightedCadPoint = getDefaultHighlightedCadPoint(config)
     alignmentState.cadCameraState = config?.cameraState?.cad || null
     alignmentState.speckleCameraState = config?.cameraState?.speckle || null

@@ -50,6 +50,8 @@ type PendingDtpModelUploadRecord = {
   assetName?: string
   status: 'pending' | 'uploading' | 'uploaded' | 'synced' | 'error'
   error?: string
+  uploadSuccessLogged?: boolean
+  uploadFailureLogged?: boolean
   updatedAt: string
 }
 
@@ -183,6 +185,7 @@ export const useDtpModelUpload = () => {
   const apollo = useApolloClient().client
   const { $dtpFetch } = useNuxtApp()
   const logger = useLogger()
+  const { track } = useLog()
   const { triggerNotification } = useGlobalToast()
   const { activeUser } = useActiveUser()
   const dtpFetch = $dtpFetch as <T = unknown>(
@@ -225,6 +228,65 @@ export const useDtpModelUpload = () => {
     level: 'info' | 'warn' | 'error' = 'info'
   ) => {
     logger[level](`[DTP Model Sync] ${message}`, payload || {})
+  }
+
+  const trackModelUploadEvent = (
+    fileUploadId: string,
+    input: {
+      status: 'success' | 'fail'
+      message?: string
+      projectId?: string
+      modelId?: string
+      versionId?: string
+      fileName?: string
+      assetId?: string
+      seedId?: string
+      assetName?: string
+    }
+  ) => {
+    const record = getRecord(fileUploadId)
+    if (input.status === 'success' && record?.uploadSuccessLogged) return
+    if (input.status === 'fail' && record?.uploadFailureLogged) return
+
+    const fileName = input.fileName || record?.fileName || ''
+    const assetName = input.assetName || record?.assetName || buildAssetName(fileName)
+    const versionId = input.versionId || record?.versionId || null
+    const projectId = input.projectId || record?.projectId || null
+    const modelId = input.modelId || record?.modelId || null
+
+    track({
+      what: {
+        action: 'model.upload.dtp',
+        targetType: 'model',
+        targetId: modelId || fileUploadId,
+        payloadSummary: {
+          fileUploadId,
+          fileName: fileName || null,
+          target: assetName || fileName || fileUploadId,
+          version: versionId,
+          assetId: input.assetId || record?.assetId || null,
+          seedId: input.seedId || record?.seedId || null,
+          assetName: assetName || null
+        }
+      },
+      result: {
+        status: input.status,
+        message: input.message || null
+      },
+      metadata: {
+        projectId,
+        modelId,
+        version: versionId,
+        service: 'dtp-model-upload'
+      }
+    })
+
+    patchRecord(
+      fileUploadId,
+      input.status === 'success'
+        ? { uploadSuccessLogged: true }
+        : { uploadFailureLogged: true }
+    )
   }
 
   const upsertRecord = (
@@ -483,6 +545,16 @@ export const useDtpModelUpload = () => {
       assetName: finalResult.assetName,
       status: 'uploaded',
       error: undefined
+    })
+
+    trackModelUploadEvent(fileUploadId, {
+      status: 'success',
+      projectId,
+      modelId,
+      fileName: file.name,
+      assetId: finalResult.assetId,
+      seedId: finalResult.seedId,
+      assetName: finalResult.assetName
     })
 
     logSyncDebug('中海上传结果已写入本地待同步记录', {
@@ -791,6 +863,14 @@ export const useDtpModelUpload = () => {
         error: message
       })
 
+      trackModelUploadEvent(params.fileUploadId, {
+        status: 'fail',
+        message,
+        projectId: params.projectId,
+        modelId: params.modelId,
+        fileName: params.file.name
+      })
+
       logSyncDebug(
         '中海同步任务失败',
         {
@@ -832,6 +912,15 @@ export const useDtpModelUpload = () => {
       patchRecord(params.fileUploadId, {
         status: 'error',
         error: message
+      })
+
+      trackModelUploadEvent(params.fileUploadId, {
+        status: 'fail',
+        message,
+        projectId: params.projectId,
+        modelId: params.modelId,
+        versionId: params.versionId,
+        fileName: params.file.name
       })
 
       logSyncDebug(

@@ -177,7 +177,11 @@ const state = useInjectedViewerState()
 const resourceIdString = computed(() => state.resources.request.resourceIdString.value)
 
 // Alignment / split-screen state
-const { state: alignState, setSplitRatio: alignSetSplitRatio } = useAlignmentState()
+const {
+  state: alignState,
+  setSplitRatio: alignSetSplitRatio,
+  disableSplitScreen
+} = useAlignmentState()
 
 const {
   isEnabled: isEmbedEnabled,
@@ -289,6 +293,12 @@ onMounted(() => {
 
   if (isEmbedEnabled.value && shouldTrackEvent) {
     mp.track('Embedded Model Load')
+  }
+})
+
+onBeforeUnmount(() => {
+  if (alignState.splitScreenEnabled) {
+    disableSplitScreen()
   }
 })
 

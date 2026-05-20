@@ -101,6 +101,18 @@ type GeneratedSyncPayloadResponse = {
   payload: SyncFlatPayload
 }
 
+type ViewerObjectCustomAttribute = {
+  id: string
+  projectId: string
+  modelId: string
+  applicationId: string
+  authorId: string | null
+  name: string
+  value: string
+  createdAt: string
+  updatedAt: string
+}
+
 type VersionExternalIds = Partial<{
   seedId: string
   assetId: string
@@ -528,6 +540,73 @@ export const useWorkbenchUploadSync = () => {
     }
   }
 
+  const fetchModelCustomAttributes = async (params: {
+    projectId: string
+    modelId: string
+  }): Promise<ViewerObjectCustomAttribute[]> => {
+    try {
+      const response = await $fetch<{ data: ViewerObjectCustomAttribute[] }>(
+        `${apiOrigin}/api/projects/${params.projectId}/viewer-object-custom-attributes`,
+        {
+          method: 'GET',
+          credentials: 'same-origin',
+          headers: authToken.value
+            ? { Authorization: `Bearer ${authToken.value}` }
+            : undefined,
+          query: {
+            modelId: params.modelId
+          }
+        }
+      )
+
+      return response.data
+    } catch (error) {
+      const fetchError = error as FetchError<{ error?: string }>
+      const message =
+        fetchError.data?.error ||
+        (typeof fetchError.statusCode === 'number'
+          ? `加载模型自定义属性失败 (${fetchError.statusCode})`
+          : '加载模型自定义属性失败')
+      throw new Error(message)
+    }
+  }
+
+  const mergeCustomAttributesIntoPayload = (
+    payload: SyncFlatPayload,
+    customAttributes: ViewerObjectCustomAttribute[]
+  ): SyncFlatPayload => {
+    if (!customAttributes.length) return payload
+
+    const groupedAttributes = new Map<string, Record<string, string>>()
+    for (const attribute of customAttributes) {
+      const applicationId = attribute.applicationId?.trim()
+      const name = attribute.name?.trim()
+      if (!applicationId || !name) continue
+
+      const current = groupedAttributes.get(applicationId) || {}
+      current[name] = attribute.value
+      groupedAttributes.set(applicationId, current)
+    }
+
+    if (!groupedAttributes.size) return payload
+
+    return {
+      ...payload,
+      elements: payload.elements.map((element) => {
+        const customParameters = groupedAttributes.get(element.id)
+        if (!customParameters) return element
+
+        return {
+          ...element,
+          parameters: {
+            ...element.parameters,
+            ...customParameters
+          }
+        }
+      })
+    }
+  }
+
   const uploadSyncPayload = async (payload: SyncFlatPayload, fileName: string) => {
     await ensureDtpToken()
 
@@ -693,11 +772,17 @@ export const useWorkbenchUploadSync = () => {
     modelId: string
     markTreeJsonDone?: boolean
   }) => {
-    const generated = await fetchGeneratedSyncPayload({
-      projectId: params.projectId,
-      modelId: params.modelId
-    })
-    const payload = generated.payload
+    const [generated, customAttributes] = await Promise.all([
+      fetchGeneratedSyncPayload({
+        projectId: params.projectId,
+        modelId: params.modelId
+      }),
+      fetchModelCustomAttributes({
+        projectId: params.projectId,
+        modelId: params.modelId
+      })
+    ])
+    const payload = mergeCustomAttributesIntoPayload(generated.payload, customAttributes)
 
     if (!payload.elements.length) {
       throw new Error(

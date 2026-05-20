@@ -18,7 +18,9 @@
         <IconTriangle
           :class="`h-3 w-3 shrink-0 ${headerClasses} ${unfold ? 'rotate-90' : ''}`"
         />
-        <div :class="`truncate text-body-3xs font-medium ${headerClasses}`">
+        <div
+          :class="`truncate w-full overflow-hidden text-body-3xs font-medium ${headerClasses}`"
+        >
           <!-- @vue-ignore -->
           {{
             REVIT_PROPERTY_NAME_ZH_MAP[title] ||
@@ -35,6 +37,59 @@
       </button>
     </div>
     <div v-if="unfold" class="space-y-1 pl-0 py-1 pr-2">
+      <div v-if="props.root" class="space-y-1 pb-1">
+        <div
+          class="pl-2 text-body-3xs font-medium text-foreground-2 flex justify-between"
+        >
+          <span>自定义属性</span>
+          <FormButton
+            v-if="props.root"
+            v-tippy="'添加自定义属性'"
+            size="sm"
+            :icon-left="Plus"
+            hide-text
+            name="deleteCatalog"
+            @click.stop="emit('add-custom-attribute')"
+          />
+        </div>
+        <div
+          v-if="props.customAttributesLoading"
+          class="pl-2 text-body-3xs text-foreground-2"
+        >
+          加载中...
+        </div>
+        <template v-else-if="props.customAttributes.length">
+          <div
+            v-for="attribute in props.customAttributes"
+            :key="attribute.id"
+            class="grid grid-cols-3 pl-2"
+          >
+            <div
+              class="col-span-1 truncate text-body-3xs font-medium text-foreground-2"
+              :title="attribute.name"
+            >
+              {{ attribute.name }}
+            </div>
+            <div
+              class="col-span-2 flex min-w-0 items-center gap-1 pl-1 text-body-3xs text-foreground"
+            >
+              <span class="flex-grow truncate" :title="attribute.value">
+                {{ attribute.value }}
+              </span>
+              <FormButton
+                v-tippy="'删除自定义属性'"
+                size="sm"
+                color="subtle"
+                :icon-left="Trash2"
+                hide-text
+                name="deleteCustomAttribute"
+                @click.stop="emit('delete-custom-attribute', attribute.id)"
+              />
+            </div>
+          </div>
+        </template>
+        <div v-else class="pl-2 text-body-3xs text-foreground-2">暂无自定义属性</div>
+      </div>
       <!-- key value pair display -->
       <ViewerSelectionKeyValuePair
         v-for="(kvp, index) in [
@@ -105,7 +160,9 @@ import { getHeaderAndSubheaderForSpeckleObject } from '~~/lib/object-sidebar/hel
 import { useInjectedViewerState } from '~~/lib/viewer/composables/setup'
 import { useHighlightedObjectsUtilities } from '~/lib/viewer/composables/ui'
 import type { KeyValuePair } from '~/components/viewer/selection/types'
+import type { ViewerObjectCustomAttribute } from '~/lib/viewer/composables/objectCustomAttributes'
 import { REVIT_PROPERTY_NAME_ZH_MAP } from '~/lib/viewer/helpers/filters/constants'
+import { Plus, Trash2 } from 'lucide-vue-next'
 
 const {
   ui: {
@@ -116,6 +173,8 @@ const {
 const props = withDefaults(
   defineProps<{
     object: SpeckleObject
+    customAttributes?: ViewerObjectCustomAttribute[]
+    customAttributesLoading?: boolean
     root?: boolean
     title?: string
     unfold?: boolean
@@ -123,8 +182,20 @@ const props = withDefaults(
     modifiedSibling?: boolean
     parentPath?: string
   }>(),
-  { debug: false, unfold: false, root: false, modifiedSibling: false }
+  {
+    debug: false,
+    unfold: false,
+    root: false,
+    modifiedSibling: false,
+    customAttributes: () => [],
+    customAttributesLoading: false
+  }
 )
+
+const emit = defineEmits<{
+  (e: 'add-custom-attribute'): void
+  (e: 'delete-custom-attribute', attributeId: string): void
+}>()
 
 const { highlightObjects, unhighlightObjects } = useHighlightedObjectsUtilities()
 const unfold = ref(props.unfold)
