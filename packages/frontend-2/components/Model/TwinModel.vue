@@ -339,14 +339,6 @@
 
               <td class="py-4 px-4 text-sm space-x-3">
                 <template v-if="activeTab === 'user'">
-                  <div v-if="hasModelOp('canFile')" class="relative inline-block">
-                    <button
-                      class="text-[#00b4b6] hover:underline cursor-pointer"
-                      @click="showOffshelfPopover(model.id, $event)"
-                    >
-                      {{ (model as UserModel).published ? '下架' : '上架' }}
-                    </button>
-                  </div>
                   <button
                     v-if="hasModelOp('canEdit')"
                     class="text-[#00b4b6] hover:underline"

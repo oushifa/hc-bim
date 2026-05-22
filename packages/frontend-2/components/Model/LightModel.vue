@@ -254,14 +254,6 @@
                             <ClockIcon class="w-3.5 h-3.5" />
                             <span>历史版本</span>
                           </button>
-                          <button
-                            v-if="hasModelOp('canFile')"
-                            class="menu-item text-red-500 hover:!bg-red-50"
-                            @click.stop="closeActionMenu"
-                          >
-                            <TrashIcon class="w-3.5 h-3.5" />
-                            <span>删除</span>
-                          </button>
                         </div>
                       </Transition>
                     </Teleport>
