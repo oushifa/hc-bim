@@ -205,11 +205,11 @@
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="bg-[#f8f9fa] text-gray-500 text-sm border-b border-gray-200">
-                  <th class="px-4 py-3 font-medium">模型名称</th>
-                  <th class="px-4 py-3 font-medium">更新时间</th>
+                  <th class="px-4 py-3 font-medium text-left min-w-[200px]">模型名称</th>
+                  <th class="px-4 py-3 font-medium text-left w-[200px]">更新时间</th>
                   <!-- <th class="px-4 py-3 font-medium text-center">seedId</th> -->
-                  <th class="px-4 py-3 font-medium text-center">版本数</th>
-                  <th class="px-4 py-3 font-medium text-right">操作</th>
+                  <th class="px-4 py-3 font-medium text-left w-[150px]">版本数</th>
+                  <th class="px-4 py-3 font-medium text-left w-[250px]">操作</th>
                 </tr>
               </thead>
               <tbody class="text-sm text-[#333] divide-y divide-gray-100">
@@ -233,18 +233,18 @@
                       </span>
                     </div>
                   </td>
-                  <td class="px-4 py-3 text-gray-500">
+                  <td class="px-4 py-3 text-left text-gray-500">
                     {{ formatDate(model.updatedAt) }}
                   </td>
                   <!-- <td class="px-4 py-3 text-center text-gray-500">
                     {{ JSON.stringify(model.raw.lastVersion?.items?.[0] || '{}') }}
                   </td> -->
-                  <td class="px-4 py-3 text-center text-gray-500">
+                  <td class="px-4 py-3 text-left text-gray-500">
                     {{ model.versionsCount || 0 }}
                   </td>
-                  <td class="px-4 py-3 text-right">
+                  <td class="px-4 py-3 text-left">
                     <div
-                      class="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                      class="flex items-center justify-start space-x-2"
                     >
                       <button
                         title="查看"
@@ -260,7 +260,7 @@
                         <ClockIcon class="h-4 w-4" />
                       </button>
                       <button
-                        v-if="model.raw.permissions.canCreateVersion.authorized"
+                        v-if="model.raw.permissions.canCreateVersion.authorized && hasModelOp('canEdit')"
                         title="上传新版本"
                         class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
                         @click.stop="triggerVersionUploadPicker(model)"
@@ -331,6 +331,13 @@
                         class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
                       >
                         <ArrowDownTrayIcon class="h-4 w-4" />
+                      </button>
+                      <button
+                        title="删除"
+                        class="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                        @click.stop="handleDeleteModel(model)"
+                      >
+                        <TrashIcon class="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -453,7 +460,8 @@ import {
   ArrowDownTrayIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  FolderIcon
+  FolderIcon,
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 import { useApolloClient, useQuery } from '@vue/apollo-composable'
 import type {
@@ -705,7 +713,7 @@ const uploadProject = computed(
       name?: string
     }) || null
 )
-const canUploadModel = computed(() => isLoggedIn.value)
+const canUploadModel = computed(() => isLoggedIn.value && hasModelOp('canUpload'))
 
 const projectFoldersByParentQuery = gql`
   query WorkbenchProjectFoldersByParent($projectId: String!, $parentId: String) {
@@ -1661,6 +1669,12 @@ const activeDirName = computed(() => {
 
 const openModel = (model: ModelListItem) => {
   router.push(getModelItemRoute(model.raw))
+}
+
+// 删除模型（仅前端处理，不调用接口）
+const handleDeleteModel = (model: ModelListItem) => {
+  // TODO: 实现删除逻辑
+  console.log('删除模型:', model.name, model.id)
 }
 
 const formatDate = (dateStr: string) => {

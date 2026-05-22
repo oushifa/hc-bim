@@ -9,25 +9,20 @@
 
     <template #actions>
       <div class="flex items-center gap-1">
-        <template v-if="state.editorOpen">
-          <button class="panel-btn" @click="closeSettingsPanel">返回</button>
-        </template>
-        <template v-else>
-          <FormButton
-            size="sm"
-            color="subtle"
-            :icon-left="RefreshCw"
-            hide-text
-            @click="loadLists"
-          />
-          <FormButton
-            size="sm"
-            color="primary"
-            :icon-left="Plus"
-            hide-text
-            @click="openCreateDialog"
-          />
-        </template>
+        <FormButton
+          size="sm"
+          color="subtle"
+          :icon-left="RefreshCw"
+          hide-text
+          @click="loadLists"
+        />
+        <FormButton
+          size="sm"
+          color="primary"
+          :icon-left="Plus"
+          hide-text
+          @click="openCreateDialog"
+        />
       </div>
     </template>
 
@@ -84,7 +79,7 @@
                 </div>
               </div>
               <span
-                class="rounded-full px-2 py-0.5 text-body-3xs"
+                class="rounded-full px-2 py-0.5 text-body-3xs whitespace-nowrap"
                 :class="
                   item.calibrationPoints.length >= 3
                     ? 'bg-emerald-500/15 text-emerald-300'
@@ -116,6 +111,12 @@
           <div class="section-header">
             <Info class="h-3.5 w-3.5" />
             配置信息
+            <button
+              class="ml-auto flex items-center gap-1 rounded-lg border border-outline-2 bg-foundation-2 px-2 py-1 text-body-xs text-foreground transition-colors hover:bg-foundation"
+              @click="closeSettingsPanel"
+            >
+              <ArrowLeft class="h-3.5 w-3.5" />
+            </button>
           </div>
 
           <label class="flex flex-col gap-1.5">
@@ -135,7 +136,7 @@
                   {{ selectedDrawingLabel }}
                 </div>
               </div>
-              <button class="panel-btn" @click="filePickerOpen = true">文件列表</button>
+              <button class="panel-btn whitespace-nowrap" @click="filePickerOpen = true">文件列表</button>
             </div>
           </div>
 
@@ -245,22 +246,26 @@
             <div v-if="!state.drawings.length" class="rounded-lg border border-dashed border-outline-2 px-3 py-4 text-center text-body-xs text-foreground-3">
               还没有已上传文件
             </div>
-            <button
-              v-for="drawing in state.drawings"
-              :key="drawing.id"
-              class="mb-2 w-full rounded-xl border px-3 py-3 text-left transition-colors"
-              :class="
-                drawing.id === editorForm.drawingId
-                  ? 'border-primary bg-primary/10'
-                  : 'border-outline-2 bg-foundation-2 hover:bg-foundation'
-              "
-              @click="selectDrawing(drawing.id)"
-            >
-              <div class="text-body-sm text-foreground">{{ drawing.fileName }}</div>
-              <div class="mt-1 text-body-3xs text-foreground-3">
-                {{ formatFileSize(drawing.fileSize) }}
-              </div>
-            </button>
+            <div class="flex flex-col gap-2">
+              <button
+                v-for="drawing in state.drawings"
+                :key="drawing.id"
+                class="rounded-xl border px-3 py-3 text-left transition-colors w-full"
+                :class="
+                  drawing.id === editorForm.drawingId
+                    ? 'border-primary bg-primary/10'
+                    : 'border-outline-2 bg-foundation-2 hover:bg-foundation'
+                "
+                @click="selectDrawing(drawing.id)"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <div class="truncate text-body-sm text-foreground" :title="drawing.fileName">{{ drawing.fileName }}</div>
+                  <div class="text-body-3xs text-foreground-3 whitespace-nowrap flex-shrink-0">
+                    {{ formatFileSize(drawing.fileSize) }}
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
 
           <div class="flex items-center justify-between gap-2 border-t border-outline-2 px-4 py-3">
@@ -289,7 +294,8 @@ import {
   RefreshCw,
   Plus,
   List,
-  Info
+  Info,
+  ArrowLeft
 } from 'lucide-vue-next'
 import { CameraController, SectionTool } from '@speckle/viewer'
 import type {

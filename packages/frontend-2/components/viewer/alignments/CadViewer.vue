@@ -56,46 +56,42 @@
 
     <!-- Top toolbar -->
     <div class="absolute top-2 left-2 right-2 flex items-center gap-2 z-10">
-      <div
+      <!-- <div
         class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-body-xs font-medium bg-foundation/90 border border-outline-2 text-foreground backdrop-blur-sm shadow-sm"
       >
         <Upload class="w-3.5 h-3.5" />
         {{ drawingLabel }}
-      </div>
+      </div> -->
 
-      <!-- Fit view -->
-      <button
+      <!-- <button
         v-if="hasModel"
         class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-body-xs font-medium bg-foundation/90 hover:bg-foundation border border-outline-2 text-foreground transition-colors backdrop-blur-sm shadow-sm"
         @click="fitToModel"
       >
         <Maximize2 class="w-3.5 h-3.5" />
         适应视图
-      </button>
+      </button> -->
 
-      <!-- Clear model -->
-      <button
+      <!-- <button
         v-if="hasModel"
         class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-body-xs font-medium bg-foundation/90 hover:bg-foundation border border-outline-2 text-foreground transition-colors backdrop-blur-sm shadow-sm"
         @click="clearModel"
       >
         <Trash2 class="w-3.5 h-3.5" />
         清除
-      </button>
-
-      <div class="flex-1" />
-
-      <!-- Calibration mode indicator -->
-      <Transition name="slide-in-right">
-        <div
-          v-if="calibrateMode"
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-body-xs font-medium bg-amber-500/20 border border-amber-500/50 text-amber-400 backdrop-blur-sm"
-        >
-          <Crosshair class="w-3.5 h-3.5 animate-pulse" />
-          校准模式 — 请点击特征点
-        </div>
-      </Transition>
+      </button> -->
     </div>
+
+    <!-- Calibration mode indicator - centered at top -->
+    <Transition name="slide-in-right">
+      <div
+        v-if="calibrateMode"
+        class="absolute top-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] text-body-xs font-medium bg-amber-500/20 border border-amber-500/50 text-amber-400 backdrop-blur-sm z-10"
+      >
+        <Crosshair class="w-3.5 h-3.5 animate-pulse" />
+        校准模式 — 请点击特征点
+      </div>
+    </Transition>
 
     <!-- Camera sync status badge -->
     <Transition name="slide-down">

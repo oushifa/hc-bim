@@ -3,7 +3,7 @@
   <div
     ref="containerEl"
     class="split-screen-root fixed inset-0 flex overflow-hidden pointer-events-none"
-    style="z-index: 20"
+    :style="{ zIndex: 20, left: leftMenuWidth + 'px', width: `calc(100vw - ${leftMenuWidth}px)` }"
   >
     <div
       class="cad-pane relative h-full flex-shrink-0 overflow-hidden pointer-events-auto"
@@ -163,6 +163,9 @@ const isDragging = ref(false)
 const speckleCalibrationMarkers = ref<
   Array<{ key: string; index: 1 | 2 | 3; x: number; y: number }>
 >([])
+
+// Left menu width (from Left.vue)
+const leftMenuWidth = 316
 
 let projectionFrameId: number | null = null
 

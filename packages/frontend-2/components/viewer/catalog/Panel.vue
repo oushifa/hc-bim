@@ -18,11 +18,45 @@
     </template>
     <div class="p-1 flex overflow-hidden items-start">
       <div class="flex-grow overflow-auto">
-        <LayoutTabsHorizontal
-          v-if="catalogs.length"
-          v-model:active-item="activeCatalogTabItem"
-          :items="catalogs"
-        ></LayoutTabsHorizontal>
+        <div v-if="catalogs.length" class="flex items-center gap-1">
+          <LayoutTabsHorizontal
+            v-model:active-item="activeCatalogTabItem"
+            :items="catalogs"
+          ></LayoutTabsHorizontal>
+          <!-- 当前激活Tab的三点菜单 -->
+          <div v-if="activeCatalogId" class="relative flex-shrink-0" ref="tabMenuContainer">
+            <button
+              type="button"
+              class="p-1 rounded hover:bg-bg-2 text-foreground-2 hover:text-foreground-1 transition-colors"
+              @click="showTabMenu = !showTabMenu"
+            >
+              <EllipsisHorizontalIcon class="w-4 h-4" />
+            </button>
+            
+            <!-- 下拉菜单 -->
+            <div
+              v-if="showTabMenu"
+              class="absolute right-0 top-full mt-1 w-40 bg-foundation border border-outline-3 rounded shadow-lg z-50"
+            >
+              <button
+                type="button"
+                class="w-full px-3 py-2 text-left text-body-xs hover:bg-bg-2 flex items-center gap-2 transition-colors"
+                @click="openRenameCatalogDialog"
+              >
+                <PencilIcon class="w-3.5 h-3.5" />
+                <span>重命名</span>
+              </button>
+              <button
+                type="button"
+                class="w-full px-3 py-2 text-left text-body-xs hover:bg-bg-2 text-danger flex items-center gap-2 transition-colors"
+                @click="onDeleteCatalog"
+              >
+                <Trash class="w-3.5 h-3.5" />
+                <span>删除</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="flex-shrink-0">
         <div class="flex items-center gap-0.5">
@@ -39,16 +73,6 @@
               name="addCatalog"
               :disabled="isSaving"
               @click="openCreateCatalogDialog"
-            />
-            <FormButton
-              v-tippy="getTooltipProps('删除当前目录')"
-              size="sm"
-              color="danger"
-              :icon-left="Trash"
-              hide-text
-              name="deleteCatalog"
-              :disabled="!activeCatalogId || isSaving"
-              @click="onDeleteCatalog"
             />
           </div>
         </div>
@@ -141,6 +165,23 @@
     </LayoutDialog>
 
     <LayoutDialog
+      v-model:open="showRenameCatalogDialog"
+      max-width="sm"
+      :buttons="renameCatalogDialogButtons"
+    >
+      <template #header>重命名目录</template>
+      <div class="space-y-2">
+        <div class="text-body-xs text-foreground-2">请输入新的目录名称</div>
+        <FormTextInput
+          v-model="renameCatalogName"
+          name="renameCatalogName"
+          placeholder="目录名称"
+          color="foundation"
+        />
+      </div>
+    </LayoutDialog>
+
+    <LayoutDialog
       v-model:open="showCreateNodeDialog"
       max-width="sm"
       :buttons="createNodeDialogButtons"
@@ -159,7 +200,8 @@
   </ViewerLayoutSidePanel>
 </template>
 <script setup lang="ts">
-import { Plus, Trash, RefreshCcw } from 'lucide-vue-next'
+import { Plus, Trash, RefreshCcw, PencilIcon } from 'lucide-vue-next'
+import { EllipsisHorizontalIcon } from '@heroicons/vue/24/outline'
 import { graphql } from '~/lib/common/generated/gql'
 import {
   useInjectedViewerState,
@@ -177,6 +219,7 @@ import {
 } from '~/lib/viewer/composables/catalog'
 import { mapApplicationIdsToIds } from '~/lib/viewer/helpers/catalogHelpers'
 import { useFilteringDataStore } from '~~/lib/viewer/composables/filtering/dataStore'
+import { onClickOutside } from '@vueuse/core'
 
 graphql(`
   fragment ViewerSavedViewsPanel_Project on Project {
@@ -532,11 +575,20 @@ const activeTreeData = computed<CatalogTreeNode[]>(() => {
 })
 
 const showCreateCatalogDialog = ref(false)
+const showRenameCatalogDialog = ref(false)
 const showCreateNodeDialog = ref(false)
+const showTabMenu = ref(false)
 const newCatalogName = ref('')
+const renameCatalogName = ref('')
 const newNodeName = ref('')
 const selectedTreeKeys = ref<string[]>([])
 const selectedTreeNodeId = computed(() => selectedTreeKeys.value[0])
+const tabMenuContainer = ref<HTMLElement | null>(null)
+
+// 点击外部关闭菜单
+onClickOutside(tabMenuContainer, () => {
+  showTabMenu.value = false
+})
 
 const findNodeById = (
   nodes: RawCatalogNode[],
@@ -604,6 +656,24 @@ const createCatalogDialogButtons = computed((): LayoutDialogButton[] => [
   }
 ])
 
+const renameCatalogDialogButtons = computed((): LayoutDialogButton[] => [
+  {
+    text: '取消',
+    props: { color: 'outline' },
+    onClick: () => {
+      showRenameCatalogDialog.value = false
+      showTabMenu.value = false
+    }
+  },
+  {
+    text: '保存',
+    disabled: !renameCatalogName.value.trim(),
+    onClick: () => {
+      onRenameCatalog()
+    }
+  }
+])
+
 const createNodeDialogButtons = computed((): LayoutDialogButton[] => [
   {
     text: '取消',
@@ -624,6 +694,15 @@ const createNodeDialogButtons = computed((): LayoutDialogButton[] => [
 const openCreateCatalogDialog = () => {
   newCatalogName.value = ''
   showCreateCatalogDialog.value = true
+}
+
+const openRenameCatalogDialog = () => {
+  const currentCatalog = catalogs.value.find((item) => item.id === activeCatalogId.value)
+  if (currentCatalog) {
+    renameCatalogName.value = currentCatalog.title
+    showRenameCatalogDialog.value = true
+    showTabMenu.value = false
+  }
 }
 
 const targetParentNodeId = ref<string | undefined>(undefined)
@@ -669,6 +748,46 @@ const onAddCatalog = async () => {
     triggerNotification({
       type: ToastNotificationType.Danger,
       title: '目录创建失败',
+      description: e instanceof Error ? e.message : '请检查网络连接'
+    })
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const onRenameCatalog = async () => {
+  const newTitle = renameCatalogName.value.trim()
+  const currentCatalogId = activeCatalogId.value
+  if (!newTitle || !currentCatalogId || !projectId.value || !currentModelId.value || isSaving.value) return
+
+  const catalogIndex = catalogs.value.findIndex((item) => item.id === currentCatalogId)
+  if (catalogIndex < 0) return
+
+  try {
+    isSaving.value = true
+    await updateCatalog(projectId.value, currentModelId.value, currentCatalogId, {
+      title: newTitle
+    })
+
+    const currentCatalog = catalogs.value[catalogIndex]
+    const updatedCatalog: CatalogTabItem = {
+      ...currentCatalog,
+      title: newTitle
+    }
+
+    const nextCatalogs = [...catalogs.value]
+    nextCatalogs.splice(catalogIndex, 1, updatedCatalog)
+    catalogs.value = nextCatalogs
+    activeCatalogItem.value = updatedCatalog
+    showRenameCatalogDialog.value = false
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '目录重命名成功'
+    })
+  } catch (e: unknown) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '目录重命名失败',
       description: e instanceof Error ? e.message : '请检查网络连接'
     })
   } finally {
