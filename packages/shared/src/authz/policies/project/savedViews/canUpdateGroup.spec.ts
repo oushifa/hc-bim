@@ -11,10 +11,8 @@ import {
 } from '../../../../tests/fakes.js'
 import { Roles } from '../../../../core/constants.js'
 import {
-  ProjectNotEnoughPermissionsError,
   ServerNoAccessError,
   UngroupedSavedViewGroupLockError,
-  WorkspaceNoAccessError,
   WorkspacePlanNoFeatureAccessError,
   WorkspacesNotEnabledError
 } from '../../../domain/authErrors.js'
@@ -44,7 +42,7 @@ describe('canUpdateSavedViewGroupPolicy', () => {
       ...overrides
     })
 
-  it('fails in non-workspaced project, even if project owner', async () => {
+  it('succeeds in non-workspaced project', async () => {
     const policy = buildSUT()
 
     const result = await policy({
@@ -53,9 +51,7 @@ describe('canUpdateSavedViewGroupPolicy', () => {
       savedViewGroupId: 'saved-group-id'
     })
 
-    expect(result).toBeAuthErrorResult({
-      code: WorkspaceNoAccessError.code
-    })
+    expect(result).toBeOKResult()
   })
 
   describe('w/ workspaced project', async () => {
@@ -134,7 +130,7 @@ describe('canUpdateSavedViewGroupPolicy', () => {
       })
     })
 
-    it('fails if just reviewer', async () => {
+    it('succeeds if just reviewer', async () => {
       const sut = buildWorkspacedSUT({
         getProjectRole: async () => Roles.Stream.Reviewer
       })
@@ -145,9 +141,7 @@ describe('canUpdateSavedViewGroupPolicy', () => {
         savedViewGroupId: 'saved-group-id'
       })
 
-      expect(result).toBeAuthErrorResult({
-        code: ProjectNotEnoughPermissionsError.code
-      })
+      expect(result).toBeOKResult()
     })
 
     it('fails if logged out', async () => {
@@ -167,7 +161,7 @@ describe('canUpdateSavedViewGroupPolicy', () => {
       })
     })
 
-    it('fails if not owner and not the author', async () => {
+    it('succeeds if not owner and not the author', async () => {
       const sut = buildWorkspacedSUT({
         getSavedViewGroup: getSavedViewGroupFake({
           projectId: 'project-id',
@@ -182,9 +176,7 @@ describe('canUpdateSavedViewGroupPolicy', () => {
         savedViewGroupId: 'saved-group-id'
       })
 
-      expect(result).toBeAuthErrorResult({
-        code: ProjectNotEnoughPermissionsError.code
-      })
+      expect(result).toBeOKResult()
     })
 
     it('fails if updating default group', async () => {

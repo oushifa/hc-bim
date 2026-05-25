@@ -1,70 +1,76 @@
 <template>
-  <div>
-    <div class="flex w-full">
-      <div
-        :class="`grid grid-cols-3 w-full pl-2 h-5 items-center ${
-          kvp.value === null || kvp.value === undefined ? 'text-foreground-2' : ''
-        }`"
-      >
+  <div :class="{ hidden: shouldHideKvp }">
+    <div>
+      <div class="flex w-full">
         <div
-          class="col-span-1 truncate text-body-3xs mr-2 font-medium text-foreground-2"
-          :title="kvp.key"
+          :class="`grid grid-cols-3 w-full pl-2 h-5 items-center ${
+            kvp.value === null || kvp.value === undefined ? 'text-foreground-2' : ''
+          }`"
         >
-          {{ REVIT_PROPERTY_NAME_ZH_MAP[kvp.key] || kvp.key }}
-        </div>
-        <div
-          class="group col-span-2 pl-1 truncate text-body-3xs flex gap-1 items-center text-foreground"
-          :title="(kvp.value as string)"
-        >
-          <div class="flex gap-1 items-center w-full">
-            <!-- NOTE: can't do kvp.value || 'null' because 0 || 'null' = 'null' -->
-            <template v-if="isUrlString(kvp.value)">
-              <a
-                :href="kvp.value as string"
-                target="_blank"
-                rel="noopener"
-                class="truncate border-b border-outline-3 hover:border-outline-5"
-                :class="kvp.value === null ? '' : 'group-hover:max-w-[calc(100%-1rem)]'"
-              >
-                {{ kvp.value }}
-              </a>
-            </template>
-            <template v-else>
-              <span
-                class="truncate"
-                :class="kvp.value === null ? '' : 'group-hover:max-w-[calc(100%-1rem)]'"
-              >
-                {{ kvp.value === null ? 'null' : kvp.value }}
+          <div
+            class="col-span-1 truncate text-body-3xs mr-2 font-medium text-foreground-2"
+            :title="kvp.key"
+          >
+            {{ REVIT_PROPERTY_NAME_ZH_MAP[kvp.key] || kvp.key }}
+          </div>
+          <div
+            class="group col-span-2 pl-1 truncate text-body-3xs flex gap-1 items-center text-foreground"
+            :title="(kvp.value as string)"
+          >
+            <div class="flex gap-1 items-center w-full">
+              <!-- NOTE: can't do kvp.value || 'null' because 0 || 'null' = 'null' -->
+              <template v-if="isUrlString(kvp.value)">
+                <a
+                  :href="kvp.value as string"
+                  target="_blank"
+                  rel="noopener"
+                  class="truncate border-b border-outline-3 hover:border-outline-5"
+                  :class="
+                    kvp.value === null ? '' : 'group-hover:max-w-[calc(100%-1rem)]'
+                  "
+                >
+                  {{ kvp.value }}
+                </a>
+              </template>
+              <template v-else>
+                <span
+                  class="truncate"
+                  :class="
+                    kvp.value === null ? '' : 'group-hover:max-w-[calc(100%-1rem)]'
+                  "
+                >
+                  {{ kvp.value === null ? 'null' : kvp.value }}
+                </span>
+              </template>
+              <span v-if="kvp.units" class="truncate opacity-70">
+                {{ kvp.units }}
               </span>
-            </template>
-            <span v-if="kvp.units" class="truncate opacity-70">
-              {{ kvp.units }}
-            </span>
-            <LayoutMenu
-              v-model:open="showActionsMenu"
-              :items="actionsItems"
-              mount-menu-on-body
-              @click.stop.prevent
-              @chosen="onActionChosen"
-            >
-              <button
-                class="group-hover:opacity-100 hover:bg-highlight-1 rounded h-4 w-4 flex items-center justify-center"
-                :class="showActionsMenu ? 'bg-highlight-1 opacity-100' : 'opacity-0'"
-                @click="showActionsMenu = !showActionsMenu"
+              <LayoutMenu
+                v-model:open="showActionsMenu"
+                :items="actionsItems"
+                mount-menu-on-body
+                @click.stop.prevent
+                @chosen="onActionChosen"
               >
-                <Ellipsis class="h-3 w-3" />
-              </button>
-            </LayoutMenu>
+                <button
+                  class="group-hover:opacity-100 hover:bg-highlight-1 rounded h-4 w-4 flex items-center justify-center"
+                  :class="showActionsMenu ? 'bg-highlight-1 opacity-100' : 'opacity-0'"
+                  @click="showActionsMenu = !showActionsMenu"
+                >
+                  <Ellipsis class="h-3 w-3" />
+                </button>
+              </LayoutMenu>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <ViewerFiltersLargePropertyWarningDialog
-      v-model:open="showLargePropertyWarning"
-      :count="pendingFilterCount"
-      @confirm="confirmLargePropertySelection"
-    />
+      <ViewerFiltersLargePropertyWarningDialog
+        v-model:open="showLargePropertyWarning"
+        :count="pendingFilterCount"
+        @confirm="confirmLargePropertySelection"
+      />
+    </div>
   </div>
 </template>
 
@@ -116,7 +122,11 @@ const showLargePropertyWarning = ref(false)
 const pendingFilter = ref<ExtendedPropertyInfo | null>(null)
 const pendingFilterCount = ref(0)
 
+const HIDDEN_PROPERTY_KEYS = new Set(['speckleType', 'speckle_type'])
+
 const isUrlString = (v: unknown) => typeof v === 'string' && VALID_HTTP_URL.test(v)
+
+const shouldHideKvp = computed(() => HIDDEN_PROPERTY_KEYS.has(props.kvp.key))
 
 const isCopyable = computed(() => {
   return (

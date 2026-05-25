@@ -111,6 +111,7 @@
           :root="true"
           :unfold="index === 0 && !isSmallerOrEqualSm"
           @add-custom-attribute="openAddAttributeDialog(object)"
+          @edit-custom-attribute="openEditAttributeDialog(object, $event)"
           @delete-custom-attribute="onDeleteCustomAttribute(object, $event)"
         />
       </div>
@@ -130,7 +131,7 @@
       max-width="sm"
       :buttons="addAttributeDialogButtons"
     >
-      <template #header>添加自定义属性</template>
+      <template #header>{{ attributeDialogTitle }}</template>
       <div class="space-y-2">
         <div class="text-body-xs text-foreground-2">
           {{
@@ -202,8 +203,13 @@ const { modelsAndVersionIds } = useInjectedViewerLoadedResources()
 const { objects, clearSelection } = useSelectionUtilities()
 const { hideObjects, showObjects, isolateObjects, unIsolateObjects } =
   useFilterUtilities()
-const { fetchAttributes, createAttribute, deleteAttribute } =
-  useViewerObjectCustomAttributes()
+const {
+  fetchAttributes,
+  createAttribute,
+  deleteAttribute,
+  updateAttribute,
+  syncCustomAttributesToDtp
+} = useViewerObjectCustomAttributes()
 const { getRootNodesForModel, findObjectInNodes } = useTreeManagement()
 const { triggerNotification } = useGlobalToast()
 
@@ -223,6 +229,7 @@ const showAddAttributeDialog = ref(false)
 const quickCardContainerRef = ref<HTMLElement>()
 const quickCardPanelRef = ref<HTMLElement>()
 const activeAttributeTarget = ref<SpeckleObject | null>(null)
+const activeEditingAttribute = ref<ViewerObjectCustomAttribute | null>(null)
 const newAttributeName = ref('')
 const newAttributeValue = ref('')
 const submittingAttribute = ref(false)
@@ -285,21 +292,32 @@ const quickCardFields: QuickCardField[] = [
   }
 ]
 
+const isEditingAttribute = computed(() => !!activeEditingAttribute.value)
+
+const attributeDialogTitle = computed(() =>
+  isEditingAttribute.value ? '编辑自定义属性' : '添加自定义属性'
+)
+
 const addAttributeDialogButtons = computed((): LayoutDialogButton[] => [
   {
     text: '取消',
     props: { color: 'outline' },
     onClick: () => {
       showAddAttributeDialog.value = false
+      resetAttributeDialog()
     }
   },
   {
-    text: '添加',
+    text: isEditingAttribute.value ? '保存' : '添加',
     disabled:
       submittingAttribute.value ||
       !newAttributeName.value.trim() ||
       !newAttributeValue.value.trim(),
     onClick: () => {
+      if (isEditingAttribute.value) {
+        void onUpdateCustomAttribute()
+        return
+      }
       void onCreateCustomAttribute()
     }
   }
@@ -517,10 +535,11 @@ const ensureCustomAttributesLoaded = async (object: SpeckleObject) => {
   }
 }
 
-const resetAddAttributeDialog = () => {
+const resetAttributeDialog = () => {
   newAttributeName.value = ''
   newAttributeValue.value = ''
   activeAttributeTarget.value = null
+  activeEditingAttribute.value = null
 }
 
 const openAddAttributeDialog = (object: SpeckleObject) => {
@@ -538,6 +557,29 @@ const openAddAttributeDialog = (object: SpeckleObject) => {
   activeAttributeTarget.value = object
   newAttributeName.value = ''
   newAttributeValue.value = ''
+  activeEditingAttribute.value = null
+  showAddAttributeDialog.value = true
+}
+
+const openEditAttributeDialog = (
+  object: SpeckleObject,
+  attribute: ViewerObjectCustomAttribute
+) => {
+  const applicationId =
+    typeof object.applicationId === 'string' ? object.applicationId.trim() : ''
+  const modelId = resolveModelIdForObject(object)
+  if (!applicationId || !modelId) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '当前构件缺少可用作用域'
+    })
+    return
+  }
+
+  activeAttributeTarget.value = object
+  activeEditingAttribute.value = attribute
+  newAttributeName.value = attribute.name
+  newAttributeValue.value = attribute.value
   showAddAttributeDialog.value = true
 }
 
@@ -576,17 +618,105 @@ const onCreateCustomAttribute = async () => {
         attribute
       ]
     }
-
     showAddAttributeDialog.value = false
-    resetAddAttributeDialog()
-    triggerNotification({
-      type: ToastNotificationType.Success,
-      title: '已添加自定义属性'
-    })
-  } catch {
+    resetAttributeDialog()
+
+    try {
+      await syncCustomAttributesToDtp(projectId.value, modelId)
+      triggerNotification({
+        type: ToastNotificationType.Success,
+        title: '已添加自定义属性',
+        description: '已同步当前模型自定义属性到中海'
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '同步中海构件参数失败'
+      triggerNotification({
+        type: ToastNotificationType.Danger,
+        title: '已添加自定义属性，但同步中海失败',
+        description: message
+      })
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '添加自定义属性失败'
     triggerNotification({
       type: ToastNotificationType.Danger,
-      title: '添加自定义属性失败'
+      title: '添加自定义属性失败',
+      description: message
+    })
+  } finally {
+    submittingAttribute.value = false
+  }
+}
+
+const onUpdateCustomAttribute = async () => {
+  if (
+    !projectId.value ||
+    !activeAttributeTarget.value ||
+    !activeEditingAttribute.value ||
+    submittingAttribute.value
+  ) {
+    return
+  }
+
+  const applicationId =
+    typeof activeAttributeTarget.value.applicationId === 'string'
+      ? activeAttributeTarget.value.applicationId.trim()
+      : ''
+  const modelId = resolveModelIdForObject(activeAttributeTarget.value)
+  const name = newAttributeName.value.trim()
+  const value = newAttributeValue.value.trim()
+
+  if (!applicationId || !modelId || !name || !value) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '请填写完整的属性名和属性值'
+    })
+    return
+  }
+
+  try {
+    submittingAttribute.value = true
+    const updatedAttribute = await updateAttribute(
+      projectId.value,
+      modelId,
+      activeEditingAttribute.value.id,
+      {
+        name,
+        value
+      }
+    )
+
+    customAttributesByApplicationId.value = {
+      ...customAttributesByApplicationId.value,
+      [applicationId]: (customAttributesByApplicationId.value[applicationId] || []).map(
+        (attribute) =>
+          attribute.id === updatedAttribute.id ? updatedAttribute : attribute
+      )
+    }
+    showAddAttributeDialog.value = false
+    resetAttributeDialog()
+
+    try {
+      await syncCustomAttributesToDtp(projectId.value, modelId)
+      triggerNotification({
+        type: ToastNotificationType.Success,
+        title: '已编辑自定义属性',
+        description: '已同步当前模型自定义属性到中海'
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '同步中海构件参数失败'
+      triggerNotification({
+        type: ToastNotificationType.Danger,
+        title: '已编辑自定义属性，但同步中海失败',
+        description: message
+      })
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '编辑自定义属性失败'
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '编辑自定义属性失败',
+      description: message
     })
   } finally {
     submittingAttribute.value = false
@@ -615,14 +745,28 @@ const onDeleteCustomAttribute = async (object: SpeckleObject, attributeId: strin
         customAttributesByApplicationId.value[applicationId] || []
       ).filter((attribute) => attribute.id !== attributeId)
     }
-    triggerNotification({
-      type: ToastNotificationType.Success,
-      title: '已删除自定义属性'
-    })
-  } catch {
+
+    try {
+      await syncCustomAttributesToDtp(projectId.value, modelId)
+      triggerNotification({
+        type: ToastNotificationType.Success,
+        title: '已删除自定义属性',
+        description: '已同步当前模型自定义属性到中海'
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '同步中海构件参数失败'
+      triggerNotification({
+        type: ToastNotificationType.Danger,
+        title: '已删除自定义属性，但同步中海失败',
+        description: message
+      })
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '删除自定义属性失败'
     triggerNotification({
       type: ToastNotificationType.Danger,
-      title: '删除自定义属性失败'
+      title: '删除自定义属性失败',
+      description: message
     })
   }
 }
@@ -722,7 +866,7 @@ const onClose = () => {
   sidebarOpen.value = false
   trackAndClearSelection()
   showAddAttributeDialog.value = false
-  resetAddAttributeDialog()
+  resetAttributeDialog()
 }
 
 const forceClose = () => {

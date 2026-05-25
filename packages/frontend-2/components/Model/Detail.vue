@@ -197,16 +197,7 @@
           </div>
           <div class="space-y-1">
             <div
-              v-for="attr in [
-                '应用程序ID',
-                '类别',
-                '族',
-                'id',
-                '标高',
-                '名称',
-                '对象',
-                '数据类型'
-              ]"
+              v-for="attr in ['应用程序ID', '类别', '族', 'id', '标高', '名称', '对象']"
               :key="attr"
               class="flex items-center px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer text-sm"
             >

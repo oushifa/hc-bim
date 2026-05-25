@@ -11,10 +11,8 @@ import {
 } from '../../../../tests/fakes.js'
 import { Roles } from '../../../../core/constants.js'
 import {
-  ProjectNotEnoughPermissionsError,
   ServerNoAccessError,
   UngroupedSavedViewGroupLockError,
-  WorkspaceNoAccessError,
   WorkspacePlanNoFeatureAccessError,
   WorkspacesNotEnabledError
 } from '../../../domain/authErrors.js'
@@ -46,7 +44,7 @@ describe('canCreateSavedViewGroupTokenPolicy', () => {
       ...overrides
     })
 
-  it('fails in non-workspaced project, even if project owner', async () => {
+  it('succeeds in non-workspaced project', async () => {
     const policy = buildSUT()
 
     const result = await policy({
@@ -55,9 +53,7 @@ describe('canCreateSavedViewGroupTokenPolicy', () => {
       savedViewGroupId: 'saved-group-id'
     })
 
-    expect(result).toBeAuthErrorResult({
-      code: WorkspaceNoAccessError.code
-    })
+    expect(result).toBeOKResult()
   })
 
   describe('w/ workspaced project', async () => {
@@ -136,7 +132,7 @@ describe('canCreateSavedViewGroupTokenPolicy', () => {
       })
     })
 
-    it('fails if just reviewer', async () => {
+    it('succeeds if just reviewer', async () => {
       const sut = buildWorkspacedSUT({
         getProjectRole: async () => Roles.Stream.Reviewer
       })
@@ -147,9 +143,7 @@ describe('canCreateSavedViewGroupTokenPolicy', () => {
         savedViewGroupId: 'saved-group-id'
       })
 
-      expect(result).toBeAuthErrorResult({
-        code: ProjectNotEnoughPermissionsError.code
-      })
+      expect(result).toBeOKResult()
     })
 
     it('fails if logged out', async () => {
@@ -169,7 +163,7 @@ describe('canCreateSavedViewGroupTokenPolicy', () => {
       })
     })
 
-    it('fails if not owner and not the author', async () => {
+    it('succeeds if not owner and not the author', async () => {
       const sut = buildWorkspacedSUT({
         getSavedViewGroup: getSavedViewGroupFake({
           projectId: 'project-id',
@@ -184,9 +178,7 @@ describe('canCreateSavedViewGroupTokenPolicy', () => {
         savedViewGroupId: 'saved-group-id'
       })
 
-      expect(result).toBeAuthErrorResult({
-        code: ProjectNotEnoughPermissionsError.code
-      })
+      expect(result).toBeOKResult()
     })
 
     it('fails if updating default group', async () => {
@@ -208,7 +200,7 @@ describe('canCreateSavedViewGroupTokenPolicy', () => {
       })
     })
 
-    it('fails if workspace plan is free', async () => {
+    it('succeeds if workspace plan is free', async () => {
       const sut = buildWorkspacedSUT({
         getWorkspacePlan: getWorkspacePlanFake({
           workspaceId: 'workspace-id',
@@ -222,12 +214,10 @@ describe('canCreateSavedViewGroupTokenPolicy', () => {
         savedViewGroupId: 'default-XXX'
       })
 
-      expect(result).toBeAuthErrorResult({
-        code: WorkspacePlanNoFeatureAccessError.code
-      })
+      expect(result).toBeOKResult()
     })
 
-    it('fails if user is author', async () => {
+    it('succeeds if user is author', async () => {
       const sut = buildWorkspacedSUT({
         getSavedViewGroup: getSavedViewGroupFake({
           projectId: 'project-id',
@@ -242,9 +232,7 @@ describe('canCreateSavedViewGroupTokenPolicy', () => {
         savedViewGroupId: 'saved-group-id'
       })
 
-      expect(result).toBeAuthErrorResult({
-        code: ProjectNotEnoughPermissionsError.code
-      })
+      expect(result).toBeOKResult()
     })
   })
 })

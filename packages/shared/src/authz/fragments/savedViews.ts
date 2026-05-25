@@ -34,6 +34,7 @@ import { Roles } from '../../core/constants.js'
 import { WorkspacePlanFeatures } from '../../workspaces/index.js'
 import { isUngroupedGroup } from '../../saved-views/index.js'
 import { StringEnum, StringEnumValues, throwUncoveredError } from '../../core/index.js'
+import { ensureMinimumServerRoleFragment } from './server.js'
 
 export const WriteTypes = StringEnum([
   'UpdateGeneral',
@@ -87,11 +88,18 @@ export const ensureCanAccessSavedViewFragment: AuthPolicyEnsureFragment<
 > =
   (loaders) =>
   async ({ userId, projectId, savedViewId, access, allowNonExistent }) => {
+    const ensuredServerRole = await ensureMinimumServerRoleFragment(loaders)({
+      userId,
+      role: Roles.Server.User
+    })
+    if (ensuredServerRole.isErr) return err(ensuredServerRole.error)
+
     const canUseSavedViews = await ensureCanUseProjectWorkspacePlanFeatureFragment(
       loaders
     )({
       projectId,
-      feature: WorkspacePlanFeatures.SavedViews
+      feature: WorkspacePlanFeatures.SavedViews,
+      allowUnworkspaced: true
     })
     if (canUseSavedViews.isErr) return err(canUseSavedViews.error)
 
@@ -100,59 +108,18 @@ export const ensureCanAccessSavedViewFragment: AuthPolicyEnsureFragment<
       if (allowNonExistent) return ok()
       return err(new SavedViewNotFoundError())
     }
-    const isPublic = savedView.visibility === SavedViewVisibility.public
-    const isAuthor = savedView.authorId === userId
-
     // Validate read access
     if (access === 'read') {
-      if (isAuthor || isPublic) {
-        return ok()
-      } else {
-        return err(
-          new SavedViewNoAccessError({
-            message: 'You do not have permission to read this saved view.'
-          })
-        )
-      }
-    }
-
-    // Validate write access
-    // Check for write access to project first
-    const ensuredWriteAccess = await ensureImplicitProjectMemberWithWriteAccessFragment(
-      loaders
-    )({
-      userId,
-      projectId
-    })
-    if (ensuredWriteAccess.isErr) {
-      if (ensuredWriteAccess.error.code === ProjectNotEnoughPermissionsError.code)
-        return err(
-          new ProjectNotEnoughPermissionsError({
-            message:
-              "Your role on this project doesn't give you permission to update views."
-          })
-        )
-      return err(ensuredWriteAccess.error)
-    }
-
-    if (isAuthor) {
-      // authors can write whatever
       return ok()
     }
 
-    // Non-author project writers can make specific changes
     switch (access) {
+      case WriteTypes.UpdateGeneral:
       case WriteTypes.MoveView:
       case WriteTypes.EditTitle:
       case WriteTypes.EditDescription:
       case WriteTypes.SetHomeView:
         return ok()
-      case WriteTypes.UpdateGeneral:
-        return err(
-          new SavedViewNoAccessError({
-            message: 'You do not have permission to edit the view in this way'
-          })
-        )
       default:
         throwUncoveredError(access)
     }
@@ -196,11 +163,18 @@ export const ensureCanAccessSavedViewGroupFragment: AuthPolicyEnsureFragment<
 > =
   (loaders) =>
   async ({ userId, projectId, savedViewGroupId, access }) => {
+    const ensuredServerRole = await ensureMinimumServerRoleFragment(loaders)({
+      userId,
+      role: Roles.Server.User
+    })
+    if (ensuredServerRole.isErr) return err(ensuredServerRole.error)
+
     const canUseSavedViews = await ensureCanUseProjectWorkspacePlanFeatureFragment(
       loaders
     )({
       projectId,
-      feature: WorkspacePlanFeatures.SavedViews
+      feature: WorkspacePlanFeatures.SavedViews,
+      allowUnworkspaced: true
     })
     if (canUseSavedViews.isErr) return err(canUseSavedViews.error)
 
@@ -217,28 +191,6 @@ export const ensureCanAccessSavedViewGroupFragment: AuthPolicyEnsureFragment<
     // Prevent default group updates (as it doesnt exist)
     if (isUngroupedGroup(savedViewGroup.id)) {
       return err(new UngroupedSavedViewGroupLockError())
-    }
-
-    // groups have no visibility (yet), so authors AND project owners can mutate
-    const isAuthor = savedViewGroup.authorId === userId
-    const expectedProjectRole = isAuthor ? Roles.Stream.Contributor : Roles.Stream.Owner
-
-    const ensuredWriteAccess = await ensureImplicitProjectMemberWithWriteAccessFragment(
-      loaders
-    )({
-      userId,
-      projectId,
-      role: expectedProjectRole
-    })
-    if (ensuredWriteAccess.isErr) {
-      if (ensuredWriteAccess.error.code === ProjectNotEnoughPermissionsError.code)
-        return err(
-          new ProjectNotEnoughPermissionsError({
-            message:
-              "Your role on this project doesn't give you permission to update view groups."
-          })
-        )
-      return err(ensuredWriteAccess.error)
     }
 
     return ok()

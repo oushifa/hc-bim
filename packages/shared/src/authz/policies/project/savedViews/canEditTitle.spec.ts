@@ -11,9 +11,7 @@ import {
 } from '../../../../tests/fakes.js'
 import { Roles } from '../../../../core/constants.js'
 import {
-  ProjectNotEnoughPermissionsError,
   ServerNoAccessError,
-  WorkspaceNoAccessError,
   WorkspacePlanNoFeatureAccessError,
   WorkspacesNotEnabledError
 } from '../../../domain/authErrors.js'
@@ -45,7 +43,7 @@ describe('canEditSavedViewTitlePolicy', () => {
       ...overrides
     })
 
-  it('fails in non-workspaced project, even if project owner', async () => {
+  it('succeeds in non-workspaced project', async () => {
     const policy = buildSUT()
 
     const result = await policy({
@@ -54,9 +52,7 @@ describe('canEditSavedViewTitlePolicy', () => {
       savedViewId: 'saved-view-id'
     })
 
-    expect(result).toBeAuthErrorResult({
-      code: WorkspaceNoAccessError.code
-    })
+    expect(result).toBeOKResult()
   })
 
   describe('w/ workspaced project', async () => {
@@ -151,7 +147,7 @@ describe('canEditSavedViewTitlePolicy', () => {
       })
     })
 
-    it('fails if just reviewer', async () => {
+    it('succeeds if just reviewer', async () => {
       const sut = buildWorkspacedSUT({
         getProjectRole: async () => Roles.Stream.Reviewer
       })
@@ -162,9 +158,7 @@ describe('canEditSavedViewTitlePolicy', () => {
         savedViewId: 'saved-view-id'
       })
 
-      expect(result).toBeAuthErrorResult({
-        code: ProjectNotEnoughPermissionsError.code
-      })
+      expect(result).toBeOKResult()
     })
 
     it('fails if logged out', async () => {

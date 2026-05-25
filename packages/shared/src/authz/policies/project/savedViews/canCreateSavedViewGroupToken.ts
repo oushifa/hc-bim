@@ -22,12 +22,9 @@ import {
 } from '../../../domain/context.js'
 import { Loaders } from '../../../domain/loaders.js'
 import { AuthPolicy } from '../../../domain/policies.js'
-import {
-  ensureImplicitProjectMemberWithWriteAccessFragment,
-  ensureMinimumProjectRoleFragment
-} from '../../../fragments/projects.js'
 import { ensureCanAccessSavedViewGroupFragment } from '../../../fragments/savedViews.js'
 import { err, ok } from 'true-myth/result'
+import { ensureMinimumServerRoleFragment } from '../../../fragments/server.js'
 
 export const canCreateSavedViewGroupTokenPolicy: AuthPolicy<
   | typeof Loaders.getSavedViewGroup
@@ -60,6 +57,12 @@ export const canCreateSavedViewGroupTokenPolicy: AuthPolicy<
 > =
   (loaders) =>
   async ({ userId, projectId, savedViewGroupId }) => {
+    const ensuredServerRole = await ensureMinimumServerRoleFragment(loaders)({
+      userId,
+      role: Roles.Server.User
+    })
+    if (ensuredServerRole.isErr) return err(ensuredServerRole.error)
+
     const canUseSavedViews = await ensureCanAccessSavedViewGroupFragment(loaders)({
       userId,
       projectId,
@@ -68,50 +71,5 @@ export const canCreateSavedViewGroupTokenPolicy: AuthPolicy<
     })
 
     if (canUseSavedViews.isErr) return err(canUseSavedViews.error)
-
-    const env = await loaders.getEnv()
-    const project = await loaders.getProject({ projectId })
-
-    if (!!project?.workspaceId && env.FF_WORKSPACES_MODULE_ENABLED) {
-      // Ensure owner-level access and valid plan
-      const ensuredProjectRole =
-        await ensureImplicitProjectMemberWithWriteAccessFragment(loaders)({
-          userId,
-          projectId,
-          role: Roles.Stream.Owner
-        })
-      if (ensuredProjectRole.isErr) {
-        return err(ensuredProjectRole.error)
-      }
-
-      const plan = await loaders.getWorkspacePlan({ workspaceId: project.workspaceId })
-
-      switch (plan?.name) {
-        case 'academia':
-        case 'enterprise':
-        case 'pro':
-        case 'proUnlimited':
-        case 'proUnlimitedInvoiced':
-        case 'team':
-        case 'teamUnlimited':
-        case 'teamUnlimitedInvoiced':
-        case 'unlimited':
-          return ok()
-        case 'free':
-        default:
-          return err(new WorkspacePlanNoFeatureAccessError())
-      }
-    } else {
-      // Ensure project owner
-      const isProjectOwner = await ensureMinimumProjectRoleFragment(loaders)({
-        userId: userId!,
-        projectId,
-        role: Roles.Stream.Owner
-      })
-      if (isProjectOwner.isErr) {
-        return err(isProjectOwner.error)
-      }
-
-      return ok()
-    }
+    return ok()
   }

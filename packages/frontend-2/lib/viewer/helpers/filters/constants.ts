@@ -61,7 +61,6 @@ export const REVIT_PROPERTY_NAME_ZH_MAP: Record<string, string> = {
   units: '单位',
   applicationId: '应用程序ID',
   objects: '对象',
-  speckleType: '数据类型',
   buildInCategory: '内建类别',
   elementId: '元素ID',
   ['Material Quantities']: '材料数量',
@@ -85,8 +84,6 @@ export const REVIT_PROPERTY_NAME_ZH_MAP: Record<string, string> = {
   materialType: '材料类型',
   density: '密度',
   structuralAsset: '结构资产',
-  // eslint-disable-next-line camelcase
-  speckle_type: '数据类型',
   RevitObject: 'Revit对象',
   location: '位置',
   properties: '属性',

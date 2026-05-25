@@ -3,6 +3,7 @@ import { useAuthCookie } from '~/lib/auth/composables/auth'
 export type ViewerCatalogNode = {
   id: string
   title: string
+  locked?: boolean
   isolatedApplicationIds?: string[]
   hiddenApplicationIds?: string[]
   childrens?: ViewerCatalogNode[]

@@ -24,7 +24,6 @@ export type WorkbenchUploadSyncTaskStatus =
   | 'syncing_external_ids'
   | 'triggering_model_transform'
   | 'polling_model_transform'
-  | 'syncing_elements'
   | 'error'
 
 export type WorkbenchUploadSyncTask = {
@@ -76,41 +75,10 @@ type SyncLatestVersionResponse = {
           seedId?: string | null
           assetId?: string | null
           assetName?: string | null
-          treeJson?: string | null
         }>
       }
     }
   }
-}
-
-type SyncFlatPayload = {
-  model: {
-    id: string
-    name: string
-    timestamp: string
-  }
-  elements: Array<{
-    id: string
-    parameters: Record<string, string | number | boolean | null>
-  }>
-}
-
-type GeneratedSyncPayloadResponse = {
-  fileName: string
-  versionId: string
-  payload: SyncFlatPayload
-}
-
-type ViewerObjectCustomAttribute = {
-  id: string
-  projectId: string
-  modelId: string
-  applicationId: string
-  authorId: string | null
-  name: string
-  value: string
-  createdAt: string
-  updatedAt: string
 }
 
 type VersionExternalIds = Partial<{
@@ -181,7 +149,6 @@ const syncModelLatestVersionQuery = gql`
             seedId
             assetId
             assetName
-            treeJson
           }
         }
       }
@@ -189,14 +156,11 @@ const syncModelLatestVersionQuery = gql`
   }
 `
 
-const updateVersionTreeJsonMutation = gql`
-  mutation WorkbenchUpdateVersionTreeJson($input: UpdateVersionInput!) {
+const updateVersionExternalIdsMutation = gql`
+  mutation WorkbenchUpdateVersionExternalIds($input: UpdateVersionInput!) {
     versionMutations {
       update(input: $input) {
         id
-        seedId
-        assetId
-        treeJson
       }
     }
   }
@@ -365,8 +329,7 @@ export const useWorkbenchUploadSync = () => {
       referencedObject: version.referencedObject || null,
       seedId: version.seedId || null,
       assetId: version.assetId || null,
-      assetName: version.assetName || null,
-      treeJson: version.treeJson || null
+      assetName: version.assetName || null
     }
   }
 
@@ -517,119 +480,6 @@ export const useWorkbenchUploadSync = () => {
     })
   }
 
-  const fetchGeneratedSyncPayload = async (params: {
-    projectId: string
-    modelId: string
-  }): Promise<GeneratedSyncPayloadResponse> => {
-    try {
-      return await $fetch<GeneratedSyncPayloadResponse>(
-        `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/bim-custom-label`,
-        {
-          method: 'GET',
-          credentials: 'same-origin'
-        }
-      )
-    } catch (error) {
-      const fetchError = error as FetchError<{ error?: string }>
-      const message =
-        fetchError.data?.error ||
-        (typeof fetchError.statusCode === 'number'
-          ? `生成模型构件参数失败 (${fetchError.statusCode})`
-          : '生成模型构件参数失败')
-      throw new Error(message)
-    }
-  }
-
-  const fetchModelCustomAttributes = async (params: {
-    projectId: string
-    modelId: string
-  }): Promise<ViewerObjectCustomAttribute[]> => {
-    try {
-      const response = await $fetch<{ data: ViewerObjectCustomAttribute[] }>(
-        `${apiOrigin}/api/projects/${params.projectId}/viewer-object-custom-attributes`,
-        {
-          method: 'GET',
-          credentials: 'same-origin',
-          headers: authToken.value
-            ? { Authorization: `Bearer ${authToken.value}` }
-            : undefined,
-          query: {
-            modelId: params.modelId
-          }
-        }
-      )
-
-      return response.data
-    } catch (error) {
-      const fetchError = error as FetchError<{ error?: string }>
-      const message =
-        fetchError.data?.error ||
-        (typeof fetchError.statusCode === 'number'
-          ? `加载模型自定义属性失败 (${fetchError.statusCode})`
-          : '加载模型自定义属性失败')
-      throw new Error(message)
-    }
-  }
-
-  const mergeCustomAttributesIntoPayload = (
-    payload: SyncFlatPayload,
-    customAttributes: ViewerObjectCustomAttribute[]
-  ): SyncFlatPayload => {
-    if (!customAttributes.length) return payload
-
-    const groupedAttributes = new Map<string, Record<string, string>>()
-    for (const attribute of customAttributes) {
-      const applicationId = attribute.applicationId?.trim()
-      const name = attribute.name?.trim()
-      if (!applicationId || !name) continue
-
-      const current = groupedAttributes.get(applicationId) || {}
-      current[name] = attribute.value
-      groupedAttributes.set(applicationId, current)
-    }
-
-    if (!groupedAttributes.size) return payload
-
-    return {
-      ...payload,
-      elements: payload.elements.map((element) => {
-        const customParameters = groupedAttributes.get(element.id)
-        if (!customParameters) return element
-
-        return {
-          ...element,
-          parameters: {
-            ...element.parameters,
-            ...customParameters
-          }
-        }
-      })
-    }
-  }
-
-  const uploadSyncPayload = async (payload: SyncFlatPayload, fileName: string) => {
-    await ensureDtpToken()
-
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: 'application/json'
-    })
-    const formData = new FormData()
-    formData.append('file', blob, fileName)
-
-    return await dtpFetch<{
-      status?: string
-      messages?: string
-      result?: {
-        originElementCount?: number
-        originValidElementCount?: number
-        importParameterCount?: number
-      }
-    }>('/v1/daas/asset/bim/elements/custom-label-import', {
-      method: 'POST',
-      body: formData
-    })
-  }
-
   const updateVersionExternalIds = async (params: {
     projectId: string
     versionId: string
@@ -650,7 +500,7 @@ export const useWorkbenchUploadSync = () => {
         } | null
       } | null
     }>({
-      mutation: updateVersionTreeJsonMutation,
+      mutation: updateVersionExternalIdsMutation,
       variables: {
         input: {
           projectId: params.projectId,
@@ -728,85 +578,6 @@ export const useWorkbenchUploadSync = () => {
       }
 
       await sleep(MODEL_TRANSFORM_POLL_INTERVAL)
-    }
-  }
-
-  const markVersionTreeJsonDone = async (params: {
-    projectId: string
-    versionId: string
-    externalIds?: Partial<{
-      seedId: string
-      assetId: string
-    }>
-  }) => {
-    const { data, errors } = await apollo.mutate<{
-      versionMutations?: {
-        update?: {
-          id: string
-        } | null
-      } | null
-    }>({
-      mutation: updateVersionTreeJsonMutation,
-      variables: {
-        input: {
-          projectId: params.projectId,
-          versionId: params.versionId,
-          treeJson: 'done',
-          ...(params.externalIds?.seedId ? { seedId: params.externalIds.seedId } : {}),
-          ...(params.externalIds?.assetId
-            ? { assetId: params.externalIds.assetId }
-            : {})
-        }
-      }
-    })
-
-    if (!data?.versionMutations?.update?.id) {
-      throw new Error(
-        (errors?.[0]?.message as string | undefined) || '回填 treeJson 失败'
-      )
-    }
-  }
-
-  const performModelElementsSync = async (params: {
-    projectId: string
-    modelId: string
-    markTreeJsonDone?: boolean
-  }) => {
-    const [generated, customAttributes] = await Promise.all([
-      fetchGeneratedSyncPayload({
-        projectId: params.projectId,
-        modelId: params.modelId
-      }),
-      fetchModelCustomAttributes({
-        projectId: params.projectId,
-        modelId: params.modelId
-      })
-    ])
-    const payload = mergeCustomAttributesIntoPayload(generated.payload, customAttributes)
-
-    if (!payload.elements.length) {
-      throw new Error(
-        '未生成可同步的构件参数，请确认模型对象中存在 applicationId 与参数数据'
-      )
-    }
-
-    const result = await uploadSyncPayload(payload, generated.fileName)
-    if (result?.status !== 'SUCCESS') {
-      throw new Error(
-        result?.messages || '模型构件同步失败，custom-label-import 未返回成功状态'
-      )
-    }
-    if (params.markTreeJsonDone !== false) {
-      await markVersionTreeJsonDone({
-        projectId: params.projectId,
-        versionId: generated.versionId
-      })
-    }
-
-    return {
-      versionId: generated.versionId,
-      payload,
-      result
     }
   }
 
@@ -899,25 +670,12 @@ export const useWorkbenchUploadSync = () => {
       })
       await pollModelTransformUntilFinished(transformTaskId)
 
-      patchTask(taskId, {
-        status: 'syncing_elements'
-      })
-      const { payload, result } = await performModelElementsSync({
-        projectId: task.projectId,
-        modelId: task.modelId
-      })
-
       await refreshModelList()
-
-      const importParameterCount =
-        result?.result?.importParameterCount ?? payload.elements.length
-      const originValidElementCount =
-        result?.result?.originValidElementCount ?? payload.elements.length
 
       triggerNotification({
         type: ToastNotificationType.Success,
-        title: '模型与构件同步成功',
-        description: `已回填 seedId/assetId/assetName，完成模型转换，并同步 ${originValidElementCount} 个构件、导入 ${importParameterCount} 个参数`
+        title: '模型同步成功',
+        description: '已回填 seedId/assetId/assetName，并完成中海模型转换'
       })
 
       removeTask(taskId)
@@ -926,8 +684,8 @@ export const useWorkbenchUploadSync = () => {
       if (task.uploadId) {
         clearVersionMetadataSyncRecord(task.uploadId)
       }
-      const message = error instanceof Error ? error.message : '模型与构件同步失败'
-      logger.error(error, '全局自动同步中海模型与构件失败')
+      const message = error instanceof Error ? error.message : '模型同步失败'
+      logger.error(error, '全局自动同步中海模型失败')
       patchTask(taskId, {
         status: 'error',
         error: message,
@@ -1012,8 +770,7 @@ export const useWorkbenchUploadSync = () => {
       'syncing_dtp_model',
       'syncing_external_ids',
       'triggering_model_transform',
-      'polling_model_transform',
-      'syncing_elements'
+      'polling_model_transform'
     ]
 
     for (const task of tasks.value) {
@@ -1051,7 +808,7 @@ export const useWorkbenchUploadSync = () => {
         triggerNotification({
           type: ToastNotificationType.Info,
           title: '等待版本创建',
-          description: '已登记完整同步任务，版本创建后会自动继续执行'
+          description: '已登记模型同步任务，版本创建后会自动继续执行'
         })
         return false
       }
@@ -1083,7 +840,7 @@ export const useWorkbenchUploadSync = () => {
         triggerNotification({
           type: ToastNotificationType.Info,
           title: '等待版本创建',
-          description: '已登记完整同步任务，待版本与上传记录关联后会自动继续执行'
+          description: '已登记模型同步任务，待版本与上传记录关联后会自动继续执行'
         })
         return false
       }
@@ -1109,108 +866,6 @@ export const useWorkbenchUploadSync = () => {
     }
   }
 
-  const syncModelElementsWithTransformCheck = async (params: {
-    projectId: string
-    modelId: string
-  }) => {
-    if (isModelSyncing(params)) return false
-
-    const task = getLatestTaskForModel(params)
-    setModelSyncing({
-      projectId: params.projectId,
-      modelId: params.modelId,
-      syncing: true
-    })
-
-    try {
-      const latestVersion = await fetchLatestVersionInfo(params)
-      if (!latestVersion?.versionId) {
-        throw new Error('未找到模型最新版本，无法同步构件')
-      }
-      if (!latestVersion.seedId?.trim()) {
-        throw new Error('未找到 seedId，请先同步模型')
-      }
-
-      const assetId = latestVersion.assetId || task?.assetId || null
-      const assetName = latestVersion.assetName || task?.assetName || null
-      if (!assetId || !assetName) {
-        throw new Error('未找到 assetId 或 assetName，请先同步模型')
-      }
-
-      let transformTaskId = task?.transformTaskId || null
-      if (!transformTaskId) {
-        if (task?.id) {
-          patchTask(task.id, {
-            status: 'triggering_model_transform',
-            error: null
-          })
-        }
-        transformTaskId = await triggerModelTransform({
-          assetId,
-          assetName
-        })
-      }
-
-      if (task?.id) {
-        patchTask(task.id, {
-          transformTaskId,
-          status: 'polling_model_transform',
-          error: null
-        })
-      }
-      await pollModelTransformUntilFinished(transformTaskId)
-
-      if (task?.id) {
-        patchTask(task.id, {
-          status: 'syncing_elements',
-          error: null
-        })
-      }
-      const { payload, result } = await performModelElementsSync({
-        projectId: params.projectId,
-        modelId: params.modelId
-      })
-      await refreshModelList()
-
-      const importParameterCount =
-        result?.result?.importParameterCount ?? payload.elements.length
-      const originValidElementCount =
-        result?.result?.originValidElementCount ?? payload.elements.length
-
-      if (task?.id) {
-        removeTask(task.id)
-      }
-
-      triggerNotification({
-        type: ToastNotificationType.Success,
-        title: '模型构件同步成功',
-        description: `已完成模型转换校验，并同步 ${originValidElementCount} 个构件、导入 ${importParameterCount} 个参数`
-      })
-      return true
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '模型构件同步失败'
-      if (task?.id) {
-        patchTask(task.id, {
-          status: 'error',
-          error: message,
-          retryCount: (taskMap.value[task.id]?.retryCount || 0) + 1
-        })
-      }
-      triggerNotification({
-        type: ToastNotificationType.Danger,
-        title: '模型构件同步失败',
-        description: message
-      })
-      return false
-    } finally {
-      setModelSyncing({
-        projectId: params.projectId,
-        modelId: params.modelId,
-        syncing: false
-      })
-    }
-  }
-
   return {
     tasks,
     tasksSignature,
@@ -1222,7 +877,6 @@ export const useWorkbenchUploadSync = () => {
     resumeInterruptedTasks,
     consumeVersionCreated,
     runFullModelSync,
-    syncModelElementsWithTransformCheck,
     setModelSyncing,
     isModelSyncing
   }

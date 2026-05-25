@@ -77,6 +77,15 @@
                 {{ attribute.value }}
               </span>
               <FormButton
+                v-tippy="'编辑自定义属性'"
+                size="sm"
+                color="subtle"
+                :icon-left="SquarePen"
+                hide-text
+                name="editCustomAttribute"
+                @click.stop="emit('edit-custom-attribute', attribute)"
+              />
+              <FormButton
                 v-tippy="'删除自定义属性'"
                 size="sm"
                 color="subtle"
@@ -162,7 +171,7 @@ import { useHighlightedObjectsUtilities } from '~/lib/viewer/composables/ui'
 import type { KeyValuePair } from '~/components/viewer/selection/types'
 import type { ViewerObjectCustomAttribute } from '~/lib/viewer/composables/objectCustomAttributes'
 import { REVIT_PROPERTY_NAME_ZH_MAP } from '~/lib/viewer/helpers/filters/constants'
-import { Plus, Trash2 } from 'lucide-vue-next'
+import { Plus, SquarePen, Trash2 } from 'lucide-vue-next'
 
 const {
   ui: {
@@ -194,6 +203,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'add-custom-attribute'): void
+  (e: 'edit-custom-attribute', attribute: ViewerObjectCustomAttribute): void
   (e: 'delete-custom-attribute', attributeId: string): void
 }>()
 

@@ -41,6 +41,18 @@
               @click="openCreateCatalogDialog"
             />
             <FormButton
+              v-if="activeCatalogId"
+              v-tippy="getTooltipProps('编辑当前目录')"
+              size="sm"
+              color="subtle"
+              :icon-left="Pencil"
+              hide-text
+              name="editCatalog"
+              :disabled="isSaving"
+              @click="openEditCatalogDialog"
+            />
+            <FormButton
+              v-if="activeCatalogId"
               v-tippy="getTooltipProps('删除当前目录')"
               size="sm"
               color="danger"
@@ -66,6 +78,7 @@
         >
           目录节点
           <FormButton
+            v-if="activeCatalogId"
             v-tippy="getTooltipProps('创建根节点')"
             size="sm"
             color="subtle"
@@ -90,6 +103,27 @@
                   class="flex items-center gap-0.5 transition-opacity duration-150 opacity-0 group-hover:opacity-100"
                   :class="{ 'opacity-100': selected }"
                 >
+                  <button
+                    type="button"
+                    class="p-1 rounded-sm text-foreground-2 hover:text-primary hover:bg-foundation-page transition-colors"
+                    title="编辑节点"
+                    :disabled="isSaving"
+                    @click.stop="openEditNodeDialog(String(node.key))"
+                  >
+                    <Pencil class="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    class="p-1 rounded-sm text-foreground-2 hover:text-warning hover:bg-warning-muted transition-colors"
+                    :title="getNodeLockButtonTitle(node)"
+                    :disabled="isSaving"
+                    @click.stop="
+                      onToggleNodeLocked(String(node.key), !isTreeNodeLocked(node))
+                    "
+                  >
+                    <Lock v-if="isTreeNodeLocked(node)" class="w-3.5 h-3.5" />
+                    <LockOpen v-else class="w-3.5 h-3.5" />
+                  </button>
                   <button
                     type="button"
                     class="p-1 rounded-sm text-foreground-2 hover:text-[#00b4b6] hover:bg-[#e6f7f8] transition-colors"
@@ -126,9 +160,9 @@
     <LayoutDialog
       v-model:open="showCreateCatalogDialog"
       max-width="sm"
-      :buttons="createCatalogDialogButtons"
+      :buttons="catalogDialogButtons"
     >
-      <template #header>创建目录</template>
+      <template #header>{{ catalogDialogTitle }}</template>
       <div class="space-y-2">
         <div class="text-body-xs text-foreground-2">请输入目录名称</div>
         <FormTextInput
@@ -143,9 +177,9 @@
     <LayoutDialog
       v-model:open="showCreateNodeDialog"
       max-width="sm"
-      :buttons="createNodeDialogButtons"
+      :buttons="nodeDialogButtons"
     >
-      <template #header>创建节点</template>
+      <template #header>{{ nodeDialogTitle }}</template>
       <div class="space-y-2">
         <div class="text-body-xs text-foreground-2">请输入节点名称</div>
         <FormTextInput
@@ -159,7 +193,7 @@
   </ViewerLayoutSidePanel>
 </template>
 <script setup lang="ts">
-import { Plus, Trash, RefreshCcw } from 'lucide-vue-next'
+import { Plus, Trash, RefreshCcw, Lock, LockOpen, Pencil } from 'lucide-vue-next'
 import { graphql } from '~/lib/common/generated/gql'
 import {
   useInjectedViewerState,
@@ -227,6 +261,7 @@ const isSaving = ref(false)
 type RawCatalogNode = {
   title: string
   id: string
+  locked?: boolean
   isolatedApplicationIds?: string[]
   hiddenApplicationIds?: string[]
   childrens?: RawCatalogNode[]
@@ -235,6 +270,7 @@ type RawCatalogNode = {
 type CatalogTreeNode = {
   key: string
   title: string
+  locked?: boolean
   children?: CatalogTreeNode[]
 }
 
@@ -431,11 +467,20 @@ const saveToNode = async ({
   const catalogIndex = catalogs.value.findIndex((item) => item.id === currentCatalogId)
   if (catalogIndex < 0) return
 
-  isSaving.value = true
   const currentCatalog = catalogs.value[catalogIndex]
   const existingChildren = Array.isArray(currentCatalog.childrens)
     ? currentCatalog.childrens
     : []
+  const targetNode = findNodeById(existingChildren, targetNodeId)
+  if (targetNode?.locked) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '保存失败',
+      description: '当前节点已锁定，不能保存节点'
+    })
+    return
+  }
+  isSaving.value = true
   const updateNodeById = (
     nodes: RawCatalogNode[],
     nodeId: string
@@ -483,10 +528,7 @@ const saveToNode = async ({
       childrens: result.updatedNodes
     }
 
-    const nextCatalogs = [...catalogs.value]
-    nextCatalogs.splice(catalogIndex, 1, updatedCatalog)
-    catalogs.value = nextCatalogs
-    activeCatalogItem.value = updatedCatalog
+    replaceCatalogAtIndex(catalogIndex, updatedCatalog)
     triggerNotification({
       type: ToastNotificationType.Success,
       title: '视图状态保存成功'
@@ -506,6 +548,12 @@ const activeCatalogId = computed(
   () => activeCatalogItem.value?.id || catalogs.value[0]?.id
 )
 
+const isTreeNodeLocked = (node: unknown) =>
+  Boolean((node as { locked?: boolean } | null)?.locked)
+
+const getNodeLockButtonTitle = (node: unknown) =>
+  isTreeNodeLocked(node) ? '解锁节点' : '锁定节点'
+
 const activeCatalogTabItem = computed<LayoutPageTabItem>({
   get: () => activeCatalogItem.value || catalogs.value[0]!,
   set: (value) => {
@@ -518,6 +566,7 @@ const mapCatalogChildrenToTreeNodes = (nodes: RawCatalogNode[]): CatalogTreeNode
   return nodes.map((node) => ({
     key: node.id,
     title: node.title,
+    locked: node.locked ?? false,
     children:
       Array.isArray(node.childrens) && node.childrens.length
         ? mapCatalogChildrenToTreeNodes(node.childrens)
@@ -535,6 +584,8 @@ const showCreateCatalogDialog = ref(false)
 const showCreateNodeDialog = ref(false)
 const newCatalogName = ref('')
 const newNodeName = ref('')
+const editingCatalogId = ref<string | undefined>(undefined)
+const editingNodeId = ref<string | undefined>(undefined)
 const selectedTreeKeys = ref<string[]>([])
 const selectedTreeNodeId = computed(() => selectedTreeKeys.value[0])
 
@@ -587,7 +638,11 @@ useKeepAliveScrollState(useTemplateRef('groupsScrollArea'))
 const canCreateViewOrGroup = computed(
   () => project.value?.permissions.canCreateSavedView
 )
-const createCatalogDialogButtons = computed((): LayoutDialogButton[] => [
+const catalogDialogTitle = computed(() =>
+  editingCatalogId.value ? '编辑目录' : '创建目录'
+)
+
+const catalogDialogButtons = computed((): LayoutDialogButton[] => [
   {
     text: '取消',
     props: { color: 'outline' },
@@ -596,15 +651,17 @@ const createCatalogDialogButtons = computed((): LayoutDialogButton[] => [
     }
   },
   {
-    text: '创建',
+    text: editingCatalogId.value ? '保存' : '创建',
     disabled: !newCatalogName.value.trim(),
     onClick: () => {
-      onAddCatalog()
+      onSubmitCatalogDialog()
     }
   }
 ])
 
-const createNodeDialogButtons = computed((): LayoutDialogButton[] => [
+const nodeDialogTitle = computed(() => (editingNodeId.value ? '编辑节点' : '创建节点'))
+
+const nodeDialogButtons = computed((): LayoutDialogButton[] => [
   {
     text: '取消',
     props: { color: 'outline' },
@@ -613,31 +670,131 @@ const createNodeDialogButtons = computed((): LayoutDialogButton[] => [
     }
   },
   {
-    text: '创建',
+    text: editingNodeId.value ? '保存' : '创建',
     disabled: !newNodeName.value.trim(),
     onClick: () => {
-      onAddNode()
+      onSubmitNodeDialog()
     }
   }
 ])
 
 const openCreateCatalogDialog = () => {
+  editingCatalogId.value = undefined
   newCatalogName.value = ''
+  showCreateCatalogDialog.value = true
+}
+
+const openEditCatalogDialog = () => {
+  const currentCatalogId = activeCatalogId.value
+  if (!currentCatalogId) return
+
+  const currentCatalog = catalogs.value.find((item) => item.id === currentCatalogId)
+  if (!currentCatalog) return
+
+  editingCatalogId.value = currentCatalogId
+  newCatalogName.value = currentCatalog.title
   showCreateCatalogDialog.value = true
 }
 
 const targetParentNodeId = ref<string | undefined>(undefined)
 
 const openCreateRootNodeDialog = () => {
+  editingNodeId.value = undefined
   targetParentNodeId.value = undefined
   newNodeName.value = ''
   showCreateNodeDialog.value = true
 }
 
 const openCreateChildNodeDialog = (parentId: string) => {
+  editingNodeId.value = undefined
   targetParentNodeId.value = parentId
   newNodeName.value = ''
   showCreateNodeDialog.value = true
+}
+
+const openEditNodeDialog = (nodeId: string) => {
+  const currentCatalogId = activeCatalogId.value
+  if (!currentCatalogId) return
+
+  const currentCatalog = catalogs.value.find((item) => item.id === currentCatalogId)
+  const targetNode = findNodeById(currentCatalog?.childrens || [], nodeId)
+  if (!targetNode) return
+
+  editingNodeId.value = nodeId
+  targetParentNodeId.value = undefined
+  newNodeName.value = targetNode.title
+  showCreateNodeDialog.value = true
+}
+
+const replaceCatalogAtIndex = (
+  catalogIndex: number,
+  updatedCatalog: CatalogTabItem,
+  options?: {
+    syncActiveItem?: boolean
+  }
+) => {
+  const nextCatalogs = [...catalogs.value]
+  nextCatalogs.splice(catalogIndex, 1, updatedCatalog)
+  catalogs.value = nextCatalogs
+
+  if (options?.syncActiveItem !== false) {
+    activeCatalogItem.value = updatedCatalog
+  }
+}
+
+const onSubmitCatalogDialog = async () => {
+  if (editingCatalogId.value) {
+    await onEditCatalog()
+    return
+  }
+
+  await onAddCatalog()
+}
+
+const onEditCatalog = async () => {
+  const title = newCatalogName.value.trim()
+  const currentCatalogId = editingCatalogId.value
+  if (
+    !title ||
+    !currentCatalogId ||
+    !projectId.value ||
+    !currentModelId.value ||
+    isSaving.value
+  )
+    return
+
+  const catalogIndex = catalogs.value.findIndex((item) => item.id === currentCatalogId)
+  if (catalogIndex < 0) return
+
+  const currentCatalog = catalogs.value[catalogIndex]
+
+  try {
+    isSaving.value = true
+    await updateCatalog(projectId.value, currentModelId.value, currentCatalogId, {
+      title
+    })
+
+    const updatedCatalog: CatalogTabItem = {
+      ...currentCatalog,
+      title
+    }
+
+    replaceCatalogAtIndex(catalogIndex, updatedCatalog)
+    showCreateCatalogDialog.value = false
+    editingCatalogId.value = undefined
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '目录编辑成功'
+    })
+  } catch (e: unknown) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '目录编辑失败',
+      description: e instanceof Error ? e.message : '请检查网络连接'
+    })
+  } finally {
+    isSaving.value = false
+  }
 }
 
 const onAddCatalog = async () => {
@@ -661,6 +818,7 @@ const onAddCatalog = async () => {
     catalogs.value = [...catalogs.value, nextCatalog]
     activeCatalogItem.value = nextCatalog
     showCreateCatalogDialog.value = false
+    editingCatalogId.value = undefined
     triggerNotification({
       type: ToastNotificationType.Success,
       title: '目录创建成功'
@@ -670,6 +828,104 @@ const onAddCatalog = async () => {
       type: ToastNotificationType.Danger,
       title: '目录创建失败',
       description: e instanceof Error ? e.message : '请检查网络连接'
+    })
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const onSubmitNodeDialog = async () => {
+  if (editingNodeId.value) {
+    await onEditNode()
+    return
+  }
+
+  await onAddNode()
+}
+
+const onEditNode = async () => {
+  const title = newNodeName.value.trim()
+  const targetNodeId = editingNodeId.value
+  const currentCatalogId = activeCatalogId.value
+  if (
+    !title ||
+    !targetNodeId ||
+    !currentCatalogId ||
+    !projectId.value ||
+    !currentModelId.value ||
+    isSaving.value
+  )
+    return
+
+  const catalogIndex = catalogs.value.findIndex((item) => item.id === currentCatalogId)
+  if (catalogIndex < 0) return
+
+  isSaving.value = true
+
+  const currentCatalog = catalogs.value[catalogIndex]
+  const existingChildren = Array.isArray(currentCatalog.childrens)
+    ? currentCatalog.childrens
+    : []
+
+  const updateNodeTitleById = (
+    nodes: RawCatalogNode[],
+    nodeId: string,
+    nextTitle: string
+  ): { updatedNodes: RawCatalogNode[]; updated: boolean } => {
+    let updated = false
+    const updatedNodes = nodes.map((node) => {
+      if (node.id === nodeId) {
+        updated = true
+        return {
+          ...node,
+          title: nextTitle
+        }
+      }
+
+      const children = node.childrens || []
+      if (!children.length) return node
+
+      const childResult = updateNodeTitleById(children, nodeId, nextTitle)
+      if (!childResult.updated) return node
+
+      updated = true
+      return {
+        ...node,
+        childrens: childResult.updatedNodes
+      }
+    })
+
+    return { updatedNodes, updated }
+  }
+
+  const result = updateNodeTitleById(existingChildren, targetNodeId, title)
+  if (!result.updated) {
+    isSaving.value = false
+    return
+  }
+
+  try {
+    await updateCatalog(projectId.value, currentModelId.value, currentCatalogId, {
+      treeData: result.updatedNodes as ViewerCatalogNode[]
+    })
+
+    const updatedCatalog: CatalogTabItem = {
+      ...currentCatalog,
+      childrens: result.updatedNodes
+    }
+
+    replaceCatalogAtIndex(catalogIndex, updatedCatalog)
+    showCreateNodeDialog.value = false
+    editingNodeId.value = undefined
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '节点编辑成功'
+    })
+  } catch (e: unknown) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '节点编辑失败',
+      description: e instanceof Error ? e.message : '网络或服务器错误'
     })
   } finally {
     isSaving.value = false
@@ -744,7 +1000,10 @@ const onAddNode = async () => {
       nextNode
     )
 
-    if (!insertionResult.inserted) return
+    if (!insertionResult.inserted) {
+      isSaving.value = false
+      return
+    }
     updatedNodes = insertionResult.updatedNodes
   }
 
@@ -758,11 +1017,9 @@ const onAddNode = async () => {
       childrens: updatedNodes
     }
 
-    const nextCatalogs = [...catalogs.value]
-    nextCatalogs.splice(catalogIndex, 1, updatedCatalog)
-    catalogs.value = nextCatalogs
-    activeCatalogItem.value = updatedCatalog
+    replaceCatalogAtIndex(catalogIndex, updatedCatalog)
     showCreateNodeDialog.value = false
+    editingNodeId.value = undefined
 
     // Automatically select the new node or expand parents
     selectedTreeKeys.value = [nextNode.id]
@@ -882,10 +1139,7 @@ const onDeleteSpecificNode = async (nodeId: string) => {
       childrens: result.updatedNodes
     }
 
-    const nextCatalogs = [...catalogs.value]
-    nextCatalogs.splice(catalogIndex, 1, updatedCatalog)
-    catalogs.value = nextCatalogs
-    activeCatalogItem.value = updatedCatalog
+    replaceCatalogAtIndex(catalogIndex, updatedCatalog)
 
     if (selectedTreeNodeId.value === nodeId) {
       selectedTreeKeys.value = []
@@ -899,6 +1153,90 @@ const onDeleteSpecificNode = async (nodeId: string) => {
     triggerNotification({
       type: ToastNotificationType.Danger,
       title: '删除节点失败',
+      description: e instanceof Error ? e.message : '网络或服务器错误'
+    })
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const onToggleNodeLocked = async (nodeId: string, locked: boolean) => {
+  const currentCatalogId = activeCatalogId.value
+  if (
+    !currentCatalogId ||
+    !nodeId ||
+    !projectId.value ||
+    !currentModelId.value ||
+    isSaving.value
+  )
+    return
+
+  const catalogIndex = catalogs.value.findIndex((item) => item.id === currentCatalogId)
+  if (catalogIndex < 0) return
+
+  isSaving.value = true
+
+  const currentCatalog = catalogs.value[catalogIndex]
+  const existingChildren = Array.isArray(currentCatalog.childrens)
+    ? currentCatalog.childrens
+    : []
+  const updateNodeLockedById = (
+    nodes: RawCatalogNode[],
+    targetId: string,
+    nextLocked: boolean
+  ): { updatedNodes: RawCatalogNode[]; updated: boolean } => {
+    let updated = false
+    const updatedNodes = nodes.map((node) => {
+      if (node.id === targetId) {
+        updated = true
+        return {
+          ...node,
+          locked: nextLocked
+        }
+      }
+
+      const children = node.childrens || []
+      if (!children.length) return node
+
+      const childResult = updateNodeLockedById(children, targetId, nextLocked)
+      if (!childResult.updated) return node
+
+      updated = true
+      return {
+        ...node,
+        childrens: childResult.updatedNodes
+      }
+    })
+
+    return { updatedNodes, updated }
+  }
+
+  const result = updateNodeLockedById(existingChildren, nodeId, locked)
+  if (!result.updated) {
+    isSaving.value = false
+    return
+  }
+
+  try {
+    await updateCatalog(projectId.value, currentModelId.value, currentCatalogId, {
+      treeData: result.updatedNodes as ViewerCatalogNode[]
+    })
+
+    const updatedCatalog: CatalogTabItem = {
+      ...currentCatalog,
+      childrens: result.updatedNodes
+    }
+
+    replaceCatalogAtIndex(catalogIndex, updatedCatalog)
+
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: locked ? '节点已锁定' : '节点已解锁'
+    })
+  } catch (e: unknown) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: locked ? '锁定节点失败' : '解锁节点失败',
       description: e instanceof Error ? e.message : '网络或服务器错误'
     })
   } finally {

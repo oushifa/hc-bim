@@ -1,5 +1,13 @@
 <template>
   <div class="h-full">
+    <input
+      ref="modelLibraryFileInput"
+      type="file"
+      class="hidden"
+      aria-label="选择要上传到模型库的模型文件"
+      accept=".ifc,.rvt,.dwg,.dxf,.3dm,.skp,.step,.stp,.igs,.iges,.obj,.fbx,.glb,.gltf"
+      @change="onModelLibraryFileSelected"
+    />
     <div
       class="h-full flex flex-col bg-white/80 backdrop-blur-md rounded-[26px] shadow-sm overflow-hidden"
     >
@@ -127,9 +135,14 @@
           <!-- Action Button -->
           <button
             v-if="hasModelOp('canUpload')"
+            :disabled="creatingModel"
             class="bg-[#00b4b6] hover:bg-[#009fa1] text-white px-4 py-1.5 rounded-[8px] text-sm font-medium transition-colors"
+            :class="creatingModel ? 'opacity-70 cursor-not-allowed' : ''"
+            @click="openModelLibraryFilePicker"
           >
-            新建模型
+            {{
+              creatingModel ? `上传中 ${Math.round(createModelProgress)}%` : '新建模型'
+            }}
           </button>
         </div>
       </div>
@@ -387,12 +400,54 @@
       title="选择要下载的版本"
       :use-auth-download="true"
     />
+    <LayoutDialog
+      v-model:open="createModelDialogOpen"
+      max-width="sm"
+      hide-closer
+      :buttons="createModelDialogButtons"
+    >
+      <template #header>新建模型</template>
+      <div class="flex flex-col space-y-4">
+        <div
+          v-if="selectedCreateModelFile"
+          class="rounded-[8px] bg-gray-50 px-3 py-2 text-sm text-gray-500"
+        >
+          已选择文件：{{ selectedCreateModelFile.name }}
+        </div>
+        <FormTextInput
+          v-model="createModelName"
+          color="foundation"
+          name="light-model-name"
+          label="模型名称"
+          show-label
+          placeholder="请输入模型名称"
+          :custom-icon="CubeIcon"
+          :disabled="creatingModel"
+          autocomplete="off"
+        />
+        <FormTextArea
+          v-model="createModelDescription"
+          color="foundation"
+          name="light-model-description"
+          show-label
+          show-optional
+          label="模型描述"
+          placeholder="请输入模型描述"
+          size="lg"
+          :disabled="creatingModel"
+        />
+        <p v-if="createModelNameError" class="text-sm text-danger">
+          {{ createModelNameError }}
+        </p>
+      </div>
+    </LayoutDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useApolloClient } from '@vue/apollo-composable'
+import type { LayoutDialogButton } from '@speckle/ui-components'
 import {
   MagnifyingGlassIcon,
   CubeIcon,
@@ -417,6 +472,8 @@ import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import { useApiOrigin } from '~~/composables/env'
 import { useFileDownload } from '~~/lib/core/composables/fileUpload'
 import { ensureError } from '@speckle/shared'
+import { useModelLibraryApi } from '~~/lib/projects/composables/modelLibrary'
+import { sanitizeModelName } from '~~/lib/projects/helpers/models'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
@@ -504,6 +561,14 @@ const { downloadWithAuth } = useFileDownload()
 const apiOrigin = useApiOrigin()
 const authToken = useAuthCookie()
 const { triggerNotification } = useGlobalToast()
+const { uploadFile: uploadModelLibraryFile } = useModelLibraryApi()
+const modelLibraryFileInput = ref<HTMLInputElement | null>(null)
+const creatingModel = ref(false)
+const createModelProgress = ref(0)
+const createModelDialogOpen = ref(false)
+const selectedCreateModelFile = ref<File | null>(null)
+const createModelName = ref('')
+const createModelDescription = ref('')
 
 const memberOptions = [
   { value: 'all', label: '所有成员' },
@@ -514,6 +579,128 @@ const sourceOptions = [
   { value: 'local', label: '本地上传' },
   { value: 'plugin', label: '插件同步' }
 ]
+
+const getModelNameFromFile = (fileName: string) => {
+  return fileName.replace(/\.[^.]+$/, '').trim() || fileName.trim()
+}
+
+const createModelNameError = computed(() => {
+  const sanitized = sanitizeModelName(createModelName.value || '')
+  if (!sanitized.length) return '请输入模型名称'
+  return ''
+})
+
+const resetModelLibraryUploadState = () => {
+  creatingModel.value = false
+  createModelProgress.value = 0
+  if (modelLibraryFileInput.value) {
+    modelLibraryFileInput.value.value = ''
+  }
+}
+
+const resetCreateModelDialogState = () => {
+  createModelDialogOpen.value = false
+  selectedCreateModelFile.value = null
+  createModelName.value = ''
+  createModelDescription.value = ''
+}
+
+const openModelLibraryFilePicker = () => {
+  if (creatingModel.value) return
+  modelLibraryFileInput.value?.click()
+}
+
+const onModelLibraryFileSelected = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  selectedCreateModelFile.value = file
+  createModelName.value = getModelNameFromFile(file.name)
+  createModelDescription.value = ''
+  createModelDialogOpen.value = true
+
+  if (modelLibraryFileInput.value) {
+    modelLibraryFileInput.value.value = ''
+  }
+}
+
+const submitCreateModel = async () => {
+  const file = selectedCreateModelFile.value
+  const modelName = sanitizeModelName(createModelName.value || '')
+  if (!file) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '新建模型失败',
+      description: '请先选择要上传的模型文件'
+    })
+    return
+  }
+
+  if (!modelName.length) return
+
+  creatingModel.value = true
+  createModelProgress.value = 0
+
+  try {
+    const result = await uploadModelLibraryFile(
+      {
+        file,
+        modelName,
+        modelDescription: createModelDescription.value.trim() || undefined
+      },
+      {
+        onProgress: (percentage) => {
+          createModelProgress.value = percentage
+        }
+      }
+    )
+
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '模型已提交到模型库',
+      description: `模型 ${result.imported.modelName} 已开始导入`
+    })
+
+    resetCreateModelDialogState()
+    await fetchModels()
+  } catch (e) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '新建模型失败',
+      description: ensureError(e).message
+    })
+  } finally {
+    resetModelLibraryUploadState()
+  }
+}
+
+const createModelDialogButtons = computed((): LayoutDialogButton[] => [
+  {
+    text: '取消',
+    props: {
+      color: 'outline'
+    },
+    onClick: () => {
+      if (creatingModel.value) return
+      resetCreateModelDialogState()
+    },
+    disabled: creatingModel.value
+  },
+  {
+    text: creatingModel.value
+      ? `上传中 ${Math.round(createModelProgress.value)}%`
+      : '创建',
+    props: {},
+    onClick: () => {
+      void submitCreateModel()
+    },
+    disabled:
+      creatingModel.value ||
+      !selectedCreateModelFile.value ||
+      !!createModelNameError.value
+  }
+])
 
 const fetchModels = async () => {
   loading.value = true

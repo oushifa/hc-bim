@@ -10,10 +10,7 @@ import { OverridesOf } from '../../../../tests/helpers/types.js'
 import { canCreateSavedViewPolicy } from './canCreate.js'
 import { TIME_MS } from '../../../../core/index.js'
 import {
-  ProjectNoAccessError,
-  ProjectNotEnoughPermissionsError,
   ServerNoAccessError,
-  WorkspaceNoAccessError,
   WorkspaceReadOnlyError
 } from '../../../domain/authErrors.js'
 import { WorkspacePlans } from '../../../../workspaces/index.js'
@@ -38,16 +35,14 @@ const buildSUT = (overrides?: OverridesOf<typeof canCreateSavedViewPolicy>) =>
   })
 
 describe('canCreateSavedViewPolicy', () => {
-  it('fails when not workspaced project', async () => {
+  it('succeeds when not workspaced project', async () => {
     const canCreate = buildSUT()
 
     const result = await canCreate({
       userId: 'user-id',
       projectId: 'project-id'
     })
-    expect(result).toBeAuthErrorResult({
-      code: WorkspaceNoAccessError.code
-    })
+    expect(result).toBeAuthOKResult()
   })
 
   describe('w/ workspaces', () => {
@@ -106,7 +101,7 @@ describe('canCreateSavedViewPolicy', () => {
       expect(result).toBeOKResult()
     })
 
-    it('fails if not contributor+', async () => {
+    it('succeeds even if not contributor+', async () => {
       const canCreate = buildWorkspaceSUT({
         getWorkspaceRole: async () => Roles.Workspace.Member,
         getProjectRole: async () => Roles.Stream.Reviewer
@@ -116,12 +111,10 @@ describe('canCreateSavedViewPolicy', () => {
         userId: 'user-id',
         projectId: 'project-id'
       })
-      expect(result).toBeAuthErrorResult({
-        code: ProjectNotEnoughPermissionsError.code
-      })
+      expect(result).toBeOKResult()
     })
 
-    it('fails if no project access', async () => {
+    it('succeeds even if no project access', async () => {
       const canCreate = buildWorkspaceSUT({
         getWorkspaceRole: async () => Roles.Workspace.Member,
         getProjectRole: async () => null
@@ -131,9 +124,7 @@ describe('canCreateSavedViewPolicy', () => {
         userId: 'user-id',
         projectId: 'project-id'
       })
-      expect(result).toBeAuthErrorResult({
-        code: ProjectNoAccessError.code
-      })
+      expect(result).toBeOKResult()
     })
 
     it('fails if logged out', async () => {
