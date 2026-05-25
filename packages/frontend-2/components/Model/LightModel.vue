@@ -5,8 +5,16 @@
       type="file"
       class="hidden"
       aria-label="选择要上传到模型库的模型文件"
-      accept=".ifc,.rvt,.dwg,.dxf,.3dm,.skp,.step,.stp,.igs,.iges,.obj,.fbx,.glb,.gltf"
+      accept=".ifc,.rvt"
       @change="onModelLibraryFileSelected"
+    />
+    <input
+      ref="versionFileInput"
+      type="file"
+      class="hidden"
+      aria-label="选择要上传的新版本文件"
+      accept=".ifc,.rvt"
+      @change="onVersionFileSelected"
     />
     <div
       class="h-full flex flex-col bg-white/80 backdrop-blur-md rounded-[26px] shadow-sm overflow-hidden"
@@ -209,6 +217,12 @@
                       </div>
                       <span class="font-medium whitespace-pre-line">
                         {{ model.title }}
+                        <span
+                          v-if="getModelRuntimeStatus(model)"
+                          class="ml-2 text-xs font-normal text-gray-400"
+                        >
+                          {{ getModelRuntimeStatus(model) }}
+                        </span>
                       </span>
                     </div>
                   </td>
@@ -219,10 +233,9 @@
                     {{ formatDate(model.updateTime) }}
                   </td>
                   <td class="px-4 py-3">
-                    <span v-if="model.status" class="text-red-500 text-xs">
-                      {{ model.status }}
+                    <span class="text-xs text-gray-500">
+                      {{ getModelRuntimeStatus(model) || '-' }}
                     </span>
-                    <span v-else class="text-green-600 text-xs">正常</span>
                   </td>
                   <td class="px-4 py-3 text-center text-gray-500">
                     {{ model.comments }}
@@ -251,29 +264,53 @@
                             <ArrowDownTrayIcon class="w-3.5 h-3.5" />
                             <span>导出模型数据</span>
                           </button>
-                          <button class="menu-item" @click.stop="closeActionMenu">
+                          <button class="menu-item" @click.stop="shareModel(model)">
                             <ShareIcon class="w-3.5 h-3.5" />
                             <span>分享</span>
                           </button>
                           <button
                             v-if="hasModelOp('canEdit')"
                             class="menu-item"
-                            @click.stop="closeActionMenu"
+                            @click.stop="openRenameDialog(model)"
                           >
                             <PencilSquareIcon class="w-3.5 h-3.5" />
                             <span>重命名</span>
                           </button>
-                          <button class="menu-item" @click.stop="closeActionMenu">
-                            <ClockIcon class="w-3.5 h-3.5" />
-                            <span>历史版本</span>
+                          <button
+                            v-if="hasModelOp('canUpload')"
+                            class="menu-item"
+                            :disabled="uploadingModelId === model.id"
+                            @click.stop="openVersionFilePicker(model)"
+                          >
+                            <ArrowUpTrayIcon class="w-3.5 h-3.5" />
+                            <span>更新版本</span>
                           </button>
                           <button
-                            v-if="hasModelOp('canFile')"
-                            class="menu-item text-red-500 hover:!bg-red-50"
-                            @click.stop="closeActionMenu"
+                            class="menu-item"
+                            :disabled="
+                              isModelSyncing({
+                                projectId: model.projectId,
+                                modelId: model.id
+                              })
+                            "
+                            @click.stop="syncModelToDtp(model)"
+                          >
+                            <ArrowPathIcon class="w-3.5 h-3.5" />
+                            <span>
+                              {{
+                                getModelRuntimeStatus(model) === '待同步'
+                                  ? '重新同步'
+                                  : '同步中海'
+                              }}
+                            </span>
+                          </button>
+                          <button
+                            v-if="hasModelOp('canEdit')"
+                            class="menu-item text-danger hover:!text-danger"
+                            @click.stop="openDeleteDialog(model)"
                           >
                             <TrashIcon class="w-3.5 h-3.5" />
-                            <span>删除</span>
+                            <span>删除模型</span>
                           </button>
                         </div>
                       </Transition>
@@ -441,6 +478,46 @@
         </p>
       </div>
     </LayoutDialog>
+    <LayoutDialog
+      v-model:open="renameDialogOpen"
+      max-width="sm"
+      hide-closer
+      :buttons="renameDialogButtons"
+    >
+      <template #header>重命名模型</template>
+      <div class="flex flex-col space-y-4">
+        <FormTextInput
+          v-model="renameModelName"
+          color="foundation"
+          name="light-model-rename"
+          label="模型名称"
+          show-label
+          placeholder="请输入模型名称"
+          :custom-icon="CubeIcon"
+          :disabled="renamingModel"
+          autocomplete="off"
+        />
+        <p v-if="renameModelNameError" class="text-sm text-danger">
+          {{ renameModelNameError }}
+        </p>
+      </div>
+    </LayoutDialog>
+    <LayoutDialog
+      v-model:open="deleteDialogOpen"
+      max-width="sm"
+      hide-closer
+      :buttons="deleteDialogButtons"
+    >
+      <template #header>删除模型</template>
+      <div class="flex flex-col text-foreground">
+        <p class="mb-2">
+          您确定要删除模型
+          <span class="inline font-medium">{{ deleteTargetModel?.title }}</span>
+          吗？
+        </p>
+        <p>此操作不可逆，所有此模型中的版本都将被删除。</p>
+      </div>
+    </LayoutDialog>
   </div>
 </template>
 
@@ -454,10 +531,11 @@ import {
   ChevronDownIcon,
   EllipsisHorizontalIcon,
   ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
+  ArrowPathIcon,
   ShareIcon,
   PencilSquareIcon,
   TrashIcon,
-  ClockIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ExclamationCircleIcon
@@ -473,7 +551,14 @@ import { useApiOrigin } from '~~/composables/env'
 import { useFileDownload } from '~~/lib/core/composables/fileUpload'
 import { ensureError } from '@speckle/shared'
 import { useModelLibraryApi } from '~~/lib/projects/composables/modelLibrary'
+import {
+  useCopyModelLink,
+  useDeleteModel,
+  useUpdateModel
+} from '~~/lib/projects/composables/modelManagement'
+import { useWorkbenchUploadSync } from '~~/lib/projects/composables/workbenchUploadSync'
 import { sanitizeModelName } from '~~/lib/projects/helpers/models'
+import { FileUploadConvertedStatus } from '~~/lib/core/api/fileImport'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
@@ -497,6 +582,13 @@ interface Model {
   versions: number
   status?: string
   hasModel: boolean
+  latestUpload?: {
+    id: string
+    fileName: string
+    uploadComplete: boolean
+    convertedStatus: number | null
+    convertedMessage?: string | null
+  } | null
 }
 
 const searchQuery = ref('')
@@ -510,6 +602,16 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const uploadsDialogOpen = ref(false)
 const selectedUploadModel = ref<Model | null>(null)
+const versionFileInput = ref<HTMLInputElement | null>(null)
+const pendingVersionUploadModel = ref<Model | null>(null)
+const uploadingModelId = ref<string | null>(null)
+const renameDialogOpen = ref(false)
+const renameTargetModel = ref<Model | null>(null)
+const renameModelName = ref('')
+const renamingModel = ref(false)
+const deleteDialogOpen = ref(false)
+const deleteTargetModel = ref<Model | null>(null)
+const deletingModel = ref(false)
 
 const memberSelectRef = ref<HTMLElement | null>(null)
 const sourceSelectRef = ref<HTMLElement | null>(null)
@@ -562,6 +664,11 @@ const apiOrigin = useApiOrigin()
 const authToken = useAuthCookie()
 const { triggerNotification } = useGlobalToast()
 const { uploadFile: uploadModelLibraryFile } = useModelLibraryApi()
+const updateModel = useUpdateModel()
+const deleteModel = useDeleteModel()
+const copyModelLink = useCopyModelLink()
+const { tasks, registerPendingUpload, isModelSyncing, runFullModelSync } =
+  useWorkbenchUploadSync()
 const modelLibraryFileInput = ref<HTMLInputElement | null>(null)
 const creatingModel = ref(false)
 const createModelProgress = ref(0)
@@ -590,6 +697,12 @@ const createModelNameError = computed(() => {
   return ''
 })
 
+const renameModelNameError = computed(() => {
+  const sanitized = sanitizeModelName(renameModelName.value || '')
+  if (!sanitized.length) return '请输入模型名称'
+  return ''
+})
+
 const resetModelLibraryUploadState = () => {
   creatingModel.value = false
   createModelProgress.value = 0
@@ -603,6 +716,12 @@ const resetCreateModelDialogState = () => {
   selectedCreateModelFile.value = null
   createModelName.value = ''
   createModelDescription.value = ''
+}
+
+const resetRenameDialogState = () => {
+  renameDialogOpen.value = false
+  renameTargetModel.value = null
+  renameModelName.value = ''
 }
 
 const openModelLibraryFilePicker = () => {
@@ -623,6 +742,27 @@ const onModelLibraryFileSelected = (event: Event) => {
   if (modelLibraryFileInput.value) {
     modelLibraryFileInput.value.value = ''
   }
+}
+
+const openVersionFilePicker = (model: Model) => {
+  if (uploadingModelId.value) return
+  pendingVersionUploadModel.value = model
+  closeActionMenu()
+  versionFileInput.value?.click()
+}
+
+const registerSyncTaskForUpload = (params: {
+  projectId: string
+  modelId: string
+  fileName: string
+  uploadId?: string | null
+}) => {
+  registerPendingUpload({
+    projectId: params.projectId,
+    modelId: params.modelId,
+    fileName: params.fileName,
+    uploadId: params.uploadId || null
+  })
 }
 
 const submitCreateModel = async () => {
@@ -662,6 +802,13 @@ const submitCreateModel = async () => {
       description: `模型 ${result.imported.modelName} 已开始导入`
     })
 
+    registerSyncTaskForUpload({
+      projectId: result.imported.projectId,
+      modelId: result.imported.modelId,
+      fileName: file.name,
+      uploadId: result.imported.fileId || result.prepared.fileId || null
+    })
+
     resetCreateModelDialogState()
     await fetchModels()
   } catch (e) {
@@ -673,6 +820,93 @@ const submitCreateModel = async () => {
   } finally {
     resetModelLibraryUploadState()
   }
+}
+
+const uploadNewVersion = async (model: Model, file: File) => {
+  uploadingModelId.value = model.id
+
+  try {
+    const result = await uploadModelLibraryFile(
+      {
+        file,
+        modelId: model.id,
+        modelName: model.title
+      },
+      {
+        onProgress: () => {
+          // 标题状态只展示“上传中”，不额外展示百分比
+        }
+      }
+    )
+
+    registerSyncTaskForUpload({
+      projectId: result.imported.projectId,
+      modelId: result.imported.modelId,
+      fileName: file.name,
+      uploadId: result.imported.fileId || result.prepared.fileId || null
+    })
+
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '新版本已提交',
+      description: `模型 ${result.imported.modelName} 已开始处理并等待同步中海`
+    })
+
+    await fetchModels()
+  } catch (e) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '更新版本失败',
+      description: ensureError(e).message
+    })
+  } finally {
+    uploadingModelId.value = null
+    pendingVersionUploadModel.value = null
+    if (versionFileInput.value) {
+      versionFileInput.value.value = ''
+    }
+  }
+}
+
+const onVersionFileSelected = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  const model = pendingVersionUploadModel.value
+  if (!file || !model) return
+
+  void uploadNewVersion(model, file)
+}
+
+const getModelRuntimeStatus = (model: Model) => {
+  if (uploadingModelId.value === model.id) {
+    return '上传中'
+  }
+
+  const convertedStatus = model.latestUpload?.convertedStatus
+  if (
+    convertedStatus === FileUploadConvertedStatus.Queued ||
+    convertedStatus === FileUploadConvertedStatus.Converting
+  ) {
+    return '模型处理中'
+  }
+
+  if (isModelSyncing({ projectId: model.projectId, modelId: model.id })) {
+    return '同步中'
+  }
+
+  const latestTask =
+    tasks.value
+      .filter((task) => task.projectId === model.projectId && task.modelId === model.id)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] || null
+
+  if (
+    latestTask &&
+    ['pending_version_created', 'matched', 'error'].includes(latestTask.status)
+  ) {
+    return '待同步'
+  }
+
+  return null
 }
 
 const createModelDialogButtons = computed((): LayoutDialogButton[] => [
@@ -699,6 +933,47 @@ const createModelDialogButtons = computed((): LayoutDialogButton[] => [
       creatingModel.value ||
       !selectedCreateModelFile.value ||
       !!createModelNameError.value
+  }
+])
+
+const renameDialogButtons = computed((): LayoutDialogButton[] => [
+  {
+    text: '取消',
+    props: { color: 'outline' },
+    onClick: () => {
+      if (renamingModel.value) return
+      resetRenameDialogState()
+    },
+    disabled: renamingModel.value
+  },
+  {
+    text: '保存',
+    onClick: () => {
+      void submitRenameModel()
+    },
+    disabled:
+      renamingModel.value || !renameTargetModel.value || !!renameModelNameError.value
+  }
+])
+
+const deleteDialogButtons = computed((): LayoutDialogButton[] => [
+  {
+    text: '取消',
+    props: { color: 'outline' },
+    onClick: () => {
+      if (deletingModel.value) return
+      deleteDialogOpen.value = false
+      deleteTargetModel.value = null
+    },
+    disabled: deletingModel.value
+  },
+  {
+    text: '删除',
+    props: { color: 'danger' },
+    onClick: () => {
+      void submitDeleteModel()
+    },
+    disabled: deletingModel.value || !deleteTargetModel.value
   }
 ])
 
@@ -749,6 +1024,80 @@ const openModelDetail = (model: Model) => {
 const openUploadsDialog = (model: Model) => {
   selectedUploadModel.value = model
   uploadsDialogOpen.value = true
+}
+
+const shareModel = async (model: Model) => {
+  closeActionMenu()
+  await copyModelLink({
+    model: {
+      projectId: model.projectId,
+      id: model.id
+    }
+  })
+}
+
+const openRenameDialog = (model: Model) => {
+  closeActionMenu()
+  renameTargetModel.value = model
+  renameModelName.value = model.title
+  renameDialogOpen.value = true
+}
+
+const submitRenameModel = async () => {
+  const model = renameTargetModel.value
+  const name = sanitizeModelName(renameModelName.value || '')
+  if (!model || !name) return
+
+  try {
+    renamingModel.value = true
+    await updateModel({
+      id: model.id,
+      projectId: model.projectId,
+      name
+    })
+    resetRenameDialogState()
+    await fetchModels()
+  } finally {
+    renamingModel.value = false
+  }
+}
+
+const openDeleteDialog = (model: Model) => {
+  closeActionMenu()
+  deleteTargetModel.value = model
+  deleteDialogOpen.value = true
+}
+
+const submitDeleteModel = async () => {
+  const model = deleteTargetModel.value
+  if (!model) return
+
+  try {
+    deletingModel.value = true
+    const deleted = await deleteModel({
+      id: model.id,
+      projectId: model.projectId
+    })
+    if (deleted) {
+      deleteDialogOpen.value = false
+      deleteTargetModel.value = null
+      await fetchModels()
+    }
+  } finally {
+    deletingModel.value = false
+  }
+}
+
+const syncModelToDtp = async (model: Model) => {
+  closeActionMenu()
+  const synced = await runFullModelSync({
+    projectId: model.projectId,
+    modelId: model.id
+  })
+
+  if (!synced && getModelRuntimeStatus(model) === '待同步') {
+    await fetchModels()
+  }
 }
 
 const downloadCustomAttributesExcel = async (model: Model) => {

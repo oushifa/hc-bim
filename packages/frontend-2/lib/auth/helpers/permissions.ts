@@ -14,8 +14,7 @@ export const ALL_MENU_PERMS = [
 export const ALL_MODEL_PERMS = [
   'canUpload',
   'canEdit',
-  'canDownload',
-  'canFile'
+  'canDownload'
 ] as const
 
 export type MenuPerm = (typeof ALL_MENU_PERMS)[number]

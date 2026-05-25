@@ -160,7 +160,13 @@
                 <h3
                   class="text-sm font-medium text-[#333] line-clamp-2 pr-2 whitespace-pre-line leading-snug"
                 >
-                  {{ model.name }}
+                  <span>{{ model.name }}</span>
+                  <span
+                    v-if="getModelRuntimeStatus(model)"
+                    class="ml-2 text-xs font-normal text-gray-400"
+                  >
+                    {{ getModelRuntimeStatus(model) }}
+                  </span>
                 </h3>
                 <button class="text-gray-400 hover:text-gray-600 p-1 shrink-0">
                   <EllipsisHorizontalIcon class="h-4 w-4" />
@@ -205,11 +211,13 @@
             <table class="w-full text-left border-collapse">
               <thead>
                 <tr class="bg-[#f8f9fa] text-gray-500 text-sm border-b border-gray-200">
-                  <th class="px-4 py-3 font-medium">模型名称</th>
-                  <th class="px-4 py-3 font-medium">更新时间</th>
+                  <th class="px-4 py-3 font-medium text-left min-w-[200px]">
+                    模型名称
+                  </th>
+                  <th class="px-4 py-3 font-medium text-left w-[200px]">更新时间</th>
                   <!-- <th class="px-4 py-3 font-medium text-center">seedId</th> -->
-                  <th class="px-4 py-3 font-medium text-center">版本数</th>
-                  <th class="px-4 py-3 font-medium text-right">操作</th>
+                  <th class="px-4 py-3 font-medium text-left w-[150px]">版本数</th>
+                  <th class="px-4 py-3 font-medium text-left w-[250px]">操作</th>
                 </tr>
               </thead>
               <tbody class="text-sm text-[#333] divide-y divide-gray-100">
@@ -230,22 +238,26 @@
                       <CubeIcon v-else class="h-4 w-4 text-gray-400 shrink-0" />
                       <span class="font-medium whitespace-pre-line">
                         {{ model.name }}
+                        <span
+                          v-if="getModelRuntimeStatus(model)"
+                          class="ml-2 text-xs font-normal text-gray-400"
+                        >
+                          {{ getModelRuntimeStatus(model) }}
+                        </span>
                       </span>
                     </div>
                   </td>
-                  <td class="px-4 py-3 text-gray-500">
+                  <td class="px-4 py-3 text-left text-gray-500">
                     {{ formatDate(model.updatedAt) }}
                   </td>
                   <!-- <td class="px-4 py-3 text-center text-gray-500">
                     {{ JSON.stringify(model.raw.lastVersion?.items?.[0] || '{}') }}
                   </td> -->
-                  <td class="px-4 py-3 text-center text-gray-500">
+                  <td class="px-4 py-3 text-left text-gray-500">
                     {{ model.versionsCount || 0 }}
                   </td>
-                  <td class="px-4 py-3 text-right">
-                    <div
-                      class="flex items-center justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
+                  <td class="px-4 py-3 text-left">
+                    <div class="flex items-center justify-start space-x-2">
                       <button
                         title="查看"
                         class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
@@ -260,7 +272,10 @@
                         <ClockIcon class="h-4 w-4" />
                       </button>
                       <button
-                        v-if="model.raw.permissions.canCreateVersion.authorized"
+                        v-if="
+                          model.raw.permissions.canCreateVersion.authorized &&
+                          hasModelOp('canEdit')
+                        "
                         title="上传新版本"
                         class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
                         @click.stop="triggerVersionUploadPicker(model)"
@@ -303,6 +318,14 @@
                       >
                         <ArrowDownTrayIcon class="h-4 w-4" />
                       </button>
+                      <button
+                        v-if="model.raw.permissions.canDelete.authorized"
+                        title="删除"
+                        class="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                        @click.stop="handleDeleteModel(model)"
+                      >
+                        <TrashIcon class="h-4 w-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -343,6 +366,13 @@
       :skip-dtp-model-sync="true"
       class="hidden"
       @uploading="onModelUploading"
+    />
+    <DeleteDialog
+      v-if="deleteTargetModel"
+      v-model:open="showDeleteModelConfirm"
+      :project-id="props.projectId"
+      :model="deleteTargetModel.raw"
+      @deleted="onModelDeleted"
     />
 
     <!-- Add Directory Modal -->
@@ -424,7 +454,8 @@ import {
   ArrowDownTrayIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  FolderIcon
+  FolderIcon,
+  TrashIcon
 } from '@heroicons/vue/24/outline'
 import { useApolloClient, useQuery } from '@vue/apollo-composable'
 import type {
@@ -435,11 +466,13 @@ import {
   latestModelsPaginationQuery,
   latestModelsQuery
 } from '~/lib/projects/graphql/queries'
+import { FileUploadConvertedStatus } from '~/lib/core/api/fileImport'
 import type { InfiniteLoaderState } from '~~/lib/global/helpers/components'
 import { getModelItemRoute } from '~/lib/projects/helpers/models'
 import dayjs from 'dayjs'
 import type { FileAreaUploadingPayload } from '~/lib/form/helpers/fileUpload'
 import { gql } from 'graphql-tag'
+import DeleteDialog from '~/components/project/page/models/card/DeleteDialog.vue'
 import ImportDialog from '~/components/projects/workbench/ImportDialog.vue'
 import ProjectCardImportFileArea from '~/components/project/CardImportFileArea.vue'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
@@ -503,9 +536,51 @@ const isModelUploading = ref(false)
 const uploadAreaRef = ref<null | { triggerPicker: () => void }>(null)
 const versionUploadAreaRef = ref<null | { triggerPicker: () => void }>(null)
 const selectedVersionUploadModel = ref<ModelListItem | null>(null)
+const showDeleteModelConfirm = ref(false)
+const deleteTargetModel = ref<ModelListItem | null>(null)
 
-const { registerPendingUpload, isModelSyncing, runFullModelSync } =
+const { tasks, registerPendingUpload, isModelSyncing, runFullModelSync } =
   useWorkbenchUploadSync()
+
+const getModelRuntimeStatus = (model: ModelListItem) => {
+  if (isModelUploading.value && selectedVersionUploadModel.value?.id === model.id) {
+    return '上传中'
+  }
+
+  const pendingUpload = model.raw.pendingImportedVersions?.[0]
+  if (
+    pendingUpload &&
+    [
+      FileUploadConvertedStatus.Queued,
+      FileUploadConvertedStatus.Converting
+    ].includes(pendingUpload.convertedStatus as FileUploadConvertedStatus)
+  ) {
+    return '模型处理中'
+  }
+
+  if (
+    isModelSyncing({
+      projectId: props.projectId,
+      modelId: model.id
+    })
+  ) {
+    return '同步中'
+  }
+
+  const latestTask =
+    tasks.value
+      .filter((task) => task.projectId === props.projectId && task.modelId === model.id)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] || null
+
+  if (
+    latestTask &&
+    ['pending_version_created', 'matched', 'error'].includes(latestTask.status)
+  ) {
+    return '待同步'
+  }
+
+  return null
+}
 
 const triggerUploadPicker = () => {
   uploadAreaRef.value?.triggerPicker()
@@ -565,7 +640,7 @@ const uploadProject = computed(
       name?: string
     }) || null
 )
-const canUploadModel = computed(() => isLoggedIn.value)
+const canUploadModel = computed(() => isLoggedIn.value && hasModelOp('canUpload'))
 
 const projectFoldersByParentQuery = gql`
   query WorkbenchProjectFoldersByParent($projectId: String!, $parentId: String) {
@@ -777,7 +852,8 @@ const {
   result: baseModelsResult,
   variables: baseModelsVariables,
   loading: baseModelsLoading,
-  onResult: onBaseModelsResult
+  onResult: onBaseModelsResult,
+  refetch: refetchBaseModels
 } = useQuery(
   latestModelsQuery,
   () => latestModelsQueryVariables.value,
@@ -788,7 +864,8 @@ const {
   result: extraModelsResult,
   fetchMore: fetchMoreModels,
   loading: extraModelsLoading,
-  onResult: onExtraModelsResult
+  onResult: onExtraModelsResult,
+  refetch: refetchExtraModels
 } = useQuery(
   latestModelsPaginationQuery,
   () => ({
@@ -879,6 +956,32 @@ const activeDirName = computed(() => {
 const openModel = (model: ModelListItem) => {
   router.push(getModelItemRoute(model.raw))
 }
+
+const handleDeleteModel = (model: ModelListItem) => {
+  deleteTargetModel.value = model
+  showDeleteModelConfirm.value = true
+}
+
+const onModelDeleted = async () => {
+  const model = deleteTargetModel.value
+  if (!model) return
+
+  if (selectedVersionUploadModel.value?.id === model.id) {
+    selectedVersionUploadModel.value = null
+  }
+
+  showDeleteModelConfirm.value = false
+  deleteTargetModel.value = null
+  loadCacheBuster.value++
+
+  await Promise.all([loadFolders(), refetchBaseModels(), refetchExtraModels()])
+}
+
+watch(showDeleteModelConfirm, (open) => {
+  if (!open) {
+    deleteTargetModel.value = null
+  }
+})
 
 const formatDate = (dateStr: string) => {
   return dayjs(dateStr).format('YYYY-MM-DD HH:mm')

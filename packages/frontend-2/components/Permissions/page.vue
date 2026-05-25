@@ -486,9 +486,8 @@ const ALL_MENU_PERMS = [
 
 const ALL_MODEL_PERMS = [
   { id: 'canUpload', name: '上传模型' },
-  { id: 'canEdit', name: '编辑模型' },
-  { id: 'canDownload', name: '下载模型' },
-  { id: 'canFile', name: '归档模型' }
+  { id: 'canEdit', name: '更新模型' },
+  { id: 'canDownload', name: '下载模型' }
 ]
 
 const searchUsersQuery = gql`

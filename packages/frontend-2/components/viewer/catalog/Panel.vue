@@ -18,11 +18,37 @@
     </template>
     <div class="p-1 flex overflow-hidden items-start">
       <div class="flex-grow overflow-auto">
-        <LayoutTabsHorizontal
-          v-if="catalogs.length"
-          v-model:active-item="activeCatalogTabItem"
-          :items="catalogs"
-        ></LayoutTabsHorizontal>
+        <div v-if="catalogs.length" class="flex items-center gap-1">
+          <div class="flex items-center gap-0.5">
+            <template v-for="catalog in catalogs" :key="catalog.id">
+              <button
+                type="button"
+                class="px-3 py-1.5 text-body-xs rounded transition-colors whitespace-nowrap"
+                :class="
+                  activeCatalogId === catalog.id
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-foreground-2 hover:bg-bg-2'
+                "
+                @click="activeCatalogItem = catalog"
+              >
+                {{ catalog.title }}
+              </button>
+              <!-- 每个Tab的三点菜单 -->
+              <div
+                :ref="(el) => setTabMenuRef(el, catalog.id)"
+                class="relative flex-shrink-0"
+              >
+                <button
+                  type="button"
+                  class="p-1 rounded hover:bg-bg-2 text-foreground-2 hover:text-foreground-1 transition-colors"
+                  @click.stop="toggleTabMenu(catalog.id)"
+                >
+                  <EllipsisHorizontalIcon class="w-4 h-4" />
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
       </div>
       <div class="flex-shrink-0">
         <div class="flex items-center gap-0.5">
@@ -40,32 +66,39 @@
               :disabled="isSaving"
               @click="openCreateCatalogDialog"
             />
-            <FormButton
-              v-if="activeCatalogId"
-              v-tippy="getTooltipProps('编辑当前目录')"
-              size="sm"
-              color="subtle"
-              :icon-left="Pencil"
-              hide-text
-              name="editCatalog"
-              :disabled="isSaving"
-              @click="openEditCatalogDialog"
-            />
-            <FormButton
-              v-if="activeCatalogId"
-              v-tippy="getTooltipProps('删除当前目录')"
-              size="sm"
-              color="danger"
-              :icon-left="Trash"
-              hide-text
-              name="deleteCatalog"
-              :disabled="!activeCatalogId || isSaving"
-              @click="onDeleteCatalog"
-            />
           </div>
         </div>
       </div>
     </div>
+
+    <!-- 下拉菜单 - 使用Teleport渲染到body避免被overflow裁剪 -->
+    <Teleport to="body">
+      <template v-for="catalog in catalogs" :key="catalog.id">
+        <div
+          v-if="activeTabMenuId === catalog.id"
+          class="fixed w-40 bg-foundation border border-outline-3 rounded shadow-lg z-[9999]"
+          :style="getMenuPosition(catalog.id)"
+        >
+          <button
+            type="button"
+            class="w-full px-3 py-2 text-left text-body-xs hover:bg-bg-2 flex items-center gap-2 transition-colors"
+            @click="openRenameCatalogDialogFor(catalog.id)"
+          >
+            <PencilIcon class="w-3.5 h-3.5" />
+            <span>重命名</span>
+          </button>
+          <button
+            type="button"
+            class="w-full px-3 py-2 text-left text-body-xs hover:bg-bg-2 text-danger flex items-center gap-2 transition-colors"
+            @click="onDeleteCatalogFor(catalog.id)"
+          >
+            <Trash class="w-3.5 h-3.5" />
+            <span>删除</span>
+          </button>
+        </div>
+      </template>
+    </Teleport>
+
     <div
       ref="groupsScrollArea"
       class="text-body-sm flex-1 min-h-0 flex flex-col gap-2 p-1"
@@ -110,7 +143,7 @@
                     :disabled="isSaving"
                     @click.stop="openEditNodeDialog(String(node.key))"
                   >
-                    <Pencil class="w-3.5 h-3.5" />
+                    <PencilIcon class="w-3.5 h-3.5" />
                   </button>
                   <button
                     type="button"
@@ -175,6 +208,23 @@
     </LayoutDialog>
 
     <LayoutDialog
+      v-model:open="showRenameCatalogDialog"
+      max-width="sm"
+      :buttons="renameCatalogDialogButtons"
+    >
+      <template #header>重命名目录</template>
+      <div class="space-y-2">
+        <div class="text-body-xs text-foreground-2">请输入新的目录名称</div>
+        <FormTextInput
+          v-model="renameCatalogName"
+          name="renameCatalogName"
+          placeholder="目录名称"
+          color="foundation"
+        />
+      </div>
+    </LayoutDialog>
+
+    <LayoutDialog
       v-model:open="showCreateNodeDialog"
       max-width="sm"
       :buttons="nodeDialogButtons"
@@ -193,8 +243,10 @@
   </ViewerLayoutSidePanel>
 </template>
 <script setup lang="ts">
-import { Plus, Trash, RefreshCcw, Lock, LockOpen, Pencil } from 'lucide-vue-next'
+import { Plus, Trash, RefreshCcw, PencilIcon, Lock, LockOpen } from 'lucide-vue-next'
+import { EllipsisHorizontalIcon } from '@heroicons/vue/24/outline'
 import { graphql } from '~/lib/common/generated/gql'
+import type { ComponentPublicInstance } from 'vue'
 import {
   useInjectedViewerState,
   useInjectedViewerLoadedResources
@@ -203,7 +255,6 @@ import { useKeepAliveScrollState } from '~/lib/common/composables/dom'
 import { useFilterUtilities } from '~/lib/viewer/composables/filtering/filtering'
 import { ToastNotificationType, useGlobalToast } from '~/lib/common/composables/toast'
 import type { LayoutDialogButton, LayoutPageTabItem } from '@speckle/ui-components'
-import { LayoutTabsHorizontal } from '#components'
 import CatalogModel from './CatalogModel.vue'
 import {
   useViewerCatalogs,
@@ -554,13 +605,6 @@ const isTreeNodeLocked = (node: unknown) =>
 const getNodeLockButtonTitle = (node: unknown) =>
   isTreeNodeLocked(node) ? '解锁节点' : '锁定节点'
 
-const activeCatalogTabItem = computed<LayoutPageTabItem>({
-  get: () => activeCatalogItem.value || catalogs.value[0]!,
-  set: (value) => {
-    activeCatalogItem.value = value as CatalogTabItem
-  }
-})
-
 const mapCatalogChildrenToTreeNodes = (nodes: RawCatalogNode[]): CatalogTreeNode[] => {
   if (!Array.isArray(nodes)) return []
   return nodes.map((node) => ({
@@ -581,13 +625,65 @@ const activeTreeData = computed<CatalogTreeNode[]>(() => {
 })
 
 const showCreateCatalogDialog = ref(false)
+const showRenameCatalogDialog = ref(false)
 const showCreateNodeDialog = ref(false)
+const activeTabMenuId = ref<string | null>(null)
 const newCatalogName = ref('')
+const renameCatalogName = ref('')
 const newNodeName = ref('')
 const editingCatalogId = ref<string | undefined>(undefined)
 const editingNodeId = ref<string | undefined>(undefined)
 const selectedTreeKeys = ref<string[]>([])
 const selectedTreeNodeId = computed(() => selectedTreeKeys.value[0])
+const tabMenuRefs = ref<Map<string, HTMLElement>>(new Map())
+
+// 设置tab菜单引用
+const setTabMenuRef = (
+  el: Element | ComponentPublicInstance | null,
+  catalogId: string
+) => {
+  if (el && el instanceof HTMLElement) {
+    tabMenuRefs.value.set(catalogId, el)
+  } else {
+    tabMenuRefs.value.delete(catalogId)
+  }
+}
+
+// 切换tab菜单显示
+const toggleTabMenu = (catalogId: string) => {
+  activeTabMenuId.value = activeTabMenuId.value === catalogId ? null : catalogId
+}
+
+// 计算菜单位置
+const getMenuPosition = (catalogId: string) => {
+  const element = tabMenuRefs.value.get(catalogId)
+  if (!element) return {}
+
+  const rect = element.getBoundingClientRect()
+  return {
+    left: `${rect.right}px`,
+    top: `${rect.bottom + 4}px`
+  }
+}
+
+// 点击外部关闭菜单
+const handleClickOutside = (event: MouseEvent) => {
+  if (!activeTabMenuId.value) return
+
+  const target = event.target as HTMLElement
+  const isInsideMenu = Array.from(tabMenuRefs.value.values()).some((el) =>
+    el.contains(target)
+  )
+
+  if (!isInsideMenu) {
+    activeTabMenuId.value = null
+  }
+}
+
+// 监听全局点击事件
+if (typeof window !== 'undefined') {
+  document.addEventListener('click', handleClickOutside)
+}
 
 const findNodeById = (
   nodes: RawCatalogNode[],
@@ -659,6 +755,24 @@ const catalogDialogButtons = computed((): LayoutDialogButton[] => [
   }
 ])
 
+const renameCatalogDialogButtons = computed((): LayoutDialogButton[] => [
+  {
+    text: '取消',
+    props: { color: 'outline' },
+    onClick: () => {
+      showRenameCatalogDialog.value = false
+      activeTabMenuId.value = null
+    }
+  },
+  {
+    text: '保存',
+    disabled: !renameCatalogName.value.trim(),
+    onClick: () => {
+      onRenameCatalog()
+    }
+  }
+])
+
 const nodeDialogTitle = computed(() => (editingNodeId.value ? '编辑节点' : '创建节点'))
 
 const nodeDialogButtons = computed((): LayoutDialogButton[] => [
@@ -684,16 +798,15 @@ const openCreateCatalogDialog = () => {
   showCreateCatalogDialog.value = true
 }
 
-const openEditCatalogDialog = () => {
-  const currentCatalogId = activeCatalogId.value
-  if (!currentCatalogId) return
-
-  const currentCatalog = catalogs.value.find((item) => item.id === currentCatalogId)
-  if (!currentCatalog) return
-
-  editingCatalogId.value = currentCatalogId
-  newCatalogName.value = currentCatalog.title
-  showCreateCatalogDialog.value = true
+const openRenameCatalogDialogFor = (catalogId: string) => {
+  const catalog = catalogs.value.find((item) => item.id === catalogId)
+  if (catalog) {
+    renameCatalogName.value = catalog.title
+    showRenameCatalogDialog.value = true
+    activeTabMenuId.value = null
+    // 切换到该catalog
+    activeCatalogItem.value = catalog
+  }
 }
 
 const targetParentNodeId = ref<string | undefined>(undefined)
@@ -834,6 +947,53 @@ const onAddCatalog = async () => {
   }
 }
 
+const onRenameCatalog = async () => {
+  const newTitle = renameCatalogName.value.trim()
+  const currentCatalogId = activeCatalogId.value
+  if (
+    !newTitle ||
+    !currentCatalogId ||
+    !projectId.value ||
+    !currentModelId.value ||
+    isSaving.value
+  )
+    return
+
+  const catalogIndex = catalogs.value.findIndex((item) => item.id === currentCatalogId)
+  if (catalogIndex < 0) return
+
+  try {
+    isSaving.value = true
+    await updateCatalog(projectId.value, currentModelId.value, currentCatalogId, {
+      title: newTitle
+    })
+
+    const currentCatalog = catalogs.value[catalogIndex]
+    const updatedCatalog: CatalogTabItem = {
+      ...currentCatalog,
+      title: newTitle
+    }
+
+    const nextCatalogs = [...catalogs.value]
+    nextCatalogs.splice(catalogIndex, 1, updatedCatalog)
+    catalogs.value = nextCatalogs
+    activeCatalogItem.value = updatedCatalog
+    showRenameCatalogDialog.value = false
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '目录重命名成功'
+    })
+  } catch (e: unknown) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '目录重命名失败',
+      description: e instanceof Error ? e.message : '请检查网络连接'
+    })
+  } finally {
+    isSaving.value = false
+  }
+}
+
 const onSubmitNodeDialog = async () => {
   if (editingNodeId.value) {
     await onEditNode()
@@ -866,7 +1026,6 @@ const onEditNode = async () => {
   const existingChildren = Array.isArray(currentCatalog.childrens)
     ? currentCatalog.childrens
     : []
-
   const updateNodeTitleById = (
     nodes: RawCatalogNode[],
     nodeId: string,
@@ -1039,25 +1198,34 @@ const onAddNode = async () => {
   }
 }
 
-const onDeleteCatalog = async () => {
-  const currentCatalogId = activeCatalogId.value
-  if (!currentCatalogId || !projectId.value || !currentModelId.value || isSaving.value)
-    return
-
+const onDeleteCatalogFor = async (catalogId: string) => {
   // eslint-disable-next-line no-alert
-  if (!window.confirm('确认要删除当前目录吗？此操作不可撤销。')) return
+  if (!window.confirm('确认要删除该目录吗？此操作不可撤销。')) return
+
+  // 切换到该catalog
+  const catalog = catalogs.value.find((item) => item.id === catalogId)
+  if (catalog) {
+    activeCatalogItem.value = catalog
+  }
+
+  await performDeleteCatalog(catalogId)
+}
+
+const performDeleteCatalog = async (catalogId: string) => {
+  if (!catalogId || !projectId.value || !currentModelId.value || isSaving.value) return
 
   try {
     isSaving.value = true
-    await deleteCatalog(projectId.value, currentModelId.value, currentCatalogId)
+    await deleteCatalog(projectId.value, currentModelId.value, catalogId)
 
-    catalogs.value = catalogs.value.filter((c) => c.id !== currentCatalogId)
+    catalogs.value = catalogs.value.filter((c) => c.id !== catalogId)
     if (catalogs.value.length > 0) {
       activeCatalogItem.value = catalogs.value[0]
     } else {
       activeCatalogItem.value = undefined
     }
 
+    activeTabMenuId.value = null
     triggerNotification({
       type: ToastNotificationType.Success,
       title: '目录已删除'
@@ -1252,3 +1420,16 @@ watch(
   { immediate: true }
 )
 </script>
+
+<style scoped>
+/* 强制覆盖输入框聚焦时的边框颜色与背景色 */
+:deep(input:focus),
+:deep(input:focus-visible),
+:deep(textarea:focus),
+:deep(textarea:focus-visible) {
+  border-color: #00b4b6 !important;
+  background-color: #ffffff !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+</style>

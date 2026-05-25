@@ -7,7 +7,7 @@
   >
     <template #header>创建新模型</template>
     <form @submit="onSubmit">
-      <div class="flex flex-col space-y-6 mb-4">
+      <div class="flex flex-col space-y-6 mb-2">
         <FormTextInput
           v-model="newModelName"
           color="foundation"
@@ -32,12 +32,20 @@
           size="lg"
           :disabled="anyMutationsLoading"
         />
+        
+        <!-- 同步提示 -->
+        <div class="flex items-start space-x-2">
+          <ExclamationCircleIcon class="w-5 h-5 text-[#00b4b6] shrink-0 mt-0.5" />
+          <p class="text-sm text-[#00b4b6] leading-relaxed">
+            该模型将自动同步至孪生模型
+          </p>
+        </div>
       </div>
     </form>
   </LayoutDialog>
 </template>
 <script setup lang="ts">
-import { CubeIcon } from '@heroicons/vue/24/outline'
+import { CubeIcon, ExclamationCircleIcon } from '@heroicons/vue/24/outline'
 import type { LayoutDialogButton } from '@speckle/ui-components'
 import { useMutationLoading } from '@vue/apollo-composable'
 import { useForm } from 'vee-validate'
@@ -136,3 +144,16 @@ const dialogButtons = computed((): LayoutDialogButton[] => [
   }
 ])
 </script>
+
+<style scoped>
+/* 强制覆盖输入框聚焦时的边框颜色与背景色 */
+:deep(input:focus),
+:deep(input:focus-visible),
+:deep(textarea:focus),
+:deep(textarea:focus-visible) {
+  border-color: #00b4b6 !important;
+  background-color: #ffffff !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+</style>

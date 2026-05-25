@@ -1,7 +1,10 @@
 <template>
-  <div class="flex flex-col gap-0" style="height: calc(100vh - 6.5rem);">
+  <div class="flex flex-col gap-0" style="height: calc(100vh - 6.5rem)">
     <Portal to="primary-actions"></Portal>
-    <div v-if="!showEmptyState" class="bg-white/80 backdrop-blur-md rounded-[26px] shadow-sm p-4 flex justify-between items-center border border-white/40 shrink-0 mb-2">
+    <div
+      v-if="!showEmptyState"
+      class="bg-white/80 backdrop-blur-md rounded-[26px] shadow-sm p-4 flex justify-between items-center border border-white/40 shrink-0 mb-2"
+    >
       <h2 class="text-lg font-medium text-[#333]">我的项目</h2>
       <div class="flex items-center gap-3">
         <!-- <FormTextInput
@@ -15,10 +18,10 @@
           v-bind="bind"
           v-on="on"
         /> -->
-        <button 
+        <button
           v-if="canClickCreate"
-          @click="onClickCreate"
           class="flex items-center space-x-2 bg-[#e6f7f8] text-[#00b4b6] hover:bg-[#00b4b6] hover:text-white px-4 py-2 rounded-[8px] text-sm font-medium transition-colors border border-[#00b4b6]/20"
+          @click="onClickCreate"
         >
           <PlusIcon class="h-4 w-4" />
           <span>新建项目</span>
@@ -93,11 +96,18 @@ import { projectsDashboardQuery } from '~~/lib/projects/graphql/queries'
 import { graphql } from '~~/lib/common/generated/gql'
 import type { Nullable, Optional, StreamRoles } from '@speckle/shared'
 import { useDebouncedTextInput, type InfiniteLoaderState } from '@speckle/ui-components'
-import { MagnifyingGlassIcon, Squares2X2Icon, PlusIcon } from '@heroicons/vue/24/outline'
+import {
+  MagnifyingGlassIcon,
+  Squares2X2Icon,
+  PlusIcon
+} from '@heroicons/vue/24/outline'
 import { useUserProjectsUpdatedTracking } from '~~/lib/user/composables/projectUpdates'
 import { useMixpanel } from '~/lib/core/composables/mp'
 import { useCanCreatePersonalProject } from '~~/lib/projects/composables/permissions'
-import { useUpdateProject, useDeleteProject } from '~~/lib/projects/composables/projectManagement'
+import {
+  useUpdateProject,
+  useDeleteProject
+} from '~~/lib/projects/composables/projectManagement'
 import type { ProjectsDashboardQueryQuery } from '~/lib/common/generated/gql/graphql'
 import type { Get } from 'type-fest'
 
