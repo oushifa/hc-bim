@@ -271,6 +271,21 @@ export const useWorkbenchUploadSync = () => {
     taskMap.value = next
   }
 
+  const removeTasksForModel = (params: { projectId: string; modelId: string }) => {
+    const next = { ...taskMap.value }
+    let changed = false
+
+    for (const task of Object.values(next)) {
+      if (task.projectId !== params.projectId || task.modelId !== params.modelId) continue
+      delete next[task.id]
+      changed = true
+    }
+
+    if (changed) {
+      taskMap.value = next
+    }
+  }
+
   const isTaskRunning = (taskId: string) => runningIds.value.includes(taskId)
 
   const setTaskRunning = (taskId: string, running: boolean) => {
@@ -783,6 +798,12 @@ export const useWorkbenchUploadSync = () => {
     if (isModelSyncing(params)) return false
 
     try {
+      const latestVersion = await fetchLatestVersionInfo(params)
+      if (latestVersion?.seedId?.trim()) {
+        removeTasksForModel(params)
+        return true
+      }
+
       const upload = await fetchLatestModelUpload(params)
       if (upload.convertedStatus === FileUploadConvertedStatus.Error) {
         throw new Error(
@@ -793,7 +814,6 @@ export const useWorkbenchUploadSync = () => {
         throw new Error('模型尚未转换成功，请稍后再试')
       }
 
-      const latestVersion = await fetchLatestVersionInfo(params)
       const task = registerPendingUpload({
         projectId: params.projectId,
         modelId: params.modelId,

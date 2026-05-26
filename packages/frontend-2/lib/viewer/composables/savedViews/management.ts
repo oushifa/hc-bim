@@ -1,4 +1,4 @@
-import { useMutation, type MutateResult } from '@vue/apollo-composable'
+import { useApolloClient, useMutation, type MutateResult } from '@vue/apollo-composable'
 import { graphql } from '~/lib/common/generated/gql'
 import type {
   CreateSavedViewGroupInput,
@@ -15,6 +15,7 @@ import type {
 import { useStateSerialization } from '~/lib/viewer/composables/serialization'
 import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
 import { useMixpanel } from '~/lib/core/composables/mp'
+import { onNewGroupViewCacheUpdates } from '~/lib/viewer/helpers/savedViews/cache'
 
 const createSavedViewMutation = graphql(`
   mutation CreateSavedView($input: CreateSavedViewInput!) {
@@ -67,6 +68,7 @@ export const useCollectNewSavedViewViewerData = () => {
 
 export const useCreateSavedView = () => {
   const { mutate } = useMutation(createSavedViewMutation)
+  const apollo = useApolloClient().client
   const { userId } = useActiveUser()
   const {
     resources: {
@@ -85,11 +87,12 @@ export const useCreateSavedView = () => {
   ) => {
     if (!userId.value) return
 
+    const createInput = {
+      ...input,
+      ...(await collect())
+    }
     const result = await mutate({
-      input: {
-        ...input,
-        ...(await collect())
-      }
+      input: createInput
     }).catch(convertThrowIntoFetchResult)
 
     const res = result?.data?.projectMutations.savedViewMutations.createView
@@ -103,6 +106,27 @@ export const useCreateSavedView = () => {
     }
 
     if (res?.id) {
+      const currentProjectId = project.value?.id || createInput.projectId
+      if (currentProjectId) {
+        onNewGroupViewCacheUpdates({
+          cache: apollo.cache,
+          viewId: res.id,
+          projectId: currentProjectId,
+          ...(res.groupId
+            ? {
+                group: {
+                  id: res.groupId,
+                  resourceIds: res.group.resourceIds
+                }
+              }
+            : {
+                view: {
+                  resourceIds: res.resourceIds
+                }
+              })
+        })
+      }
+
       mp.track('Saved View Created', {
         viewId: res.id,
         groupId: res.groupId,

@@ -3,7 +3,11 @@
   <div
     ref="containerEl"
     class="split-screen-root fixed inset-0 flex overflow-hidden pointer-events-none"
-    :style="{ zIndex: 20, left: leftMenuWidth + 'px', width: `calc(100vw - ${leftMenuWidth}px)` }"
+    :style="{
+      zIndex: 20,
+      left: leftMenuWidth + 'px',
+      width: `calc(100vw - ${leftMenuWidth}px)`
+    }"
   >
     <div
       class="cad-pane relative h-full flex-shrink-0 overflow-hidden pointer-events-auto"
@@ -214,13 +218,14 @@ const DIVIDER_PX = 6
 const applyViewerClip = (leftPct: number) => {
   if (!import.meta.client) return
   const viewerEl = document.querySelector<HTMLElement>(VIEWER_SELECTOR)
-  if (!viewerEl) return
+  const containerWidth = containerEl.value?.clientWidth
+  if (!viewerEl || !containerWidth) return
 
-  const totalW = window.innerWidth
-  const leftPx = (leftPct / 100) * totalW + DIVIDER_PX
+  const leftPx = (leftPct / 100) * containerWidth + DIVIDER_PX
+  const rightWidth = Math.max(containerWidth - leftPx, 0)
   viewerEl.style.left = leftPx + 'px'
-  viewerEl.style.right = '0px'
-  viewerEl.style.width = `calc(100% - ${leftPx}px)`
+  viewerEl.style.right = 'auto'
+  viewerEl.style.width = `${rightWidth}px`
 }
 
 const resetViewerClip = () => {
@@ -335,15 +340,16 @@ const pickSpecklePoint = (event: MouseEvent): Vector3 | null => {
 
 const updateSpeckleCalibrationMarkers = () => {
   const paneEl = specklePaneEl.value
+  const viewerRect = speckleContainer.getBoundingClientRect()
   const renderer = speckleInstance.getRenderer()
   const camera = renderer.renderingCamera
 
-  if (!paneEl || !camera) {
+  if (!paneEl || !camera || !viewerRect.width || !viewerRect.height) {
     speckleCalibrationMarkers.value = []
     return
   }
 
-  const rect = paneEl.getBoundingClientRect()
+  const paneRect = paneEl.getBoundingClientRect()
   speckleCalibrationMarkers.value = alignState.calibration.markers
     .flatMap((marker) => {
       if (!marker.specklePoint) return []
@@ -367,8 +373,11 @@ const updateSpeckleCalibrationMarkers = () => {
         {
           key: `speckle-${marker.index}`,
           index: marker.index,
-          x: ((projected.x + 1) / 2) * rect.width,
-          y: ((1 - projected.y) / 2) * rect.height
+          x:
+            viewerRect.left -
+            paneRect.left +
+            ((projected.x + 1) / 2) * viewerRect.width,
+          y: viewerRect.top - paneRect.top + ((1 - projected.y) / 2) * viewerRect.height
         }
       ]
     })

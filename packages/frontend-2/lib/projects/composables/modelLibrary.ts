@@ -40,6 +40,22 @@ export type ModelLibraryImportResponse = {
   fileId?: string
 }
 
+export type ModelLibraryListItem = {
+  id: string
+  projectId: string
+  title: string
+  streamName?: string
+  previewUrl?: string | null
+  updateTime: string
+  comments: number
+  versions: number
+}
+
+export type ModelLibraryListResponse = {
+  data: ModelLibraryListItem[]
+  total: number
+}
+
 type UploadProgressCallback = (percentage: number) => void
 
 export function useModelLibraryApi() {
@@ -67,6 +83,31 @@ export function useModelLibraryApi() {
     )
 
     return res.data
+  }
+
+  const listModels = async (params?: {
+    search?: string
+    page?: number
+    pageSize?: number
+  }): Promise<ModelLibraryListResponse> => {
+    const res = await $fetch<{ data: ModelLibraryListItem[]; total?: number }>(
+      `${config.public.apiOrigin}/api/v1/models`,
+      {
+        headers: getHeaders(),
+        params: {
+          search: params?.search || '',
+          member: 'all',
+          source: 'all',
+          page: params?.page || 1,
+          pageSize: params?.pageSize || 30
+        }
+      }
+    )
+
+    return {
+      data: res.data || [],
+      total: res.total ?? 0
+    }
   }
 
   const ensureModel = async (payload: {
@@ -198,6 +239,7 @@ export function useModelLibraryApi() {
 
   return {
     ensureProject,
+    listModels,
     ensureModel,
     prepareUpload,
     uploadToSignedUrl,

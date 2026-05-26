@@ -283,7 +283,7 @@
                         <ArrowUpTrayIcon class="h-4 w-4" />
                       </button>
                       <button
-                        v-if="!model.raw.lastVersion?.items?.[0]?.seedId"
+                        v-if="shouldShowSyncAction(model)"
                         :title="
                           isModelSyncing({
                             projectId: props.projectId,
@@ -319,7 +319,7 @@
                         <ArrowDownTrayIcon class="h-4 w-4" />
                       </button>
                       <button
-                        v-if="model.raw.permissions.canDelete.authorized"
+                        v-if="canDeleteModel(model)"
                         title="删除"
                         class="p-1.5 text-red-500 hover:bg-red-50 rounded"
                         @click.stop="handleDeleteModel(model)"
@@ -345,7 +345,7 @@
     <ImportDialog
       v-if="showImportModal"
       :active-dir-name="activeDirName"
-      :imported-model-ids="importedModelIds"
+      :importing="isImportingFromLibrary"
       @close="showImportModal = false"
       @import="handleImport"
     />
@@ -478,6 +478,11 @@ import ProjectCardImportFileArea from '~/components/project/CardImportFileArea.v
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import { useWorkbenchUploadSync } from '~~/lib/projects/composables/workbenchUploadSync'
+import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
+import { ensureError, Roles } from '@speckle/shared'
+import type { ModelLibraryListItem } from '~/lib/projects/composables/modelLibrary'
+import { useApiOrigin } from '~~/composables/env'
+import { useAuthCookie } from '~~/lib/auth/composables/auth'
 
 const props = defineProps<{
   projectId: string
@@ -486,7 +491,10 @@ const props = defineProps<{
 const router = useRouter()
 const logger = useLogger()
 const apollo = useApolloClient().client
-const { isLoggedIn } = useActiveUser()
+const { triggerNotification } = useGlobalToast()
+const apiOrigin = useApiOrigin()
+const authToken = useAuthCookie()
+const { activeUser, isLoggedIn } = useActiveUser()
 const { ensureLoaded: ensureUserPermsLoaded, hasModelOp } = useUserPermissions()
 void ensureUserPermsLoaded()
 
@@ -538,6 +546,7 @@ const versionUploadAreaRef = ref<null | { triggerPicker: () => void }>(null)
 const selectedVersionUploadModel = ref<ModelListItem | null>(null)
 const showDeleteModelConfirm = ref(false)
 const deleteTargetModel = ref<ModelListItem | null>(null)
+const isImportingFromLibrary = ref(false)
 
 const { tasks, registerPendingUpload, isModelSyncing, runFullModelSync } =
   useWorkbenchUploadSync()
@@ -550,12 +559,15 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
   const pendingUpload = model.raw.pendingImportedVersions?.[0]
   if (
     pendingUpload &&
-    [
-      FileUploadConvertedStatus.Queued,
-      FileUploadConvertedStatus.Converting
-    ].includes(pendingUpload.convertedStatus as FileUploadConvertedStatus)
+    [FileUploadConvertedStatus.Queued, FileUploadConvertedStatus.Converting].includes(
+      pendingUpload.convertedStatus as FileUploadConvertedStatus
+    )
   ) {
     return '模型处理中'
+  }
+
+  if (model.raw.lastVersion?.items?.[0]?.seedId?.trim()) {
+    return '已同步'
   }
 
   if (
@@ -580,6 +592,19 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
   }
 
   return null
+}
+
+const shouldShowSyncAction = (model: ModelListItem) => {
+  const status = getModelRuntimeStatus(model)
+  return status === '待同步' || status === '同步中'
+}
+
+const canDeleteModel = (model: ModelListItem) => {
+  return (
+    model.raw.permissions.canDelete.authorized ||
+    activeUser.value?.role === Roles.Server.User ||
+    activeUser.value?.role === Roles.Server.Admin
+  )
 }
 
 const triggerUploadPicker = () => {
@@ -670,6 +695,137 @@ const createFolderMutation = gql`
     }
   }
 `
+
+const importSourceModelQuery = gql`
+  query WorkbenchImportSourceModel($projectId: String!, $modelId: String!) {
+    project(id: $projectId) {
+      id
+      model(id: $modelId) {
+        id
+        name
+        versions(limit: 1) {
+          items {
+            id
+            referencedObject
+          }
+        }
+      }
+    }
+  }
+`
+
+const createImportedModelMutation = gql`
+  mutation WorkbenchCreateImportedModel($input: CreateModelInput!) {
+    modelMutations {
+      create(input: $input) {
+        id
+        name
+      }
+    }
+  }
+`
+
+const createImportedVersionMutation = gql`
+  mutation WorkbenchCreateImportedVersion($input: CreateVersionInput!) {
+    versionMutations {
+      create(input: $input) {
+        id
+      }
+    }
+  }
+`
+
+const createObjectsMutation = gql`
+  mutation WorkbenchCreateObjects($input: ObjectCreateInput!) {
+    objectCreate(objectInput: $input)
+  }
+`
+
+const addModelToFolderMutation = gql`
+  mutation WorkbenchAddModelToFolder($input: AddModelToFolderInput!) {
+    folderMutations {
+      addModel(input: $input)
+    }
+  }
+`
+
+type ProjectModelObjectsResponse = {
+  projectId: string
+  modelId: string
+  modelName: string
+  versionId: string | null
+  rootObjectId: string | null
+  totalCount: number
+  limit: number
+  cursor: string | null
+  items: Array<{
+    id: string
+    data: Record<string, unknown> | null
+  }>
+}
+
+type ProjectModelObjectResponse = {
+  projectId: string
+  modelId: string
+  modelName: string
+  versionId: string | null
+  rootObjectId: string | null
+  item: {
+    id: string
+    data: Record<string, unknown> | null
+  }
+}
+
+const getApiHeaders = () => {
+  const headers: Record<string, string> = {}
+  if (authToken.value) headers.Authorization = `Bearer ${authToken.value}`
+  return headers
+}
+
+async function requestJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: getApiHeaders()
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(errorText || `Request failed with status ${response.status}`)
+  }
+
+  return (await response.json()) as T
+}
+
+const loadSourceModelObjectTree = async (params: {
+  projectId: string
+  modelId: string
+  rootObjectId: string
+}) => {
+  const rootObjectUrl: string = `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/objects/${params.rootObjectId}`
+  const rootResponse = await requestJson<ProjectModelObjectResponse>(rootObjectUrl)
+
+  const objects: Record<string, unknown>[] = []
+  if (rootResponse.item.data) {
+    objects.push(rootResponse.item.data)
+  }
+
+  let cursor: string | null = null
+  do {
+    const objectsUrl = new URL(
+      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/objects`
+    )
+    objectsUrl.searchParams.set('limit', '100')
+    if (cursor) objectsUrl.searchParams.set('cursor', cursor)
+    const response = await requestJson<ProjectModelObjectsResponse>(
+      objectsUrl.toString()
+    )
+    response.items.forEach((item: ProjectModelObjectsResponse['items'][number]) => {
+      if (item.data) objects.push(item.data)
+    })
+    cursor = response.cursor || null
+  } while (cursor)
+
+  return objects
+}
 
 const syncModelFile = async (model: ModelListItem) => {
   await runFullModelSync({
@@ -940,12 +1096,142 @@ const infiniteLoad = async (state: InfiniteLoaderState) => {
   if (!moreToLoad.value) state.complete()
 }
 
-const importedModelIds = computed(() => displayedModels.value.map((model) => model.id))
+const handleImport = async (models: ModelLibraryListItem[]) => {
+  if (!models.length || isImportingFromLibrary.value) return
 
-const handleImport = async () => {
-  showImportModal.value = false
-  loadCacheBuster.value++
-  await Promise.all([loadFolders()])
+  isImportingFromLibrary.value = true
+  const targetFolderId = activeDir.value === ROOT_ID ? null : activeDir.value
+  let successCount = 0
+
+  try {
+    for (const sourceModel of models) {
+      const sourceRes = await apollo.query<{
+        project?: {
+          model?: {
+            id: string
+            name: string
+            versions?: {
+              items: Array<{
+                id: string
+                referencedObject?: string | null
+              }>
+            }
+          } | null
+        } | null
+      }>({
+        query: importSourceModelQuery,
+        variables: {
+          projectId: sourceModel.projectId,
+          modelId: sourceModel.id
+        },
+        fetchPolicy: 'no-cache'
+      })
+
+      const sourceVersion = sourceRes.data?.project?.model?.versions?.items?.[0]
+      const referencedObject = sourceVersion?.referencedObject?.trim()
+      if (!referencedObject) {
+        throw new Error(`模型 ${sourceModel.title} 缺少可导入的快照数据`)
+      }
+
+      const sourceObjects = await loadSourceModelObjectTree({
+        projectId: sourceModel.projectId,
+        modelId: sourceModel.id,
+        rootObjectId: referencedObject
+      })
+      if (!sourceObjects.length) {
+        throw new Error(`模型 ${sourceModel.title} 的对象数据为空，无法导入`)
+      }
+
+      const createObjectsRes = await apollo.mutate<{
+        objectCreate?: string[]
+      }>({
+        mutation: createObjectsMutation,
+        variables: {
+          input: {
+            streamId: props.projectId,
+            objects: sourceObjects
+          }
+        }
+      })
+
+      if (!createObjectsRes.data?.objectCreate?.includes(referencedObject)) {
+        throw new Error(`模型 ${sourceModel.title} 的对象复制失败`)
+      }
+
+      const createModelRes = await apollo.mutate<{
+        modelMutations?: {
+          create?: {
+            id: string
+            name: string
+          } | null
+        }
+      }>({
+        mutation: createImportedModelMutation,
+        variables: {
+          input: {
+            projectId: props.projectId,
+            name: sourceModel.title
+          }
+        }
+      })
+
+      const createdModelId = createModelRes.data?.modelMutations?.create?.id
+      if (!createdModelId) {
+        throw new Error(`模型 ${sourceModel.title} 创建失败`)
+      }
+
+      await apollo
+        .mutate({
+          mutation: createImportedVersionMutation,
+          variables: {
+            input: {
+              projectId: props.projectId,
+              modelId: createdModelId,
+              objectId: referencedObject,
+              message: '从模型库导入快照'
+            }
+          }
+        })
+        .then((res) => {
+          const versionId = res.data?.versionMutations?.create?.id
+          if (!versionId) {
+            throw new Error(`模型 ${sourceModel.title} 的版本创建失败`)
+          }
+        })
+
+      if (targetFolderId) {
+        await apollo.mutate({
+          mutation: addModelToFolderMutation,
+          variables: {
+            input: {
+              projectId: props.projectId,
+              folderId: targetFolderId,
+              modelId: createdModelId
+            }
+          }
+        })
+      }
+
+      successCount++
+    }
+
+    showImportModal.value = false
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '导入成功',
+      description: `已从模型库导入 ${successCount} 个模型快照`
+    })
+    loadCacheBuster.value++
+    await Promise.all([loadFolders(), refetchBaseModels(), refetchExtraModels()])
+  } catch (e) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '导入失败',
+      description: ensureError(e).message
+    })
+  } finally {
+    isImportingFromLibrary.value = false
+  }
 }
 
 const activeDirName = computed(() => {

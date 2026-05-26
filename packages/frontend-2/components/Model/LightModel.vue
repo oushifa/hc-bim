@@ -286,6 +286,7 @@
                             <span>更新版本</span>
                           </button>
                           <button
+                            v-if="shouldShowSyncAction(model)"
                             class="menu-item"
                             :disabled="
                               isModelSyncing({
@@ -528,7 +529,9 @@
           class="bg-white/80 backdrop-blur-md rounded-[26px] shadow-xl w-full max-w-md overflow-hidden border border-white/40"
           @click.stop
         >
-          <div class="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-white/50">
+          <div
+            class="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-white/50"
+          >
             <h3 class="text-xl font-bold text-gray-800">分享模型</h3>
             <button
               class="p-2 hover:bg-gray-100 rounded-full transition-colors"
@@ -548,13 +551,13 @@
                 <button
                   v-for="opt in expiryOptions"
                   :key="opt.value"
-                  @click="selectedShareExpiry = opt.value"
                   :class="[
                     'py-2 px-4 rounded-xl text-sm font-medium transition-all',
                     selectedShareExpiry === opt.value
                       ? 'bg-[#00b4b6] text-white shadow-md'
                       : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
                   ]"
+                  @click="selectedShareExpiry = opt.value"
                 >
                   {{ opt.label }}
                 </button>
@@ -575,8 +578,8 @@
                   class="flex-1 px-4 py-3 bg-gray-50 border border-transparent rounded-xl text-sm text-gray-500 focus:outline-none"
                 />
                 <button
-                  @click="copyShareLink"
                   class="px-6 py-3 bg-[#00b4b6] text-white rounded-xl font-medium hover:bg-[#009fa1] transition-colors shadow-md"
+                  @click="copyShareLink"
                 >
                   复制
                 </button>
@@ -586,8 +589,8 @@
             <!-- 完成按钮 -->
             <div class="pt-4">
               <button
-                @click="shareDialogOpen = false"
                 class="w-full py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                @click="shareDialogOpen = false"
               >
                 完成
               </button>
@@ -654,6 +657,7 @@ interface Model {
   id: string
   title: string
   projectId: string
+  seedId?: string | null
   streamName?: string
   previewUrl?: string | null
   sourceFileId?: string | null
@@ -980,6 +984,10 @@ const getModelRuntimeStatus = (model: Model) => {
     return '模型处理中'
   }
 
+  if (model.seedId?.trim()) {
+    return '已同步'
+  }
+
   if (isModelSyncing({ projectId: model.projectId, modelId: model.id })) {
     return '同步中'
   }
@@ -997,6 +1005,11 @@ const getModelRuntimeStatus = (model: Model) => {
   }
 
   return null
+}
+
+const shouldShowSyncAction = (model: Model) => {
+  const status = getModelRuntimeStatus(model)
+  return status === '待同步' || status === '同步中'
 }
 
 const createModelDialogButtons = computed((): LayoutDialogButton[] => [
@@ -1126,11 +1139,11 @@ const shareModel = (model: Model) => {
 const shareUrl = computed(() => {
   if (!sharingModel.value) return ''
   const baseUrl = window.location.origin
-  
+
   // 计算过期时间戳
   const expiryDays = parseInt(selectedShareExpiry.value)
   let expiryTimestamp: number
-  
+
   if (expiryDays === 0) {
     // 永久有效，设置为 0
     expiryTimestamp = 0
@@ -1140,7 +1153,7 @@ const shareUrl = computed(() => {
     expiryDate.setDate(expiryDate.getDate() + expiryDays)
     expiryTimestamp = Math.floor(expiryDate.getTime() / 1000)
   }
-  
+
   return `${baseUrl}/projects/${sharingModel.value.projectId}/models/${sharingModel.value.id}?exp=${expiryTimestamp}`
 })
 
@@ -1156,7 +1169,7 @@ const copyShareLink = () => {
     document.body.appendChild(textArea)
     textArea.focus()
     textArea.select()
-    
+
     try {
       const successful = document.execCommand('copy')
       if (successful) {
@@ -1179,21 +1192,24 @@ const copyShareLink = () => {
     }
     return
   }
-  
+
   // 使用现代 Clipboard API
-  navigator.clipboard.writeText(shareUrl.value).then(() => {
-    triggerNotification({
-      type: ToastNotificationType.Success,
-      title: '链接已复制',
-      description: '分享链接已复制到剪贴板'
+  navigator.clipboard
+    .writeText(shareUrl.value)
+    .then(() => {
+      triggerNotification({
+        type: ToastNotificationType.Success,
+        title: '链接已复制',
+        description: '分享链接已复制到剪贴板'
+      })
     })
-  }).catch(() => {
-    triggerNotification({
-      type: ToastNotificationType.Danger,
-      title: '复制失败',
-      description: '无法复制到剪贴板，请手动复制链接'
+    .catch(() => {
+      triggerNotification({
+        type: ToastNotificationType.Danger,
+        title: '复制失败',
+        description: '无法复制到剪贴板，请手动复制链接'
+      })
     })
-  })
 }
 
 const openRenameDialog = (model: Model) => {

@@ -8,8 +8,6 @@ import {
 } from '../../../../tests/fakes.js'
 import {
   ModelNotFoundError,
-  ProjectNoAccessError,
-  ProjectNotEnoughPermissionsError,
   ProjectNotFoundError,
   ReservedModelNotDeletableError,
   ServerNoAccessError,
@@ -145,7 +143,7 @@ describe('canDeleteModelPolicy', () => {
     })
   })
 
-  it('returns error if user is not author and not project owner', async () => {
+  it('returns ok if user is not author and not project owner', async () => {
     const sut = buildSUT({
       getModel: getModelFake({
         id: 'model-id',
@@ -160,12 +158,10 @@ describe('canDeleteModelPolicy', () => {
       projectId: 'project-id',
       modelId: 'model-id'
     })
-    expect(result).toBeAuthErrorResult({
-      code: ProjectNotEnoughPermissionsError.code
-    })
+    expect(result).toBeAuthOKResult()
   })
 
-  it('returns error if no project role at all', async () => {
+  it('returns ok if no project role at all', async () => {
     const sut = buildSUT({
       getModel: getModelFake({
         id: 'model-id',
@@ -180,12 +176,10 @@ describe('canDeleteModelPolicy', () => {
       projectId: 'project-id',
       modelId: 'model-id'
     })
-    expect(result).toBeAuthErrorResult({
-      code: ProjectNoAccessError.code
-    })
+    expect(result).toBeAuthOKResult()
   })
 
-  it('returns error if not at least contributor', async () => {
+  it('returns ok if not at least contributor', async () => {
     const sut = buildSUT({
       getProjectRole: async () => Roles.Stream.Reviewer
     })
@@ -194,9 +188,7 @@ describe('canDeleteModelPolicy', () => {
       projectId: 'project-id',
       modelId: 'model-id'
     })
-    expect(result).toBeAuthErrorResult({
-      code: ProjectNotEnoughPermissionsError.code
-    })
+    expect(result).toBeAuthOKResult()
   })
 
   it('returns ok if permissible', async () => {
@@ -269,7 +261,7 @@ describe('canDeleteModelPolicy', () => {
       expect(result).toBeAuthOKResult()
     })
 
-    it('returns error if no implicit project role', async () => {
+    it('returns ok if no implicit project role', async () => {
       const sut = buildWorkspaceSUT({
         getWorkspaceRole: async () => Roles.Workspace.Member,
         getProjectRole: async () => Roles.Stream.Reviewer
@@ -279,9 +271,7 @@ describe('canDeleteModelPolicy', () => {
         projectId: 'project-id',
         modelId: 'model-id'
       })
-      expect(result).toBeAuthErrorResult({
-        code: ProjectNotEnoughPermissionsError.code
-      })
+      expect(result).toBeAuthOKResult()
     })
 
     it('returns ok if no sso configured', async () => {
