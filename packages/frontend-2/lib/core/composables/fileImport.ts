@@ -366,8 +366,8 @@ export const useFileImportBaseSettings = () => {
   const isNextGenFileImporterEnabled = useIsNextGenFileImporterEnabled()
   const isRhinoFileImportEnabled = useIsRhinoFileImporterEnabled()
 
-  const legacyFileImportService = '.ifc,.obj,.stl'
-  const nextGenBackgroundJobs = `.ifc,${
+  const legacyFileImportService = '.ifc,.obj,.stl,.rvt'
+  const nextGenBackgroundJobs = `.ifc,.rvt,${
     isRhinoFileImportEnabled.value
       ? [...rhinoImporterSupportedFileExtensions]
           .map((ext: string) => `.${ext}`)
