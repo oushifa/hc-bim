@@ -57,7 +57,10 @@ function buildConfig(isWebBuild = false) {
     external: isWebBuild
       ? undefined
       : // In non web build we don't want to bundle in any deps
-        Object.keys(pkg.dependencies || {}).map((d) => new RegExp(`^${d}(\\/.*)?$`))
+        [
+          /^#lodash$/,
+          ...Object.keys(pkg.dependencies || {}).map((d) => new RegExp(`^${d}(\\/.*)?$`))
+        ]
   }
 
   return config
