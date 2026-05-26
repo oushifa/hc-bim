@@ -105,7 +105,22 @@ const expiryOptions = [
 const shareUrl = computed(() => {
   if (!props.project) return ''
   const baseUrl = window.location.origin
-  return `${baseUrl}/projects/${props.project.id}?exp=${selectedExpiry.value}`
+  
+  // 计算过期时间戳
+  const expiryDays = parseInt(selectedExpiry.value)
+  let expiryTimestamp: number
+  
+  if (expiryDays === 0) {
+    // 永久有效，设置为 0
+    expiryTimestamp = 0
+  } else {
+    // 计算过期时间：当前时间 + 天数
+    const expiryDate = new Date()
+    expiryDate.setDate(expiryDate.getDate() + expiryDays)
+    expiryTimestamp = Math.floor(expiryDate.getTime() / 1000)
+  }
+  
+  return `${baseUrl}/projects/${props.project.id}/models/all?exp=${expiryTimestamp}`
 })
 
 const copyLink = () => {

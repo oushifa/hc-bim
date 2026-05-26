@@ -518,6 +518,84 @@
         <p>此操作不可逆，所有此模型中的版本都将被删除。</p>
       </div>
     </LayoutDialog>
+    <Teleport to="body">
+      <div
+        v-if="shareDialogOpen"
+        class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-white/40 backdrop-blur-sm"
+        @click="shareDialogOpen = false"
+      >
+        <div
+          class="bg-white/80 backdrop-blur-md rounded-[26px] shadow-xl w-full max-w-md overflow-hidden border border-white/40"
+          @click.stop
+        >
+          <div class="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-white/50">
+            <h3 class="text-xl font-bold text-gray-800">分享模型</h3>
+            <button
+              class="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              @click="shareDialogOpen = false"
+            >
+              <XMarkIcon class="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+          <div class="p-8 space-y-6">
+            <!-- 有效期限设置 -->
+            <div class="space-y-3">
+              <label class="text-sm font-medium text-gray-600 flex items-center">
+                <CalendarIcon class="w-4 h-4 mr-2 text-[#00b4b6]" />
+                设置有效期限
+              </label>
+              <div class="grid grid-cols-3 gap-3">
+                <button
+                  v-for="opt in expiryOptions"
+                  :key="opt.value"
+                  @click="selectedShareExpiry = opt.value"
+                  :class="[
+                    'py-2 px-4 rounded-xl text-sm font-medium transition-all',
+                    selectedShareExpiry === opt.value
+                      ? 'bg-[#00b4b6] text-white shadow-md'
+                      : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                  ]"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+
+            <!-- 分享链接 -->
+            <div class="space-y-3">
+              <label class="text-sm font-medium text-gray-600 flex items-center">
+                <LinkIcon class="w-4 h-4 mr-2 text-[#00b4b6]" />
+                分享链接
+              </label>
+              <div class="flex space-x-2">
+                <input
+                  type="text"
+                  readonly
+                  :value="shareUrl"
+                  class="flex-1 px-4 py-3 bg-gray-50 border border-transparent rounded-xl text-sm text-gray-500 focus:outline-none"
+                />
+                <button
+                  @click="copyShareLink"
+                  class="px-6 py-3 bg-[#00b4b6] text-white rounded-xl font-medium hover:bg-[#009fa1] transition-colors shadow-md"
+                >
+                  复制
+                </button>
+              </div>
+            </div>
+
+            <!-- 完成按钮 -->
+            <div class="pt-4">
+              <button
+                @click="shareDialogOpen = false"
+                class="w-full py-3 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+              >
+                完成
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -538,7 +616,10 @@ import {
   TrashIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  ExclamationCircleIcon
+  ExclamationCircleIcon,
+  XMarkIcon,
+  CalendarIcon,
+  LinkIcon
 } from '@heroicons/vue/24/outline'
 import UploadsDialog from '~~/components/project/page/models/UploadsDialog.vue'
 import {
@@ -612,6 +693,9 @@ const renamingModel = ref(false)
 const deleteDialogOpen = ref(false)
 const deleteTargetModel = ref<Model | null>(null)
 const deletingModel = ref(false)
+const shareDialogOpen = ref(false)
+const sharingModel = ref<Model | null>(null)
+const selectedShareExpiry = ref('7')
 
 const memberSelectRef = ref<HTMLElement | null>(null)
 const sourceSelectRef = ref<HTMLElement | null>(null)
@@ -676,6 +760,12 @@ const createModelDialogOpen = ref(false)
 const selectedCreateModelFile = ref<File | null>(null)
 const createModelName = ref('')
 const createModelDescription = ref('')
+
+const expiryOptions = [
+  { label: '7天', value: '7' },
+  { label: '30天', value: '30' },
+  { label: '永久', value: '0' }
+]
 
 const memberOptions = [
   { value: 'all', label: '所有成员' },
@@ -1026,13 +1116,47 @@ const openUploadsDialog = (model: Model) => {
   uploadsDialogOpen.value = true
 }
 
-const shareModel = async (model: Model) => {
+const shareModel = (model: Model) => {
   closeActionMenu()
-  await copyModelLink({
-    model: {
-      projectId: model.projectId,
-      id: model.id
-    }
+  sharingModel.value = model
+  selectedShareExpiry.value = '7'
+  shareDialogOpen.value = true
+}
+
+const shareUrl = computed(() => {
+  if (!sharingModel.value) return ''
+  const baseUrl = window.location.origin
+  
+  // 计算过期时间戳
+  const expiryDays = parseInt(selectedShareExpiry.value)
+  let expiryTimestamp: number
+  
+  if (expiryDays === 0) {
+    // 永久有效，设置为 0
+    expiryTimestamp = 0
+  } else {
+    // 计算过期时间：当前时间 + 天数
+    const expiryDate = new Date()
+    expiryDate.setDate(expiryDate.getDate() + expiryDays)
+    expiryTimestamp = Math.floor(expiryDate.getTime() / 1000)
+  }
+  
+  return `${baseUrl}/projects/${sharingModel.value.projectId}/models/${sharingModel.value.id}?exp=${expiryTimestamp}`
+})
+
+const copyShareLink = () => {
+  navigator.clipboard.writeText(shareUrl.value).then(() => {
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '链接已复制',
+      description: '分享链接已复制到剪贴板'
+    })
+  }).catch(() => {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '复制失败',
+      description: '无法复制到剪贴板'
+    })
   })
 }
 
