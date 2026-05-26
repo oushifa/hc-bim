@@ -81,6 +81,9 @@
 
 <script setup lang="ts">
 import { XMarkIcon, CalendarIcon, LinkIcon } from '@heroicons/vue/24/outline'
+import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
+
+const { triggerNotification } = useGlobalToast()
 
 const props = defineProps<{
   open: boolean
@@ -124,9 +127,54 @@ const shareUrl = computed(() => {
 })
 
 const copyLink = () => {
+  // 安全检查：确保 navigator.clipboard 可用
+  if (typeof navigator === 'undefined' || !navigator.clipboard) {
+    // 降级方案：使用传统的 document.execCommand
+    const textArea = document.createElement('textarea')
+    textArea.value = shareUrl.value
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-999999px'
+    textArea.style.top = '-999999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    
+    try {
+      const successful = document.execCommand('copy')
+      if (successful) {
+        triggerNotification({
+          type: ToastNotificationType.Success,
+          title: '链接已复制',
+          description: '分享链接已复制到剪贴板'
+        })
+      } else {
+        throw new Error('execCommand copy failed')
+      }
+    } catch (err) {
+      triggerNotification({
+        type: ToastNotificationType.Danger,
+        title: '复制失败',
+        description: '无法复制到剪贴板，请手动复制链接'
+      })
+    } finally {
+      document.body.removeChild(textArea)
+    }
+    return
+  }
+  
+  // 使用现代 Clipboard API
   navigator.clipboard.writeText(shareUrl.value).then(() => {
-    // 可以添加toast提示
-    console.log('链接已复制')
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '链接已复制',
+      description: '分享链接已复制到剪贴板'
+    })
+  }).catch(() => {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '复制失败',
+      description: '无法复制到剪贴板，请手动复制链接'
+    })
   })
 }
 

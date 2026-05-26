@@ -2,7 +2,7 @@
   <Teleport to="#toast-portal">
     <div
       aria-live="assertive"
-      class="pointer-events-none fixed top-0 right-0 left-0 flex items-start justify-center px-4 py-6 z-[100]"
+      class="pointer-events-none fixed top-0 right-0 left-0 flex items-start justify-center px-4 py-6 z-[200]"
     >
       <Transition
         enter-active-class="transform ease-out duration-300 transition"

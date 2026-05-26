@@ -417,7 +417,7 @@
       <!-- Error State -->
       <div
         v-if="error"
-        class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-xl shadow-xl flex items-center space-x-3 z-[100]"
+        class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-xl shadow-xl flex items-center space-x-3 z-[200]"
       >
         <ExclamationCircleIcon class="w-5 h-5" />
         <span class="font-medium">{{ error }}</span>
@@ -1145,6 +1145,42 @@ const shareUrl = computed(() => {
 })
 
 const copyShareLink = () => {
+  // 安全检查：确保 navigator.clipboard 可用
+  if (typeof navigator === 'undefined' || !navigator.clipboard) {
+    // 降级方案：使用传统的 document.execCommand
+    const textArea = document.createElement('textarea')
+    textArea.value = shareUrl.value
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-999999px'
+    textArea.style.top = '-999999px'
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    
+    try {
+      const successful = document.execCommand('copy')
+      if (successful) {
+        triggerNotification({
+          type: ToastNotificationType.Success,
+          title: '链接已复制',
+          description: '分享链接已复制到剪贴板'
+        })
+      } else {
+        throw new Error('execCommand copy failed')
+      }
+    } catch (err) {
+      triggerNotification({
+        type: ToastNotificationType.Danger,
+        title: '复制失败',
+        description: '无法复制到剪贴板，请手动复制链接'
+      })
+    } finally {
+      document.body.removeChild(textArea)
+    }
+    return
+  }
+  
+  // 使用现代 Clipboard API
   navigator.clipboard.writeText(shareUrl.value).then(() => {
     triggerNotification({
       type: ToastNotificationType.Success,
@@ -1155,7 +1191,7 @@ const copyShareLink = () => {
     triggerNotification({
       type: ToastNotificationType.Danger,
       title: '复制失败',
-      description: '无法复制到剪贴板'
+      description: '无法复制到剪贴板，请手动复制链接'
     })
   })
 }
