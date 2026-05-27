@@ -5,9 +5,7 @@ import {
   ProjectContext
 } from '../../../domain/context.js'
 import { AuthPolicy } from '../../../domain/policies.js'
-import {
-  ensureMinimumServerRoleFragment
-} from '../../../fragments/projects.js'
+import { ensureMinimumServerRoleFragment } from '../../../fragments/server.js'
 import { Loaders } from '../../../domain/loaders.js'
 import {
   ReservedModelNotDeletableError,
@@ -20,9 +18,7 @@ import {
 import { Roles } from '../../../../core/constants.js'
 
 export const canDeleteModelPolicy: AuthPolicy<
-  | typeof Loaders.getModel
-  | typeof Loaders.getServerRole
-  | typeof Loaders.getEnv,
+  typeof Loaders.getModel | typeof Loaders.getServerRole | typeof Loaders.getEnv,
   ProjectContext & MaybeUserContext & ModelContext,
   InstanceType<
     | typeof ProjectNotFoundError
