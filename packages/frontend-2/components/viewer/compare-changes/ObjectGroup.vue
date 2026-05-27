@@ -11,7 +11,7 @@
   >
     <div class="shrink-0 h-10 w-1 rounded-full" :class="color" />
     <div class="flex flex-col">
-      <div class="text-body-xs font-medium capitalize">{{ name }}</div>
+      <div class="text-body-xs font-medium capitalize">{{ displayName }}</div>
       <div class="text-body-xs font-medium text-foreground-2 -mt-0.5">
         {{ description }}
       </div>
@@ -65,13 +65,27 @@ const objectCount = computed(() => {
 const description = computed(() => {
   switch (props.name) {
     case 'added':
-      return 'in new version'
+      return '在新版本中'
     case 'removed':
-      return 'from old version'
+      return '从旧版本中'
     case 'modified':
-      return 'across both versions'
+      return '跨两个版本'
     default:
-      return 'across both versions'
+      return '跨两个版本'
+  }
+})
+
+const displayName = computed(() => {
+  switch (props.name) {
+    case 'added':
+      return '新增'
+    case 'removed':
+      return '删除'
+    case 'modified':
+      return '修改'
+    case 'unchanged':
+    default:
+      return '未变更'
   }
 })
 const mp = useMixpanel()

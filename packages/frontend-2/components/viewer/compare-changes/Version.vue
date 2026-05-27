@@ -13,7 +13,7 @@
         {{ createdAt.relative }}
       </span>
       <br />
-      {{ isNewest ? 'New' : 'Old' }} version
+      {{ isNewest ? '新版本' : '旧版本' }}
     </div>
   </div>
 </template>
