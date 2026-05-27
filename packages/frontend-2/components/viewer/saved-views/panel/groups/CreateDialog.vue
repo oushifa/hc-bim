@@ -90,3 +90,13 @@ watch(open, (newVal, oldVal) => {
   }
 })
 </script>
+
+<style scoped>
+/* 强制覆盖输入框聚焦时的边框颜色 */
+:deep(input:focus),
+:deep(input:focus-visible) {
+  border-color: #00b4b6 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+</style>

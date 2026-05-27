@@ -44,7 +44,7 @@
       >
         <div class="w-48 h-1.5 bg-outline-3 rounded-full overflow-hidden">
           <div
-            class="h-full bg-primary rounded-full transition-all duration-200"
+            class="h-full bg-[#00b4b6] rounded-full transition-all duration-200"
             :style="{ width: loadProgress + '%' }"
           />
         </div>

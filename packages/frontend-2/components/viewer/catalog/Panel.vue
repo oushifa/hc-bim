@@ -26,7 +26,7 @@
                 class="px-3 py-1.5 text-body-xs rounded transition-colors whitespace-nowrap"
                 :class="
                   activeCatalogId === catalog.id
-                    ? 'bg-primary/10 text-primary font-medium'
+                    ? 'bg-[#00b4b6]/10 text-[#00b4b6] font-medium'
                     : 'text-foreground-2 hover:bg-bg-2'
                 "
                 @click="activeCatalogItem = catalog"
@@ -43,7 +43,7 @@
                   class="p-1 rounded hover:bg-bg-2 text-foreground-2 hover:text-foreground-1 transition-colors"
                   @click.stop="toggleTabMenu(catalog.id)"
                 >
-                  <EllipsisHorizontalIcon class="w-4 h-4" />
+                  <EllipsisVerticalIcon class="w-4 h-4" />
                 </button>
               </div>
             </template>
@@ -244,7 +244,7 @@
 </template>
 <script setup lang="ts">
 import { Plus, Trash, RefreshCcw, PencilIcon, Lock, LockOpen } from 'lucide-vue-next'
-import { EllipsisHorizontalIcon } from '@heroicons/vue/24/outline'
+import { EllipsisVerticalIcon } from '@heroicons/vue/24/outline'
 import { graphql } from '~/lib/common/generated/gql'
 import type { ComponentPublicInstance } from 'vue'
 import {

@@ -122,7 +122,7 @@
       <div
         v-if="activePanel !== 'none' && !isEmbedEnabled"
         ref="resizeHandle"
-        class="absolute h-full w-4 transition border-l hover:border-l-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30"
+        class="absolute h-full w-4 transition border-l hover:border-l-[2px] border-outline-2 hover:border-[#00b4b6] hidden lg:flex items-center cursor-ew-resize z-30"
         :style="`left:${width + 52}px;`"
         @mousedown="startResizing"
       />
@@ -171,7 +171,7 @@
         <!-- Resize handle for panel extension -->
         <div
           ref="panelExtensionResizeHandle"
-          class="absolute h-full max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] w-4 transition border-r hover:border-r-[2px] border-outline-2 hover:border-primary hidden lg:flex items-center cursor-ew-resize z-30 right-0"
+          class="absolute h-full max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] w-4 transition border-r hover:border-r-[2px] border-outline-2 hover:border-[#00b4b6] hidden lg:flex items-center cursor-ew-resize z-30 right-0"
           @mousedown="startPanelExtensionResizing"
         />
         <PortalTarget name="panel-extension"></PortalTarget>
@@ -394,13 +394,31 @@ const exitSettingsRoute = computed(() => {
 })
 
 const goBackToPreviousPage = async () => {
-  // if (import.meta.client && window.history.length > 1) {
-  //   router.back()
-  //   return
-  // }
-
-  // await router.push(() => projectsRoute)
-  await router.push(() => exitSettingsRoute.value)
+  // 获取当前路由
+  const currentRoute = useRoute()
+  
+  // 尝试从路由参数中获取项目 ID
+  const projectId = currentRoute.params.projectId as string || currentRoute.params.id as string
+  
+  // 检查来源页面，决定返回目标
+  const fromPage = sessionStorage.getItem('viewer-from-page')
+  
+  if (fromPage === 'light-models' && projectId) {
+    // 从轻量模型页面进入，返回到轻量模型列表
+    const target = `/models/light`
+    // 清除标记
+    sessionStorage.removeItem('viewer-from-page')
+    await router.push(() => target)
+  } else if (projectId) {
+    // 其他情况，返回到项目的 workbench 页面
+    const target = `/projects/${projectId}/workbench`
+    // 清除标记
+    sessionStorage.removeItem('viewer-from-page')
+    await router.push(() => target)
+  } else {
+    // 如果没有项目 ID，则使用默认路由
+    await router.push(() => exitSettingsRoute.value)
+  }
 }
 
 const forceClosePanel = () => {

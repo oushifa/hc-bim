@@ -113,3 +113,13 @@ watch(open, (newVal, oldVal) => {
   }
 })
 </script>
+
+<style scoped>
+/* 强制覆盖下拉框聚焦时的边框颜色 */
+:deep(select:focus),
+:deep(select:focus-visible) {
+  border-color: #00b4b6 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+</style>
