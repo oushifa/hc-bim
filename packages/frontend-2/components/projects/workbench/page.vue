@@ -123,7 +123,7 @@
                 v-model="searchQuery"
                 type="text"
                 placeholder="搜索模型..."
-                class="w-64 bg-[#f5f7fa] border border-transparent rounded-[8px] py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white/80 text-[#333] transition-all"
+                class="search-input w-64 bg-[#f5f7fa] border border-transparent rounded-[8px] py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white/80 text-[#333] transition-all"
               />
             </div>
           </div>
@@ -1282,3 +1282,14 @@ onBaseModelsResult(calculateLoaderId)
 onExtraModelsResult(calculateLoaderId)
 onMounted(loadFolders)
 </script>
+
+<style scoped>
+/* 强制覆盖搜索框聚焦时的边框颜色与背景色 */
+input.search-input:focus,
+input.search-input:focus-visible {
+  border: 1px solid #00b4b6 !important;
+  background-color: #ffffff !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+</style>

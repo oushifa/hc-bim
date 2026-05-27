@@ -115,11 +115,23 @@ watch(open, (newVal, oldVal) => {
 </script>
 
 <style scoped>
-/* 强制覆盖下拉框聚焦时的边框颜色 */
+/* 强制覆盖下拉框按钮聚焦时的边框颜色 */
 :deep(select:focus),
-:deep(select:focus-visible) {
+:deep(select:focus-visible),
+:deep(button:focus),
+:deep(button:focus-visible) {
   border-color: #00b4b6 !important;
-  outline: none !important;
-  box-shadow: none !important;
+  outline-color: #00b4b6 !important;
+  outline: 2px solid #00b4b6 !important;
+  box-shadow: 0 0 0 2px rgba(0, 180, 182, 0.2) !important;
+}
+
+/* 强制覆盖下拉框展开时的边框颜色 - 覆盖 border-outline-4 */
+:deep(.border-outline-4) {
+  border-color: #00b4b6 !important;
+}
+
+:deep(.group:focus-within) {
+  border-color: #00b4b6 !important;
 }
 </style>

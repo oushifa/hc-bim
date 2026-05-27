@@ -114,3 +114,38 @@ const getSearchResults = async (search: string): Promise<ItemType[]> => {
   return items
 }
 </script>
+
+<style scoped>
+/* 强制覆盖下拉框按钮聚焦时的边框颜色 */
+:deep(button:focus),
+:deep(button:focus-visible) {
+  border-color: #00b4b6 !important;
+  outline-color: #00b4b6 !important;
+  outline: 1px solid #00b4b6 !important;
+  box-shadow: 0 0 0 1px rgba(0, 180, 182, 0.2) !important;
+}
+
+/* 强制覆盖下拉框展开时的边框颜色 - 覆盖 border-outline-4 */
+:deep(.border-outline-4) {
+  border-color: #00b4b6 !important;
+}
+
+:deep(.group:focus-within) {
+  border-color: #00b4b6 !important;
+}
+</style>
+
+<style>
+/* 全局样式：覆盖下拉框内搜索框聚焦时的边框颜色 */
+.listbox-options input:focus-visible,
+.listbox-options input:focus {
+  border-color: #00b4b6 !important;
+  box-shadow: 0 0 0 1px rgba(0, 180, 182, 0.2) !important;
+}
+
+/* 覆盖 Base.vue 中的 focus-visible:border-outline-4 */
+input.focus\:border-outline-4:focus-visible,
+input.focus-visible\:border-outline-4:focus-visible {
+  border-color: #00b4b6 !important;
+}
+</style>
