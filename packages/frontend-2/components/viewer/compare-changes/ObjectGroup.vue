@@ -1,29 +1,33 @@
 <!-- eslint-disable vuejs-accessibility/no-static-element-interactions -->
 <template>
-  <div
-    class="rounded-md p-2 flex items-center gap-3"
-    :class="[
-      isSelected ? '' : 'border-transparent',
-      objectCount > 0 ? 'cursor-pointer hover:bg-highlight-1' : ''
-    ]"
-    @click="setSelection()"
-    @keypress="keyboardClick(setSelection)"
-  >
-    <div class="shrink-0 h-10 w-1 rounded-full" :class="color" />
-    <div class="flex flex-col">
-      <div class="text-body-xs font-medium capitalize">{{ name }}</div>
-      <div class="text-body-xs font-medium text-foreground-2 -mt-0.5">
-        {{ description }}
+  <div>
+    <CommonLoadingBar :loading="isProcessing" />
+    <div
+      class="rounded-md p-2 flex items-center gap-3"
+      :class="[
+        isSelected ? '' : 'border-transparent',
+        objectCount > 0 ? 'cursor-pointer hover:bg-highlight-1' : ''
+      ]"
+      @click="setSelection()"
+      @keypress="keyboardClick(setSelection)"
+    >
+      <div class="shrink-0 h-10 w-1 rounded-full" :class="color" />
+      <div class="flex flex-col">
+        <div class="text-body-xs font-medium capitalize">{{ displayName }}</div>
+        <div class="text-body-xs font-medium text-foreground-2 -mt-0.5">
+          {{ description }}
+        </div>
       </div>
-    </div>
-    <div class="text-heading-lg font-medium ml-auto">
-      {{ objectCount }}
+      <div class="text-heading-lg font-medium ml-auto">
+        {{ objectCount }}
+      </div>
     </div>
   </div>
 </template>
 <script setup lang="ts">
 import { useSelectionUtilities } from '~~/lib/viewer/composables/ui'
-import { keyboardClick } from '@speckle/ui-components'
+import { useInjectedViewer } from '~~/lib/viewer/composables/setup'
+import { keyboardClick, CommonLoadingBar } from '@speckle/ui-components'
 import { useMixpanel } from '~~/lib/core/composables/mp'
 
 const {
@@ -31,6 +35,8 @@ const {
   setSelectionFromObjectIds,
   objects: selectedObjects
 } = useSelectionUtilities()
+
+const { metadata } = useInjectedViewer()
 
 const props = defineProps<{
   name: 'unchanged' | 'added' | 'removed' | 'modified'
@@ -65,31 +71,35 @@ const objectCount = computed(() => {
 const description = computed(() => {
   switch (props.name) {
     case 'added':
-      return 'in new version'
+      return '在新版本中'
     case 'removed':
-      return 'from old version'
+      return '从旧版本中'
     case 'modified':
-      return 'across both versions'
+      return '跨两个版本'
     default:
-      return 'across both versions'
+      return '跨两个版本'
   }
 })
 
-// const displayName = computed(() => {
-//   switch (props.name) {
-//     case 'added':
-//       return '新增'
-//     case 'removed':
-//       return '删除'
-//     case 'modified':
-//       return '修改'
-//     case 'unchanged':
-//     default:
-//       return '未变更'
-//   }
-// })
+const displayName = computed(() => {
+  switch (props.name) {
+    case 'added':
+      return '新增'
+    case 'removed':
+      return '删除'
+    case 'modified':
+      return '修改'
+    case 'unchanged':
+    default:
+      return '未变更'
+  }
+})
 const mp = useMixpanel()
-const setSelection = () => {
+const isProcessing = ref(false)
+
+const yieldToMain = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
+const setSelection = async () => {
   mp.track('Viewer Action', {
     type: 'action',
     name: 'diffs',
@@ -98,6 +108,32 @@ const setSelection = () => {
   })
 
   if (isSelected.value) return clearSelection()
-  setSelectionFromObjectIds(props.objectIds)
+
+  // Batch process to avoid blocking the main thread with thousands of findId calls
+  const BATCH_SIZE = 200
+  const ids = props.objectIds
+  if (ids.length <= BATCH_SIZE) {
+    setSelectionFromObjectIds(ids)
+    return
+  }
+
+  isProcessing.value = true
+  const collected: Array<(typeof selectedObjects.value)[number]> = []
+
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const batch = ids.slice(i, i + BATCH_SIZE)
+    batch.forEach((id: string) => {
+      const nodes = (metadata?.worldTree.value?.findId(id) || []) as unknown as Array<{
+        model: Record<string, unknown>
+      }>
+      nodes.forEach((node) => {
+        collected.push(node.model.raw as (typeof selectedObjects.value)[number])
+      })
+    })
+    await yieldToMain()
+  }
+
+  selectedObjects.value = collected
+  isProcessing.value = false
 }
 </script>
