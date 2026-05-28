@@ -6,7 +6,8 @@
       class="rounded-md p-2 flex items-center gap-3"
       :class="[
         isSelected ? '' : 'border-transparent',
-        objectCount > 0 ? 'cursor-pointer hover:bg-highlight-1' : ''
+        objectCount > 0 ? 'cursor-pointer hover:bg-highlight-1' : '',
+        isProcessing ? 'opacity-60 pointer-events-none' : ''
       ]"
       @click="setSelection()"
       @keypress="keyboardClick(setSelection)"
@@ -107,17 +108,22 @@ const setSelection = async () => {
     group: props.name
   })
 
+  if (isProcessing.value) return
+
   if (isSelected.value) return clearSelection()
 
   // Batch process to avoid blocking the main thread with thousands of findId calls
   const BATCH_SIZE = 200
   const ids = props.objectIds
+
+  isProcessing.value = true
+
   if (ids.length <= BATCH_SIZE) {
     setSelectionFromObjectIds(ids)
+    isProcessing.value = false
     return
   }
 
-  isProcessing.value = true
   const collected: Array<(typeof selectedObjects.value)[number]> = []
 
   for (let i = 0; i < ids.length; i += BATCH_SIZE) {
