@@ -27,9 +27,23 @@
         @keydown.space.prevent="openDrawing(drawing)"
       >
         <div class="p-3 flex justify-between items-start shrink-0">
-          <h3 class="text-sm font-medium text-[#333] line-clamp-2 pr-2 whitespace-pre-line leading-snug">
-            {{ drawing.name }}
-          </h3>
+          <div class="min-w-0 pr-2">
+            <h3 class="text-sm font-medium text-[#333] line-clamp-2 whitespace-pre-line leading-snug">
+              {{ drawing.name }}
+            </h3>
+            <div v-if="drawing.conversionLabel" class="mt-1 flex items-center space-x-1">
+              <CommonLoadingIcon
+                v-if="drawing.conversionStatus === 'processing'"
+                class="w-3.5 h-3.5 opacity-70"
+              />
+              <span
+                class="text-xs px-2 py-0.5 rounded"
+                :class="getConversionLabelClass(drawing)"
+              >
+                {{ drawing.conversionLabel }}
+              </span>
+            </div>
+          </div>
           <button class="text-gray-400 hover:text-gray-600 p-1 shrink-0">
             <EllipsisHorizontalIcon class="h-4 w-4" />
           </button>
@@ -96,7 +110,21 @@
                   <PreviewImage :preview-url="drawing.previewUrl" />
                 </div>
                 <CubeIcon v-else class="h-4 w-4 text-gray-400 shrink-0" />
-                <span class="font-medium whitespace-pre-line">{{ drawing.name }}</span>
+                <div class="min-w-0 flex-1">
+                  <div class="font-medium whitespace-pre-line">{{ drawing.name }}</div>
+                  <div v-if="drawing.conversionLabel" class="mt-1 flex items-center space-x-1">
+                    <CommonLoadingIcon
+                      v-if="drawing.conversionStatus === 'processing'"
+                      class="w-3.5 h-3.5 opacity-70"
+                    />
+                    <span
+                      class="text-xs px-2 py-0.5 rounded inline-block"
+                      :class="getConversionLabelClass(drawing)"
+                    >
+                      {{ drawing.conversionLabel }}
+                    </span>
+                  </div>
+                </div>
               </div>
             </td>
             <td class="px-4 py-3 text-left text-gray-500">
@@ -128,7 +156,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import {
   CubeIcon,
   EllipsisHorizontalIcon,
@@ -138,6 +166,7 @@ import {
 import dayjs from 'dayjs'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { useWorkbenchDrawingsApi, type WorkbenchDrawing } from './drawingsApi'
+import { useAuthCookie } from '~/lib/auth/composables/auth'
 
 type ViewMode = 'grid' | 'list'
 
@@ -147,6 +176,9 @@ type DrawingListItem = {
   updatedAt: string
   previewUrl?: string | null
   folderId: string | null
+  fileType: string
+  conversionStatus: string | null
+  conversionLabel: string | null
 }
 
 const props = defineProps<{
@@ -161,10 +193,14 @@ const props = defineProps<{
 const { triggerNotification } = useGlobalToast()
 const router = useRouter()
 const api = useWorkbenchDrawingsApi()
+const apiOrigin = useApiOrigin()
+const authCookie = useAuthCookie()
 
 const drawings = ref<WorkbenchDrawing[]>([])
 const isLoading = ref(false)
 const fetchDebounce = ref<ReturnType<typeof setTimeout> | null>(null)
+const conversionAbort = ref<AbortController | null>(null)
+const shouldReconnect = ref(true)
 
 const displayedDrawings = computed<DrawingListItem[]>(() => {
   return drawings.value.map((d) => ({
@@ -172,9 +208,34 @@ const displayedDrawings = computed<DrawingListItem[]>(() => {
     name: d.name,
     updatedAt: d.updatedAt,
     previewUrl: null,
-    folderId: d.folderId
+    folderId: d.folderId,
+    fileType: d.fileType,
+    conversionStatus: d.conversionStatus,
+    conversionLabel: getConversionLabel(d)
   }))
 })
+
+const getConversionLabel = (drawing: Pick<WorkbenchDrawing, 'fileType' | 'conversionStatus'>) => {
+  if (drawing.fileType?.toLowerCase() !== 'dwg') return null
+  switch (drawing.conversionStatus) {
+    case 'processing':
+      return '转换中'
+    case 'done':
+      return '已转换'
+    case 'failed':
+      return '转换失败'
+    case 'pending':
+    case null:
+    default:
+      return '待转换'
+  }
+}
+
+const getConversionLabelClass = (drawing: Pick<DrawingListItem, 'conversionStatus'>) => {
+  if (drawing.conversionStatus === 'failed') return 'bg-red-50 text-red-600'
+  if (drawing.conversionStatus === 'done') return 'bg-emerald-50 text-emerald-700'
+  return 'bg-[#e6f7f8] text-[#00b4b6]'
+}
 
 const formatDate = (dateStr: string) => {
   return dayjs(dateStr).format('YYYY-MM-DD HH:mm')
@@ -207,11 +268,102 @@ const refresh = async () => {
   }, 200)
 }
 
+const stopConversionSubscription = () => {
+  shouldReconnect.value = false
+  conversionAbort.value?.abort()
+  conversionAbort.value = null
+}
+
+const startConversionSubscription = async () => {
+  if (!import.meta.client) return
+  if (!props.projectId) return
+
+  shouldReconnect.value = true
+  conversionAbort.value?.abort()
+  conversionAbort.value = null
+
+  const controller = new AbortController()
+  conversionAbort.value = controller
+
+  try {
+    const res = await fetch(
+      `${apiOrigin}/api/v1/projects/${props.projectId}/drawings/conversion/events`,
+      {
+        method: 'GET',
+        headers: authCookie.value ? { Authorization: `Bearer ${authCookie.value}` } : undefined,
+        signal: controller.signal
+      }
+    )
+
+    if (!res.ok || !res.body) throw new Error('subscribe failed')
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+
+      while (true) {
+        const sep = buffer.indexOf('\n\n')
+        if (sep === -1) break
+        const raw = buffer.slice(0, sep)
+        buffer = buffer.slice(sep + 2)
+
+        const dataLines = raw
+          .split('\n')
+          .filter((l) => l.startsWith('data:'))
+          .map((l) => l.slice(5).trim())
+        if (!dataLines.length) continue
+
+        const jsonText = dataLines.join('\n')
+        try {
+          const payload = JSON.parse(jsonText) as {
+            drawingId?: string
+            conversionStatus?: string | null
+            convertedBlobId?: string | null
+            conversionError?: string | null
+          }
+          if (!payload.drawingId) continue
+
+          const idx = drawings.value.findIndex((d) => d.id === payload.drawingId)
+          if (idx === -1) continue
+
+          const cur = drawings.value[idx]
+          drawings.value[idx] = {
+            ...cur,
+            conversionStatus: payload.conversionStatus ?? cur.conversionStatus,
+            convertedBlobId: payload.convertedBlobId ?? cur.convertedBlobId,
+            conversionError: payload.conversionError ?? cur.conversionError
+          }
+        } catch {
+        }
+      }
+    }
+  } catch {
+    if (!shouldReconnect.value) return
+    if (controller.signal.aborted) return
+    setTimeout(() => void startConversionSubscription(), 2000)
+  }
+}
+
 watch(
   () => [props.projectId, props.activeDir, props.searchQuery, props.refreshKey],
   () => void refresh(),
   { immediate: true }
 )
+
+watch(
+  () => props.projectId,
+  () => void startConversionSubscription(),
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  stopConversionSubscription()
+})
 
 const openDrawing = (drawing: DrawingListItem) => {
   router.push(`/projects/${props.projectId}/drawings/${drawing.id}`)

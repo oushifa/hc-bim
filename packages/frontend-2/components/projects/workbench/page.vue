@@ -58,6 +58,22 @@
       </div>
     </div>
 
+    <div
+      v-if="activeTab === 'drawings' && isDrawingUploading"
+      class="shrink-0 px-4 py-2 bg-white/80 backdrop-blur-md border-b border-gray-100"
+    >
+      <div class="flex items-center justify-between text-xs text-gray-600">
+        <span>图纸上传中</span>
+        <span>{{ drawingUploadProgress }}%</span>
+      </div>
+      <div class="mt-1 h-2 w-full rounded bg-gray-200 overflow-hidden">
+        <div
+          class="h-full bg-[#00b4b6] transition-all"
+          :style="{ width: `${drawingUploadProgress}%` }"
+        />
+      </div>
+    </div>
+
     <!-- Content -->
     <div class="flex-1 flex overflow-hidden">
       <!-- Left: Directory Tree -->
@@ -168,7 +184,7 @@
                 :id="searchInputId"
                 v-model="searchQuery"
                 type="text"
-                placeholder="搜索模型..."
+                :placeholder="searchPlaceholder"
                 class="search-input w-64 bg-[#f5f7fa] border border-transparent rounded-[8px] py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white/80 text-[#333] transition-all"
               />
             </div>
@@ -204,17 +220,27 @@
                 @keydown.space.prevent="openModel(model)"
               >
                 <div class="p-3 flex justify-between items-start shrink-0">
-                  <h3
-                    class="text-sm font-medium text-[#333] line-clamp-2 pr-2 whitespace-pre-line leading-snug"
-                  >
-                    <span>{{ model.name }}</span>
-                    <span
-                      v-if="getModelRuntimeStatus(model)"
-                      class="ml-2 text-xs font-normal text-gray-400"
+                  <div class="min-w-0 pr-2">
+                    <h3
+                      class="text-sm font-medium text-[#333] line-clamp-2 whitespace-pre-line leading-snug"
                     >
-                      {{ getModelRuntimeStatus(model) }}
-                    </span>
-                  </h3>
+                      <span>{{ model.name }}</span>
+                      <span
+                        v-if="getModelRuntimeStatus(model)"
+                        class="ml-2 text-xs font-normal text-gray-400"
+                      >
+                        {{ getModelRuntimeStatus(model) }}
+                      </span>
+                    </h3>
+                    <div
+                      v-if="shouldShowProgressBar(getModelRuntimeStatus(model))"
+                      class="mt-1 w-56"
+                    >
+                      <CommonModelRuntimeProgressBar
+                        :status="getModelRuntimeStatus(model)"
+                      />
+                    </div>
+                  </div>
                   <button class="text-gray-400 hover:text-gray-600 p-1 shrink-0">
                     <EllipsisHorizontalIcon class="h-4 w-4" />
                   </button>
@@ -284,15 +310,25 @@
                           <PreviewImage :preview-url="model.previewUrl" />
                         </div>
                         <CubeIcon v-else class="h-4 w-4 text-gray-400 shrink-0" />
-                        <span class="font-medium whitespace-pre-line">
-                          {{ model.name }}
-                          <span
-                            v-if="getModelRuntimeStatus(model)"
-                            class="ml-2 text-xs font-normal text-gray-400"
-                          >
-                            {{ getModelRuntimeStatus(model) }}
+                        <div class="min-w-0">
+                          <span class="font-medium whitespace-pre-line">
+                            {{ model.name }}
+                            <span
+                              v-if="getModelRuntimeStatus(model)"
+                              class="ml-2 text-xs font-normal text-gray-400"
+                            >
+                              {{ getModelRuntimeStatus(model) }}
+                            </span>
                           </span>
-                        </span>
+                          <div
+                            v-if="shouldShowProgressBar(getModelRuntimeStatus(model))"
+                            class="mt-1 w-56"
+                          >
+                            <CommonModelRuntimeProgressBar
+                              :status="getModelRuntimeStatus(model)"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </td>
                     <td class="px-4 py-3 text-left text-gray-500">
@@ -354,6 +390,7 @@
                           v-if="hasModelOp('canDownload')"
                           title="数据下载及导出"
                           class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
+                          @click.stop="downloadModelSource(model)"
                         >
                           <ArrowDownTrayIcon class="h-4 w-4" />
                         </button>
@@ -433,6 +470,15 @@
       :project-id="props.projectId"
       :model="deleteTargetModel.raw"
       @deleted="onModelDeleted"
+    />
+    <UploadsDialog
+      v-if="selectedDownloadModel"
+      v-model:open="downloadsDialogOpen"
+      :project-id="props.projectId"
+      :model-id="selectedDownloadModel.id"
+      title="选择要下载的版本"
+      :use-auth-download="true"
+      @downloaded="onUploadDownloaded"
     />
 
     <!-- Add Directory Modal -->
@@ -520,8 +566,10 @@ import {
 import { useApolloClient, useQuery } from '@vue/apollo-composable'
 import type {
   ProjectCardImportFileArea_ProjectFragment,
-  ProjectPageLatestItemsModelItemFragment
+  ProjectPageLatestItemsModelItemFragment,
+  GetModelUploadsQuery
 } from '~/lib/common/generated/gql/graphql'
+import { GetModelUploadsDocument } from '~/lib/common/generated/gql/graphql'
 import {
   latestModelsPaginationQuery,
   latestModelsQuery
@@ -533,6 +581,7 @@ import dayjs from 'dayjs'
 import type { FileAreaUploadingPayload } from '~/lib/form/helpers/fileUpload'
 import { gql } from 'graphql-tag'
 import DeleteDialog from '~/components/project/page/models/card/DeleteDialog.vue'
+import UploadsDialog from '~/components/project/page/models/UploadsDialog.vue'
 import ImportDialog from '~/components/projects/workbench/ImportDialog.vue'
 import DrawingsTab from '~/components/projects/workbench/DrawingsTab.vue'
 import ProjectCardImportFileArea from '~/components/project/CardImportFileArea.vue'
@@ -545,6 +594,7 @@ import { ensureError, Roles } from '@speckle/shared'
 import type { ModelLibraryListItem } from '~/lib/projects/composables/modelLibrary'
 import { useApiOrigin } from '~~/composables/env'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
+import { useFileDownload } from '~~/lib/core/composables/fileUpload'
 
 const props = defineProps<{
   projectId: string
@@ -556,6 +606,7 @@ const apollo = useApolloClient().client
 const { triggerNotification } = useGlobalToast()
 const apiOrigin = useApiOrigin()
 const authToken = useAuthCookie()
+const { downloadWithAuth } = useFileDownload()
 const { activeUser, isLoggedIn } = useActiveUser()
 const { ensureLoaded: ensureUserPermsLoaded, hasModelOp } = useUserPermissions()
 void ensureUserPermsLoaded()
@@ -612,11 +663,82 @@ const deleteTargetModel = ref<ModelListItem | null>(null)
 const isImportingFromLibrary = ref(false)
 const drawingsRefreshKey = ref(0)
 const isDrawingUploading = ref(false)
+const drawingUploadProgress = ref(0)
 const drawingFileInputRef = ref<HTMLInputElement | null>(null)
 const drawingsApi = useWorkbenchDrawingsApi()
 
 const { tasks, registerPendingUpload, isModelSyncing, runFullModelSync } =
   useWorkbenchUploadSync()
+
+const downloadsDialogOpen = ref(false)
+const selectedDownloadModel = ref<ModelListItem | null>(null)
+
+const openDownloadsDialog = (model: ModelListItem) => {
+  selectedDownloadModel.value = model
+  downloadsDialogOpen.value = true
+}
+
+const downloadCustomAttributesExcel = async (model: ModelListItem) => {
+  const response = await fetch(
+    `${apiOrigin}/api/v1/projects/${props.projectId}/models/${model.id}/custom-attributes-excel`,
+    {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: authToken.value
+        ? {
+            Authorization: `Bearer ${authToken.value}`
+          }
+        : undefined
+    }
+  )
+
+  if (!response.ok) {
+    let message = `导出自定义属性失败 (${response.status})`
+    try {
+      const body = (await response.json()) as {
+        message?: string
+        statusMessage?: string
+      }
+      if (body.message) message = body.message
+      else if (body.statusMessage) message = body.statusMessage
+    } catch {
+      // ignore non-json body
+    }
+    throw new Error(message)
+  }
+
+  const blob = await response.blob()
+  const disposition = response.headers.get('content-disposition') || ''
+  const fileNameMatch =
+    disposition.match(/filename\*=UTF-8''([^;]+)/i) ||
+    disposition.match(/filename="?([^"]+)"?/i)
+  const fileName = fileNameMatch?.[1]
+    ? decodeURIComponent(fileNameMatch[1])
+    : `${(model.name || model.id).trim() || model.id}-自定义属性.xlsx`
+  const objectUrl = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = objectUrl
+  anchor.download = fileName
+  document.body.appendChild(anchor)
+  anchor.click()
+  document.body.removeChild(anchor)
+  URL.revokeObjectURL(objectUrl)
+}
+
+const onUploadDownloaded = async () => {
+  const model = selectedDownloadModel.value
+  if (!model) return
+
+  try {
+    await downloadCustomAttributesExcel(model)
+  } catch (e) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '自定义属性导出失败',
+      description: ensureError(e).message
+    })
+  }
+}
 
 const getModelRuntimeStatus = (model: ModelListItem) => {
   if (isModelUploading.value && selectedVersionUploadModel.value?.id === model.id) {
@@ -681,6 +803,11 @@ const shouldShowSyncAction = (model: ModelListItem) => {
   return status === '待同步' || status === '同步中'
 }
 
+const shouldShowProgressBar = (status: string | null) => {
+  if (!status) return false
+  return ['上传中', '模型处理中', '同步中', '待同步', '转换失败'].includes(status)
+}
+
 const canDeleteModel = (model: ModelListItem) => {
   return (
     model.raw.permissions.canDelete.authorized ||
@@ -705,18 +832,29 @@ const onDrawingFilePicked = async (e: Event) => {
   if (!file) return
 
   isDrawingUploading.value = true
+  drawingUploadProgress.value = 0
   try {
     const { blobId, uploadUrl } = await drawingsApi.generateUploadUrl(
       props.projectId,
       file.name
     )
-    const putRes = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: file
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('PUT', uploadUrl)
+      xhr.upload.onprogress = (ev) => {
+        if (!ev.lengthComputable) return
+        drawingUploadProgress.value = Math.min(
+          99,
+          Math.round((ev.loaded / ev.total) * 100)
+        )
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) resolve()
+        else reject(new Error('上传图纸文件失败'))
+      }
+      xhr.onerror = () => reject(new Error('上传图纸文件失败'))
+      xhr.send(file)
     })
-    if (!putRes.ok) {
-      throw new Error('上传图纸文件失败')
-    }
 
     const name = file.name.replace(/\.[^/.]+$/, '')
     await drawingsApi.createDrawing(props.projectId, {
@@ -727,6 +865,7 @@ const onDrawingFilePicked = async (e: Event) => {
       folderId: activeDir.value === ROOT_ID ? null : activeDir.value,
       name: name.trim() || file.name
     })
+    drawingUploadProgress.value = 100
 
     drawingsRefreshKey.value++
     triggerNotification({
@@ -742,6 +881,7 @@ const onDrawingFilePicked = async (e: Event) => {
     })
   } finally {
     isDrawingUploading.value = false
+    drawingUploadProgress.value = 0
   }
 }
 
@@ -981,6 +1121,67 @@ const syncModelFile = async (model: ModelListItem) => {
     projectId: props.projectId,
     modelId: model.id
   })
+}
+
+const downloadModelSource = async (model: ModelListItem) => {
+  if (model.versionsCount > 1) {
+    openDownloadsDialog(model)
+    return
+  }
+
+  try {
+    const result = (await apollo.query({
+      query: GetModelUploadsDocument,
+      variables: {
+        projectId: props.projectId,
+        modelId: model.id,
+        input: {
+          cursor: null,
+          limit: 2
+        }
+      },
+      fetchPolicy: 'no-cache'
+    })) as { data?: GetModelUploadsQuery }
+
+    const uploads = result.data?.project?.model.uploads.items || []
+    if (uploads.length > 1) {
+      openDownloadsDialog(model)
+      return
+    }
+
+    const upload = uploads[0]
+    if (upload?.id && upload.fileName) {
+      await downloadWithAuth({
+        blobId: upload.id,
+        fileName: upload.fileName,
+        projectId: props.projectId
+      })
+      await downloadCustomAttributesExcel(model)
+      return
+    }
+  } catch (e) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '加载版本列表失败',
+      description: ensureError(e).message
+    })
+    return
+  }
+
+  triggerNotification({
+    type: ToastNotificationType.Info,
+    title: '暂无可下载源文件',
+    description: '该模型当前没有可下载的源文件。'
+  })
+  try {
+    await downloadCustomAttributesExcel(model)
+  } catch (e) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '自定义属性导出失败',
+      description: ensureError(e).message
+    })
+  }
 }
 
 const folderRows = ref<RawTreeItem[]>([])

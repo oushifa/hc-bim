@@ -6,6 +6,9 @@ export type WorkbenchDrawing = {
   folderId: string | null
   name: string
   blobId: string
+  convertedBlobId: string | null
+  conversionStatus: string | null
+  conversionError: string | null
   fileName: string
   fileType: string
   contentType: string
@@ -86,6 +89,12 @@ export function useWorkbenchDrawingsApi() {
     await request(`/api/v1/projects/${projectId}/drawings/${drawingId}`, { method: 'DELETE' })
   }
 
+  const convertToDxf = async (projectId: string, drawingId: string) => {
+    await request(`/api/v1/projects/${projectId}/drawings/${drawingId}/convert-to-dxf`, {
+      method: 'POST'
+    })
+  }
+
   const getDownloadUrl = async (projectId: string, drawingId: string) =>
     (
       await request<{ data: { url: string } }>(
@@ -99,7 +108,7 @@ export function useWorkbenchDrawingsApi() {
     generateUploadUrl,
     createDrawing,
     deleteDrawing,
+    convertToDxf,
     getDownloadUrl
   }
 }
-

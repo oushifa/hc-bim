@@ -1,5 +1,11 @@
 <template>
   <div class="h-full">
+    <WorkbenchUploadSyncProjectSubscriber
+      v-for="projectId in subscribedProjectIds"
+      :key="projectId"
+      :project-id="projectId"
+      :on-version-update="scheduleRefreshModels"
+    />
     <input
       ref="modelLibraryFileInput"
       type="file"
@@ -202,8 +208,7 @@
                 <tr
                   v-for="model in models"
                   :key="model.id"
-                  class="hover:bg-[#fcfcfc] transition-colors cursor-pointer relative"
-                  @click="openModelDetail(model)"
+                  class="hover:bg-[#fcfcfc] transition-colors relative"
                 >
                   <td class="px-4 py-3">
                     <div class="flex items-center space-x-3">
@@ -215,15 +220,24 @@
                         </div>
                         <CubeIcon v-else class="h-4 w-4 text-gray-400" />
                       </div>
-                      <span class="font-medium whitespace-pre-line">
-                        {{ model.title }}
+                      <button
+                        type="button"
+                        class="font-medium whitespace-pre-line text-left cursor-pointer transition-colors hover:text-[#00b4b6]"
+                        @click="openModelDetail(model)"
+                      >
+                        <span>{{ model.title }}</span>
                         <span
                           v-if="getModelRuntimeStatus(model)"
                           class="ml-2 text-xs font-normal text-gray-400"
                         >
                           {{ getModelRuntimeStatus(model) }}
                         </span>
-                      </span>
+                        <div v-if="getModelRuntimeStatus(model)" class="mt-1">
+                          <CommonModelRuntimeProgressBar
+                            :status="getModelRuntimeStatus(model)"
+                          />
+                        </div>
+                      </button>
                     </div>
                   </td>
                   <td class="px-4 py-3 text-gray-500">
@@ -523,7 +537,11 @@
       <div
         v-if="shareDialogOpen"
         class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-white/40 backdrop-blur-sm"
+        role="button"
+        tabindex="0"
         @click="shareDialogOpen = false"
+        @keydown.enter="shareDialogOpen = false"
+        @keydown.space.prevent="shareDialogOpen = false"
       >
         <div
           class="bg-white/80 backdrop-blur-md rounded-[26px] shadow-xl w-full max-w-md overflow-hidden border border-white/40"
@@ -543,10 +561,10 @@
           <div class="p-8 space-y-6">
             <!-- 有效期限设置 -->
             <div class="space-y-3">
-              <label class="text-sm font-medium text-gray-600 flex items-center">
+              <div class="text-sm font-medium text-gray-600 flex items-center">
                 <CalendarIcon class="w-4 h-4 mr-2 text-[#00b4b6]" />
                 设置有效期限
-              </label>
+              </div>
               <div class="grid grid-cols-3 gap-3">
                 <button
                   v-for="opt in expiryOptions"
@@ -566,15 +584,16 @@
 
             <!-- 分享链接 -->
             <div class="space-y-3">
-              <label class="text-sm font-medium text-gray-600 flex items-center">
+              <div class="text-sm font-medium text-gray-600 flex items-center">
                 <LinkIcon class="w-4 h-4 mr-2 text-[#00b4b6]" />
                 分享链接
-              </label>
+              </div>
               <div class="flex space-x-2">
                 <input
                   type="text"
                   readonly
                   :value="shareUrl"
+                  aria-label="分享链接"
                   class="flex-1 px-4 py-3 bg-gray-50 border border-transparent rounded-xl text-sm text-gray-500 focus:outline-none"
                 />
                 <button
@@ -633,10 +652,11 @@ import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import { useApiOrigin } from '~~/composables/env'
 import { useFileDownload } from '~~/lib/core/composables/fileUpload'
+import { useFileImportApi } from '~~/lib/core/composables/fileImport'
 import { ensureError } from '@speckle/shared'
 import { useModelLibraryApi } from '~~/lib/projects/composables/modelLibrary'
+import WorkbenchUploadSyncProjectSubscriber from '~~/components/singleton/WorkbenchUploadSyncProjectSubscriber.vue'
 import {
-  useCopyModelLink,
   useDeleteModel,
   useUpdateModel
 } from '~~/lib/projects/composables/modelManagement'
@@ -752,9 +772,9 @@ const apiOrigin = useApiOrigin()
 const authToken = useAuthCookie()
 const { triggerNotification } = useGlobalToast()
 const { uploadFile: uploadModelLibraryFile } = useModelLibraryApi()
+const { importFile: importModelFile } = useFileImportApi()
 const updateModel = useUpdateModel()
 const deleteModel = useDeleteModel()
-const copyModelLink = useCopyModelLink()
 const { tasks, registerPendingUpload, isModelSyncing, runFullModelSync } =
   useWorkbenchUploadSync()
 const modelLibraryFileInput = ref<HTMLInputElement | null>(null)
@@ -783,6 +803,19 @@ const sourceOptions = [
 
 const getModelNameFromFile = (fileName: string) => {
   return fileName.replace(/\.[^.]+$/, '').trim() || fileName.trim()
+}
+
+const subscribedProjectIds = computed(() => {
+  const ids = models.value.map((m) => m.projectId).filter((v): v is string => !!v)
+  return Array.from(new Set(ids))
+})
+
+let refreshTimeout: ReturnType<typeof setTimeout> | null = null
+const scheduleRefreshModels = () => {
+  if (refreshTimeout) clearTimeout(refreshTimeout)
+  refreshTimeout = setTimeout(() => {
+    void fetchModels({ silent: true })
+  }, 200)
 }
 
 const createModelNameError = computed(() => {
@@ -920,11 +953,14 @@ const uploadNewVersion = async (model: Model, file: File) => {
   uploadingModelId.value = model.id
 
   try {
-    const result = await uploadModelLibraryFile(
+    await importModelFile(
       {
         file,
-        modelId: model.id,
-        modelName: model.title
+        projectId: model.projectId,
+        apiOrigin,
+        authToken: authToken.value || '',
+        modelName: model.title,
+        modelId: model.id
       },
       {
         onProgress: () => {
@@ -933,20 +969,20 @@ const uploadNewVersion = async (model: Model, file: File) => {
       }
     )
 
-    registerSyncTaskForUpload({
-      projectId: result.imported.projectId,
-      modelId: result.imported.modelId,
-      fileName: file.name,
-      uploadId: result.imported.fileId || result.prepared.fileId || null
-    })
-
     triggerNotification({
       type: ToastNotificationType.Success,
       title: '新版本已提交',
-      description: `模型 ${result.imported.modelName} 已开始处理并等待同步中海`
+      description: `模型 ${model.title} 已开始处理并等待同步中海`
     })
 
-    await fetchModels()
+    registerSyncTaskForUpload({
+      projectId: model.projectId,
+      modelId: model.id,
+      fileName: file.name,
+      uploadId: null
+    })
+
+    scheduleRefreshModels()
   } catch (e) {
     triggerNotification({
       type: ToastNotificationType.Danger,
@@ -973,6 +1009,10 @@ const onVersionFileSelected = (event: Event) => {
 
 const getModelRuntimeStatus = (model: Model) => {
   if (uploadingModelId.value === model.id) {
+    return '上传中'
+  }
+
+  if (model.latestUpload?.id && !model.latestUpload.uploadComplete) {
     return '上传中'
   }
 
@@ -1092,9 +1132,12 @@ const deleteDialogButtons = computed((): LayoutDialogButton[] => [
   }
 ])
 
-const fetchModels = async () => {
-  loading.value = true
-  error.value = null
+const fetchModels = async (options?: { silent?: boolean }) => {
+  const silent = options?.silent
+  if (!silent) {
+    loading.value = true
+    error.value = null
+  }
   try {
     const apiOrigin = useApiOrigin()
     const response = await $fetch<{ data: Model[]; total?: number }>(
@@ -1112,9 +1155,13 @@ const fetchModels = async () => {
     models.value = response.data || []
     totalRecords.value = response.total ?? 0
   } catch {
-    error.value = '连接服务器失败'
+    if (!silent) {
+      error.value = '连接服务器失败'
+    }
   } finally {
-    loading.value = false
+    if (!silent) {
+      loading.value = false
+    }
   }
 }
 
@@ -1195,7 +1242,7 @@ const copyShareLink = () => {
       } else {
         throw new Error('execCommand copy failed')
       }
-    } catch (err) {
+    } catch {
       triggerNotification({
         type: ToastNotificationType.Danger,
         title: '复制失败',
@@ -1531,6 +1578,7 @@ onUnmounted(() => {
   document.removeEventListener('mousedown', handleClickOutside)
   window.removeEventListener('scroll', handleScrollClose, true)
   window.removeEventListener('resize', handleScrollClose)
+  if (refreshTimeout) clearTimeout(refreshTimeout)
 })
 </script>
 

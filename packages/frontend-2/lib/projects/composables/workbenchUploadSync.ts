@@ -6,7 +6,6 @@ import {
   latestModelsQuery
 } from '~/lib/projects/graphql/queries'
 import { gql } from 'graphql-tag'
-import type { FetchError } from 'ofetch'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { useDtpModelUpload } from '~~/composables/useDtpModelUpload'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
@@ -205,7 +204,6 @@ export const useWorkbenchUploadSync = () => {
   const { $dtpFetch } = useNuxtApp()
   const { triggerNotification } = useGlobalToast()
   const {
-    ensureDtpToken,
     syncModelFileForVersion,
     clearVersionMetadataSyncRecord,
     getVersionMetadataSyncRecord
@@ -276,7 +274,8 @@ export const useWorkbenchUploadSync = () => {
     let changed = false
 
     for (const task of Object.values(next)) {
-      if (task.projectId !== params.projectId || task.modelId !== params.modelId) continue
+      if (task.projectId !== params.projectId || task.modelId !== params.modelId)
+        continue
       delete next[task.id]
       changed = true
     }
@@ -311,13 +310,6 @@ export const useWorkbenchUploadSync = () => {
     syncingModelKeys.value.includes(
       buildSyncingModelKey(params.projectId, params.modelId)
     )
-
-  const getLatestTaskForModel = (params: { projectId: string; modelId: string }) =>
-    tasks.value
-      .filter(
-        (task) => task.projectId === params.projectId && task.modelId === params.modelId
-      )
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] || null
 
   const fetchLatestVersionInfo = async (params: {
     projectId: string
@@ -732,7 +724,7 @@ export const useWorkbenchUploadSync = () => {
       if (task.projectId !== params.projectId) return false
       if (task.status !== 'pending_version_created') return false
       if (task.modelId && task.modelId !== version.model.id) return false
-      return !!version.message?.includes(task.fileName)
+      return true
     })
 
     for (const candidate of candidates) {

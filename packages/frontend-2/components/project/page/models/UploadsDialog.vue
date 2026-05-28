@@ -159,6 +159,10 @@ const props = defineProps<{
   useAuthDownload?: boolean
 }>()
 
+const emit = defineEmits<{
+  (e: 'downloaded', item: ProjectPageModelsUploadsDialog_FileUploadFragment): void
+}>()
+
 const open = defineModel<boolean>('open', { required: true })
 const { copy } = useClipboard()
 const { formattedRelativeDate, formattedFullDate } = useDateFormatters()
@@ -251,6 +255,7 @@ const onDownload = async (item: ProjectPageModelsUploadsDialog_FileUploadFragmen
     fileName: item.fileName,
     projectId: props.projectId
   })
+  emit('downloaded', item)
 }
 
 const buildUploadedVersionUrl = (

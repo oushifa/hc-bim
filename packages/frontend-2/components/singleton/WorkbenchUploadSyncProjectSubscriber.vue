@@ -6,6 +6,7 @@ import { useProjectVersionUpdateTracking } from '~/lib/projects/composables/vers
 
 const props = defineProps<{
   projectId: string
+  onVersionUpdate?: () => void
 }>()
 
 const { consumeVersionCreated } = useWorkbenchUploadSync()
@@ -15,14 +16,23 @@ useProjectVersionUpdateTracking(
   (
     event: NonNullable<OnProjectVersionsUpdateSubscription['projectVersionsUpdated']>
   ) => {
-    if (event.type !== ProjectVersionsUpdatedMessageType.Created || !event.version) {
+    if (!event.version) {
       return
     }
 
-    void consumeVersionCreated({
-      projectId: props.projectId,
-      version: event.version
-    })
+    if (
+      event.type === ProjectVersionsUpdatedMessageType.Created ||
+      event.type === ProjectVersionsUpdatedMessageType.Updated
+    ) {
+      props.onVersionUpdate?.()
+    }
+
+    if (event.type === ProjectVersionsUpdatedMessageType.Created) {
+      void consumeVersionCreated({
+        projectId: props.projectId,
+        version: event.version
+      })
+    }
   },
   {
     silenceToast: true
