@@ -15,7 +15,6 @@ export type ViewerObjectCustomAttribute = {
 
 export type ViewerObjectCustomAttributesCustomLabelPayloadResult = {
   fileName: string
-  versionId: string
   treeJson: string
 }
 
@@ -128,17 +127,46 @@ export function useViewerObjectCustomAttributes() {
     projectId: string,
     modelId: string
   ): Promise<ViewerObjectCustomAttributesCustomLabelPayloadResult> => {
-    const res = await $fetch<{
-      data: ViewerObjectCustomAttributesCustomLabelPayloadResult
-    }>(
-      `${config.public.apiOrigin}/api/projects/${projectId}/viewer-object-custom-attributes/custom-label-payload`,
-      {
-        method: 'POST',
-        headers: getHeaders(),
-        query: { modelId }
-      }
-    )
-    return res.data
+    const [allAttributes, allElementsPayload] = await Promise.all([
+      fetchAttributes(projectId, modelId),
+      $fetch<{
+        fileName: string
+        payload: {
+          model: { id: string; name: string; timestamp: string }
+          elements: Array<{ id: string; parameters?: Record<string, unknown> }>
+        }
+      }>(`/api/projects/${projectId}/models/${modelId}/bim-custom-label`, {
+        headers: getHeaders()
+      })
+    ])
+
+    const groupedByApplicationId = new Map<string, Record<string, string>>()
+    for (const attr of allAttributes) {
+      const current = groupedByApplicationId.get(attr.applicationId) || {}
+      current[attr.name] = attr.value
+      groupedByApplicationId.set(attr.applicationId, current)
+    }
+
+    const uniqueElementIds = new Set<string>()
+    const fullElements: Array<{ id: string; parameters: Record<string, string> }> = []
+    for (const element of allElementsPayload.payload.elements) {
+      if (!element?.id || uniqueElementIds.has(element.id)) continue
+      uniqueElementIds.add(element.id)
+      fullElements.push({
+        id: element.id,
+        parameters: groupedByApplicationId.get(element.id) || {}
+      })
+    }
+
+    const treeJson = JSON.stringify({
+      model: allElementsPayload.payload.model,
+      elements: fullElements
+    })
+
+    return {
+      fileName: allElementsPayload.fileName,
+      treeJson
+    }
   }
 
   const syncCustomAttributesToDtp = async (

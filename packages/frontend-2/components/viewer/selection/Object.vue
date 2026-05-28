@@ -42,15 +42,27 @@
           class="pl-2 text-body-3xs font-medium text-foreground-2 flex justify-between"
         >
           <span>自定义属性</span>
-          <FormButton
-            v-if="props.root"
-            v-tippy="'添加自定义属性'"
-            size="sm"
-            :icon-left="Plus"
-            hide-text
-            name="deleteCatalog"
-            @click.stop="emit('add-custom-attribute')"
-          />
+          <div class="flex items-center gap-1">
+            <FormButton
+              v-if="props.root"
+              v-tippy="'下载同步 treeJson'"
+              size="sm"
+              color="subtle"
+              :icon-left="Bug"
+              hide-text
+              name="downloadCustomAttributeTreeJson"
+              @click.stop="emit('debug-custom-attribute')"
+            />
+            <FormButton
+              v-if="props.root"
+              v-tippy="'添加自定义属性'"
+              size="sm"
+              :icon-left="Plus"
+              hide-text
+              name="addCustomAttribute"
+              @click.stop="emit('add-custom-attribute')"
+            />
+          </div>
         </div>
         <div
           v-if="props.customAttributesLoading"
@@ -171,7 +183,7 @@ import { useHighlightedObjectsUtilities } from '~/lib/viewer/composables/ui'
 import type { KeyValuePair } from '~/components/viewer/selection/types'
 import type { ViewerObjectCustomAttribute } from '~/lib/viewer/composables/objectCustomAttributes'
 import { REVIT_PROPERTY_NAME_ZH_MAP } from '~/lib/viewer/helpers/filters/constants'
-import { Plus, SquarePen, Trash2 } from 'lucide-vue-next'
+import { Bug, Plus, SquarePen, Trash2 } from 'lucide-vue-next'
 
 const {
   ui: {
@@ -203,6 +215,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'add-custom-attribute'): void
+  (e: 'debug-custom-attribute'): void
   (e: 'edit-custom-attribute', attribute: ViewerObjectCustomAttribute): void
   (e: 'delete-custom-attribute', attributeId: string): void
 }>()

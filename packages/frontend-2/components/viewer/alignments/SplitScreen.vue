@@ -218,14 +218,13 @@ const DIVIDER_PX = 6
 const applyViewerClip = (leftPct: number) => {
   if (!import.meta.client) return
   const viewerEl = document.querySelector<HTMLElement>(VIEWER_SELECTOR)
-  const containerWidth = containerEl.value?.clientWidth
-  if (!viewerEl || !containerWidth) return
+  const containerRect = containerEl.value?.getBoundingClientRect()
+  if (!viewerEl || !containerRect || !containerRect.width) return
 
-  const leftPx = (leftPct / 100) * containerWidth + DIVIDER_PX
-  const rightWidth = Math.max(containerWidth - leftPx, 0)
+  const leftPx = containerRect.left + (leftPct / 100) * containerRect.width + DIVIDER_PX
   viewerEl.style.left = leftPx + 'px'
-  viewerEl.style.right = 'auto'
-  viewerEl.style.width = `${rightWidth}px`
+  viewerEl.style.right = '0px'
+  viewerEl.style.width = 'auto'
 }
 
 const resetViewerClip = () => {

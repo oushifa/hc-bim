@@ -111,6 +111,7 @@
           :root="true"
           :unfold="index === 0 && !isSmallerOrEqualSm"
           @add-custom-attribute="openAddAttributeDialog(object)"
+          @debug-custom-attribute="downloadCustomLabelTreeJson()"
           @edit-custom-attribute="openEditAttributeDialog(object, $event)"
           @delete-custom-attribute="onDeleteCustomAttribute(object, $event)"
         />
@@ -208,6 +209,7 @@ const {
   createAttribute,
   deleteAttribute,
   updateAttribute,
+  getCustomLabelPayload,
   syncCustomAttributesToDtp
 } = useViewerObjectCustomAttributes()
 const { getRootNodesForModel, findObjectInNodes } = useTreeManagement()
@@ -559,6 +561,45 @@ const openAddAttributeDialog = (object: SpeckleObject) => {
   newAttributeValue.value = ''
   activeEditingAttribute.value = null
   showAddAttributeDialog.value = true
+}
+
+const downloadCustomLabelTreeJson = async (object?: SpeckleObject) => {
+  if (!projectId.value) return
+
+  const modelId =
+    (object ? resolveModelIdForObject(object) : undefined) ||
+    (objectsUniqueByAppId.value[0]
+      ? resolveModelIdForObject(objectsUniqueByAppId.value[0] as SpeckleObject)
+      : undefined) ||
+    modelsAndVersionIds.value[0]?.model.id
+  if (!modelId) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '当前构件缺少可用作用域'
+    })
+    return
+  }
+
+  try {
+    const generated = await getCustomLabelPayload(projectId.value, modelId)
+    const blob = new Blob([generated.treeJson], { type: 'application/json' })
+    const objectUrl = URL.createObjectURL(blob)
+    const dlAnchor = document.createElement('a')
+    dlAnchor.href = objectUrl
+    dlAnchor.download = generated.fileName
+    dlAnchor.style.display = 'none'
+    document.body.appendChild(dlAnchor)
+    dlAnchor.click()
+    dlAnchor.remove()
+    URL.revokeObjectURL(objectUrl)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '下载失败'
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '下载同步 treeJson 失败',
+      description: message
+    })
+  }
 }
 
 const openEditAttributeDialog = (

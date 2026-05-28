@@ -3,7 +3,7 @@
   <!-- eslint-disable vuejs-accessibility/no-static-element-interactions, vuejs-accessibility/click-events-have-key-events -->
   <div
     ref="containerEl"
-    class="cad-viewer relative w-full h-full bg-[#0f111a] overflow-hidden select-none"
+    class="cad-viewer relative w-full h-full bg-[#fbfbfb] overflow-hidden select-none"
     tabindex="-1"
     @dragover.prevent="onDragOver"
     @dragleave="onDragLeave"
@@ -40,7 +40,7 @@
     <Transition name="fade">
       <div
         v-if="isLoading"
-        class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#0f111a]/80 z-20 backdrop-blur-sm"
+        class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#fbfbf]/80 z-20 backdrop-blur-sm"
       >
         <div class="w-48 h-1.5 bg-outline-3 rounded-full overflow-hidden">
           <div
@@ -129,8 +129,12 @@
         top: `${projectedHighlightMarker.y}px`
       }"
     >
-      <div class="absolute inset-0 rounded-full bg-rose-500/25 animate-ping scale-[1.8]" />
-      <div class="relative flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-rose-500 text-white shadow-xl">
+      <div
+        class="absolute inset-0 rounded-full bg-rose-500/25 animate-ping scale-[1.8]"
+      />
+      <div
+        class="relative flex h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-rose-500 text-white shadow-xl"
+      >
         <Crosshair class="h-4 w-4" />
       </div>
     </div>
@@ -161,12 +165,14 @@ import { Upload, Maximize2, Trash2, Link2, Crosshair } from 'lucide-vue-next'
 import { parseDxfToGroup } from './DxfLoader'
 import type { AlignmentDrawing } from './api'
 import { useAlignmentApi } from './api'
-import { useInjectedViewerState } from '~~/lib/viewer/composables/setup'
+import { inject } from 'vue'
+import { InjectableViewerStateKey } from '~~/lib/viewer/composables/setup'
 
 // --------------------------------------------------------------------------
 // Props / emits
 // --------------------------------------------------------------------------
 interface Props {
+  projectId?: string | null
   cameraSync?: boolean
   calibrateMode?: boolean
   drawing?: AlignmentDrawing | null
@@ -178,6 +184,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  projectId: null,
   cameraSync: false,
   calibrateMode: false,
   drawing: null,
@@ -199,7 +206,10 @@ const containerEl = useTemplateRef<HTMLDivElement>('containerEl')
 const canvasEl = useTemplateRef<HTMLCanvasElement>('canvasEl')
 const drawingLabel = computed(() => props.drawing?.fileName || '未加载图纸')
 const api = useAlignmentApi()
-const { projectId } = useInjectedViewerState()
+const injectedViewerState = inject(InjectableViewerStateKey, null)
+const projectId = computed(
+  () => props.projectId || injectedViewerState?.projectId?.value || null
+)
 
 // --------------------------------------------------------------------------
 // State
@@ -452,12 +462,12 @@ const initThree = () => {
   })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.setSize(w, h)
-  renderer.setClearColor(new Color('#0f111a'))
+  renderer.setClearColor(new Color('#fbfbf'))
   renderer.shadowMap.enabled = true
 
   // Scene
   scene = new Scene()
-  scene.background = new Color('#0f111a')
+  scene.background = new Color('#fbfbf')
 
   // Cameras
   perspectiveCamera = new PerspectiveCamera(
@@ -885,7 +895,8 @@ const pickPointFromEvent = (e: MouseEvent) => {
             1,
             Math.max(
               0,
-              ((pointer.x - segmentStart.x) * abX + (pointer.y - segmentStart.y) * abY) /
+              ((pointer.x - segmentStart.x) * abX +
+                (pointer.y - segmentStart.y) * abY) /
                 lengthSquared
             )
           )

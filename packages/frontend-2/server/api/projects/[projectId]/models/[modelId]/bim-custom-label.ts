@@ -279,11 +279,15 @@ const setQuantityField = (
   if (found) out[label] = formatQuantityValue(found)
 }
 
-const buildDisplayParameters = (raw: Record<string, unknown>): Record<string, FlatValue> => {
+const buildDisplayParameters = (
+  raw: Record<string, unknown>
+): Record<string, FlatValue> => {
   const out: Record<string, FlatValue> = {}
 
   const properties = isObject(raw.properties) ? raw.properties : undefined
-  const attributes = isObject(properties?.Attributes) ? properties.Attributes : undefined
+  const attributes = isObject(properties?.Attributes)
+    ? properties.Attributes
+    : undefined
   const quantities = collectNamedQuantities(
     isObject(properties?.Quantities) ? properties.Quantities : {}
   )
@@ -327,7 +331,7 @@ const buildDisplayParameters = (raw: Record<string, unknown>): Record<string, Fl
 }
 
 const getSyncElementId = (raw: Record<string, unknown>) => {
-  return pickString(raw.originalId, raw.originalID)
+  return pickString(raw.applicationId, raw.originalId, raw.originalID)
 }
 
 const buildSyncFlatPayload = (params: {
@@ -350,10 +354,10 @@ const buildSyncFlatPayload = (params: {
 
     const source = pickParametersSource(item.raw)
     const displayParameters = buildDisplayParameters(item.raw)
-    const parameters = Object.keys(displayParameters).length
+    const rawParameters = Object.keys(displayParameters).length
       ? displayParameters
       : toFlatPrimitiveRecord(source)
-    if (!Object.keys(parameters).length) continue
+    const parameters = Object.keys(rawParameters).length ? rawParameters : {}
 
     const existing = dedupedElements.get(elementId)
     if (!existing) {
@@ -402,53 +406,69 @@ export default defineEventHandler(async (event) => {
   }
 
   const apiOrigin = useApiOrigin()
-  const graphQlResponse = await fetch(`${apiOrigin}/graphql`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${authToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      query: `
-        query WorkbenchSyncModelLatestVersion($projectId: String!, $modelId: String!) {
-          project(id: $projectId) {
-            id
-            model(id: $modelId) {
+  const cookieHeader = event.node.req.headers.cookie
+  const requestHeaders: Record<string, string> = {
+    Authorization: `Bearer ${authToken}`
+  }
+  if (cookieHeader) requestHeaders['Cookie'] = cookieHeader
+
+  let graphQlBody: SyncLatestVersionResponse
+  try {
+    graphQlBody = await $fetch<SyncLatestVersionResponse>(`${apiOrigin}/graphql`, {
+      method: 'POST',
+      headers: {
+        ...requestHeaders,
+        'Content-Type': 'application/json'
+      },
+      body: {
+        query: `
+          query WorkbenchSyncModelLatestVersion($projectId: String!, $modelId: String!) {
+            project(id: $projectId) {
               id
-              name
-              versions(limit: 1) {
-                items {
-                  id
-                  createdAt
-                  referencedObject
-                  seedId
+              model(id: $modelId) {
+                id
+                name
+                versions(limit: 1) {
+                  items {
+                    id
+                    createdAt
+                    referencedObject
+                    seedId
+                  }
                 }
               }
             }
           }
+        `,
+        variables: {
+          projectId,
+          modelId
         }
-      `,
-      variables: {
-        projectId,
-        modelId
       }
     })
-  })
-
-  if (!graphQlResponse.ok) {
+  } catch (error) {
+    const err = error as {
+      statusCode?: number
+      statusMessage?: string
+      message?: string
+      data?: unknown
+    }
     throw createError({
-      statusCode: graphQlResponse.status,
-      statusMessage: 'GraphQL request failed',
-      message: await graphQlResponse.text()
+      statusCode: typeof err.statusCode === 'number' ? err.statusCode : 500,
+      statusMessage: err.statusMessage || 'GraphQL request failed',
+      message:
+        typeof err.data === 'string'
+          ? err.data
+          : err.message || 'GraphQL request failed'
     })
   }
-
-  const graphQlBody = (await graphQlResponse.json()) as SyncLatestVersionResponse
   if (graphQlBody.errors?.length) {
     throw createError({
       statusCode: 500,
       statusMessage: 'GraphQL returned errors',
-      message: graphQlBody.errors.map((item) => item.message || 'Unknown error').join('; ')
+      message: graphQlBody.errors
+        .map((item) => item.message || 'Unknown error')
+        .join('; ')
     })
   }
 
@@ -460,43 +480,41 @@ export default defineEventHandler(async (event) => {
       message: '未找到模型最新版本的 referencedObject'
     })
   }
-  if (!latestVersion.seedId?.trim()) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: 'Seed ID missing',
-      message: '未找到模型最新版本的 seedId，请先确认该模型已完成中海同步'
-    })
-  }
+  const modelSeedId = latestVersion.seedId?.trim() || ''
 
-  const objectsResponse = await fetch(
-    `${apiOrigin}/streams/${projectId}/objects/${latestVersion.referencedObject}`,
-    {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        Accept: 'text/plain'
+  let objectsStream: ReadableStream<Uint8Array>
+  try {
+    objectsStream = await $fetch<ReadableStream<Uint8Array>>(
+      `${apiOrigin}/objects/${projectId}/${latestVersion.referencedObject}`,
+      {
+        method: 'GET',
+        headers: {
+          ...requestHeaders,
+          Accept: 'text/plain'
+        },
+        responseType: 'stream'
       }
+    )
+  } catch (error) {
+    const err = error as {
+      statusCode?: number
+      statusMessage?: string
+      message?: string
+      data?: unknown
     }
-  )
-
-  if (!objectsResponse.ok) {
     throw createError({
-      statusCode: objectsResponse.status,
+      statusCode: typeof err.statusCode === 'number' ? err.statusCode : 500,
       statusMessage: 'Object download failed',
-      message: await objectsResponse.text()
-    })
-  }
-  if (!objectsResponse.body) {
-    throw createError({
-      statusCode: 500,
-      statusMessage: 'Object response body empty',
-      message: '模型对象下载结果为空'
+      message:
+        typeof err.data === 'string'
+          ? err.data
+          : err.message || 'Object download failed'
     })
   }
 
-  const objectMap = await indexObjectsFromJsonlResponse(objectsResponse.body)
+  const objectMap = await indexObjectsFromJsonlResponse(objectsStream)
   const payload = buildSyncFlatPayload({
-    modelSeedId: latestVersion.seedId,
+    modelSeedId,
     modelName: graphQlBody.data?.project?.model?.name || modelId,
     versionCreatedAt: latestVersion.createdAt,
     rootId: latestVersion.referencedObject,

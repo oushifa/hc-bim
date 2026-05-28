@@ -45,6 +45,26 @@ const ACI_COLORS: number[] = [
   0x333333, 0x505050, 0x696969, 0x828282, 0xb4b4b4, 0xffffff
 ]
 
+function ensureContrastOnWhite(colorHex: number): number {
+  const color = new Color(colorHex)
+  const r = ((colorHex >> 16) & 255) / 255
+  const g = ((colorHex >> 8) & 255) / 255
+  const b = (colorHex & 255) / 255
+  const toLinear = (c: number) =>
+    c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  const luminance =
+    0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
+  const contrastRatio = 1.05 / (luminance + 0.05)
+  if (contrastRatio >= 2.4) return colorHex
+
+  const hsl = { h: 0, s: 0, l: 0 }
+  color.getHSL(hsl)
+  if (hsl.s <= 0.08) return 0x111827
+
+  const adjusted = new Color().setHSL(hsl.h, Math.min(1, hsl.s * 1.05), 0.3)
+  return adjusted.getHex()
+}
+
 function getAciColor(colorIndex: number | undefined | null): number {
   if (typeof colorIndex !== 'number') return 0xffffff
   if (colorIndex > 255) return colorIndex // Might be a raw hex
@@ -100,7 +120,7 @@ export function parseDxfToGroup(text: string): Object3D {
         const layerDef = dxf.tables?.layer?.layers?.[layerName]
         colorNum = layerDef?.color
       }
-      const color = getAciColor(colorNum)
+      const color = ensureContrastOnWhite(getAciColor(colorNum))
 
       switch (e.type) {
         case 'LINE': {
@@ -193,7 +213,7 @@ export function parseDxfToGroup(text: string): Object3D {
   // Text entities (cap at 3000 to avoid OOM)
   const cappedText = textItems.slice(0, 3000)
   for (const { entity, matrix, color } of cappedText) {
-    const mesh = buildTextMesh(entity, color)
+    const mesh = buildTextMesh(entity, ensureContrastOnWhite(color))
     if (mesh) {
       mesh.updateMatrix()
       mesh.applyMatrix4(matrix)

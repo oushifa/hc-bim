@@ -15,35 +15,45 @@
         <h2 class="text-base font-medium text-[#333]">{{ projectName }}</h2>
       </div>
       <div class="flex space-x-2">
+        <template v-if="activeTab === 'models'">
+          <button
+            class="flex items-center space-x-1 bg-gradient-to-r from-[#00b4b6] to-[#009fa1] text-white px-3 py-1.5 rounded-[8px] text-sm font-medium transition-opacity shadow-sm"
+            :disabled="!displayedModels.length"
+            :class="
+              !displayedModels.length
+                ? 'opacity-50 cursor-not-allowed pointer-events-none'
+                : 'hover:opacity-90'
+            "
+            @click="viewAllIn3D"
+          >
+            <EyeIcon class="w-4 h-4" />
+            <span>在3D中查看全部</span>
+          </button>
+          <button
+            class="flex items-center space-x-1 bg-white/80 backdrop-blur-md border border-gray-200 text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6] px-3 py-1.5 rounded text-sm font-medium transition-colors"
+            @click="showImportModal = true"
+          >
+            <InboxIcon class="w-4 h-4" />
+            <span>从模型库导入</span>
+          </button>
+          <button
+            v-if="canUploadModel"
+            class="flex items-center space-x-1 bg-[#e6f7f8] text-[#00b4b6] hover:bg-[#00b4b6] hover:text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
+            :disabled="!uploadProject"
+            :class="{ 'opacity-60 cursor-not-allowed': !uploadProject }"
+            @click="triggerUploadPicker"
+          >
+            <ArrowUpTrayIcon class="w-4 h-4" />
+            <span>上传模型</span>
+          </button>
+        </template>
         <button
-          class="flex items-center space-x-1 bg-gradient-to-r from-[#00b4b6] to-[#009fa1] text-white px-3 py-1.5 rounded-[8px] text-sm font-medium transition-opacity shadow-sm"
-          :disabled="!displayedModels.length"
-          :class="
-            !displayedModels.length
-              ? 'opacity-50 cursor-not-allowed pointer-events-none'
-              : 'hover:opacity-90'
-          "
-          @click="viewAllIn3D"
-        >
-          <EyeIcon class="w-4 h-4" />
-          <span>在3D中查看全部</span>
-        </button>
-        <button
-          class="flex items-center space-x-1 bg-white/80 backdrop-blur-md border border-gray-200 text-gray-600 hover:bg-[#e6f7f8] hover:text-[#00b4b6] px-3 py-1.5 rounded text-sm font-medium transition-colors"
-          @click="showImportModal = true"
-        >
-          <InboxIcon class="w-4 h-4" />
-          <span>从模型库导入</span>
-        </button>
-        <button
-          v-if="canUploadModel"
+          v-else-if="canUploadModel"
           class="flex items-center space-x-1 bg-[#e6f7f8] text-[#00b4b6] hover:bg-[#00b4b6] hover:text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
-          :disabled="!uploadProject"
-          :class="{ 'opacity-60 cursor-not-allowed': !uploadProject }"
-          @click="triggerUploadPicker"
+          @click="triggerDrawingUpload"
         >
           <ArrowUpTrayIcon class="w-4 h-4" />
-          <span>上传模型</span>
+          <span>上传图纸</span>
         </button>
       </div>
     </div>
@@ -109,20 +119,56 @@
         <div
           class="py-4 border-b border-gray-100 flex justify-between items-center bg-white/80 backdrop-blur-md shrink-0"
         >
-          <h3 class="text-sm font-medium text-[#333] px-6">
-            {{ activeDirName }} 模型列表
-          </h3>
+          <div class="flex items-center space-x-4 px-6 min-w-0">
+            <h3 class="text-sm font-medium text-[#333] truncate">
+              {{ activeDirBaseName }}
+            </h3>
+            <div
+              class="flex items-center bg-[#f5f7fa] border border-gray-200 rounded-[10px] p-0.5"
+              role="tablist"
+              aria-label="列表切换"
+            >
+              <button
+                role="tab"
+                type="button"
+                class="px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors"
+                :class="
+                  activeTab === 'models'
+                    ? 'bg-white text-[#00b4b6] shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                "
+                :aria-selected="activeTab === 'models'"
+                @click="activeTab = 'models'"
+              >
+                模型列表
+              </button>
+              <button
+                role="tab"
+                type="button"
+                class="px-3 py-1.5 rounded-[8px] text-sm font-medium transition-colors"
+                :class="
+                  activeTab === 'drawings'
+                    ? 'bg-white text-[#00b4b6] shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                "
+                :aria-selected="activeTab === 'drawings'"
+                @click="activeTab = 'drawings'"
+              >
+                图纸列表
+              </button>
+            </div>
+          </div>
           <div class="flex items-center space-x-4 pr-4">
             <div class="relative">
               <MagnifyingGlassIcon
                 class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
               />
-              <label for="workbench-model-search" class="sr-only">搜索模型</label>
+              <label :for="searchInputId" class="sr-only">{{ searchLabel }}</label>
               <input
-                id="workbench-model-search"
+                :id="searchInputId"
                 v-model="searchQuery"
                 type="text"
-                placeholder="搜索模型..."
+                :placeholder="searchPlaceholder"
                 class="w-64 bg-[#f5f7fa] border border-transparent rounded-[8px] py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-[#00b4b6] focus:bg-white/80 text-[#333] transition-all"
               />
             </div>
@@ -130,213 +176,218 @@
         </div>
 
         <div class="flex-1 overflow-auto bg-[#f5f7fa] p-6">
-          <div
-            v-if="modelsLoading && !displayedModels.length"
-            class="bg-white/80 backdrop-blur-md border border-gray-200 rounded-[8px] p-12 text-center text-gray-500"
-          >
-            模型加载中...
-          </div>
-          <div
-            v-else-if="displayedModels.length === 0"
-            class="bg-white/80 backdrop-blur-md border border-gray-200 rounded-[8px] p-12 text-center text-gray-500"
-          >
-            该目录下暂无模型，请从模型库导入或上传。
-          </div>
-          <div
-            v-else-if="viewMode === 'grid'"
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-          >
+          <template v-if="activeTab === 'models'">
             <div
-              v-for="model in displayedModels"
-              :key="model.id"
-              class="bg-white/80 backdrop-blur-md border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow flex flex-col h-[280px] cursor-pointer"
-              role="button"
-              tabindex="0"
-              @click="openModel(model)"
-              @keydown.enter.prevent="openModel(model)"
-              @keydown.space.prevent="openModel(model)"
+              v-if="modelsLoading && !displayedModels.length"
+              class="bg-white/80 backdrop-blur-md border border-gray-200 rounded-[8px] p-12 text-center text-gray-500"
             >
-              <div class="p-3 flex justify-between items-start shrink-0">
-                <h3
-                  class="text-sm font-medium text-[#333] line-clamp-2 pr-2 whitespace-pre-line leading-snug"
-                >
-                  <span>{{ model.name }}</span>
-                  <span
-                    v-if="getModelRuntimeStatus(model)"
-                    class="ml-2 text-xs font-normal text-gray-400"
+              模型加载中...
+            </div>
+            <div
+              v-else-if="displayedModels.length === 0"
+              class="bg-white/80 backdrop-blur-md border border-gray-200 rounded-[8px] p-12 text-center text-gray-500"
+            >
+              该目录下暂无模型，请从模型库导入或上传。
+            </div>
+            <div
+              v-else-if="viewMode === 'grid'"
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+            >
+              <div
+                v-for="model in displayedModels"
+                :key="model.id"
+                class="bg-white/80 backdrop-blur-md border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow flex flex-col h-[280px] cursor-pointer"
+                role="button"
+                tabindex="0"
+                @click="openModel(model)"
+                @keydown.enter.prevent="openModel(model)"
+                @keydown.space.prevent="openModel(model)"
+              >
+                <div class="p-3 flex justify-between items-start shrink-0">
+                  <h3
+                    class="text-sm font-medium text-[#333] line-clamp-2 pr-2 whitespace-pre-line leading-snug"
                   >
-                    {{ getModelRuntimeStatus(model) }}
-                  </span>
-                </h3>
-                <button class="text-gray-400 hover:text-gray-600 p-1 shrink-0">
-                  <EllipsisHorizontalIcon class="h-4 w-4" />
-                </button>
-              </div>
-              <div
-                class="flex-1 flex flex-col items-center justify-center p-4 min-h-0 bg-gradient-to-br from-gray-50 to-gray-100"
-              >
+                    <span>{{ model.name }}</span>
+                    <span
+                      v-if="getModelRuntimeStatus(model)"
+                      class="ml-2 text-xs font-normal text-gray-400"
+                    >
+                      {{ getModelRuntimeStatus(model) }}
+                    </span>
+                  </h3>
+                  <button class="text-gray-400 hover:text-gray-600 p-1 shrink-0">
+                    <EllipsisHorizontalIcon class="h-4 w-4" />
+                  </button>
+                </div>
                 <div
-                  v-if="model.previewUrl"
-                  class="w-full h-full rounded-md overflow-hidden border border-gray-200"
+                  class="flex-1 flex flex-col items-center justify-center p-4 min-h-0 bg-gradient-to-br from-gray-50 to-gray-100"
                 >
-                  <PreviewImage :preview-url="model.previewUrl" />
-                </div>
-                <CubeIcon v-else class="w-20 h-20 text-gray-300" />
-              </div>
-              <div
-                class="p-3 border-t border-gray-100 flex justify-between items-end shrink-0"
-              >
-                <div class="flex flex-col">
-                  <span class="text-xs text-gray-500">
-                    {{ formatDate(model.updatedAt) }}
-                  </span>
-                </div>
-                <div class="flex items-center space-x-3 text-gray-500">
-                  <div class="flex items-center space-x-1" title="评论">
-                    <ChatBubbleLeftIcon class="h-3.5 w-3.5" />
-                    <span class="text-xs">{{ model.commentCount }}</span>
+                  <div
+                    v-if="model.previewUrl"
+                    class="w-full h-full rounded-md overflow-hidden border border-gray-200"
+                  >
+                    <PreviewImage :preview-url="model.previewUrl" />
                   </div>
-                  <div class="flex items-center space-x-1" title="版本">
-                    <ClockIcon class="h-3.5 w-3.5" />
-                    <span class="text-xs">{{ model.versionsCount || 0 }}</span>
+                  <CubeIcon v-else class="w-20 h-20 text-gray-300" />
+                </div>
+                <div
+                  class="p-3 border-t border-gray-100 flex justify-between items-end shrink-0"
+                >
+                  <div class="flex flex-col">
+                    <span class="text-xs text-gray-500">
+                      {{ formatDate(model.updatedAt) }}
+                    </span>
+                  </div>
+                  <div class="flex items-center space-x-3 text-gray-500">
+                    <div class="flex items-center space-x-1" title="评论">
+                      <ChatBubbleLeftIcon class="h-3.5 w-3.5" />
+                      <span class="text-xs">{{ model.commentCount }}</span>
+                    </div>
+                    <div class="flex items-center space-x-1" title="版本">
+                      <ClockIcon class="h-3.5 w-3.5" />
+                      <span class="text-xs">{{ model.versionsCount || 0 }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-          <div
-            v-else
-            class="bg-white/80 backdrop-blur-md border border-gray-200 rounded-lg overflow-hidden"
-          >
-            <table class="w-full text-left border-collapse">
-              <thead>
-                <tr class="bg-[#f8f9fa] text-gray-500 text-sm border-b border-gray-200">
-                  <th class="px-4 py-3 font-medium text-left min-w-[200px]">
-                    模型名称
-                  </th>
-                  <th class="px-4 py-3 font-medium text-left w-[200px]">更新时间</th>
-                  <!-- <th class="px-4 py-3 font-medium text-center">seedId</th> -->
-                  <th class="px-4 py-3 font-medium text-left w-[150px]">版本数</th>
-                  <th class="px-4 py-3 font-medium text-left w-[250px]">操作</th>
-                </tr>
-              </thead>
-              <tbody class="text-sm text-[#333] divide-y divide-gray-100">
-                <tr
-                  v-for="model in displayedModels"
-                  :key="model.id"
-                  class="hover:bg-[#fcfcfc] transition-colors group cursor-pointer"
-                  @click="openModel(model)"
-                >
-                  <td class="px-4 py-3">
-                    <div class="flex items-center space-x-3">
-                      <div
-                        v-if="model.previewUrl"
-                        class="w-12 h-8 rounded overflow-hidden border border-gray-200 bg-gray-50 shrink-0"
-                      >
-                        <PreviewImage :preview-url="model.previewUrl" />
-                      </div>
-                      <CubeIcon v-else class="h-4 w-4 text-gray-400 shrink-0" />
-                      <span class="font-medium whitespace-pre-line">
-                        {{ model.name }}
-                        <span
-                          v-if="getModelRuntimeStatus(model)"
-                          class="ml-2 text-xs font-normal text-gray-400"
+            <div
+              v-else
+              class="bg-white/80 backdrop-blur-md border border-gray-200 rounded-lg overflow-hidden"
+            >
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr
+                    class="bg-[#f8f9fa] text-gray-500 text-sm border-b border-gray-200"
+                  >
+                    <th class="px-4 py-3 font-medium text-left min-w-[200px]">
+                      模型名称
+                    </th>
+                    <th class="px-4 py-3 font-medium text-left w-[200px]">更新时间</th>
+                    <th class="px-4 py-3 font-medium text-left w-[150px]">版本数</th>
+                    <th class="px-4 py-3 font-medium text-left w-[250px]">操作</th>
+                  </tr>
+                </thead>
+                <tbody class="text-sm text-[#333] divide-y divide-gray-100">
+                  <tr
+                    v-for="model in displayedModels"
+                    :key="model.id"
+                    class="hover:bg-[#fcfcfc] transition-colors group cursor-pointer"
+                    @click="openModel(model)"
+                  >
+                    <td class="px-4 py-3">
+                      <div class="flex items-center space-x-3">
+                        <div
+                          v-if="model.previewUrl"
+                          class="w-12 h-8 rounded overflow-hidden border border-gray-200 bg-gray-50 shrink-0"
                         >
-                          {{ getModelRuntimeStatus(model) }}
+                          <PreviewImage :preview-url="model.previewUrl" />
+                        </div>
+                        <CubeIcon v-else class="h-4 w-4 text-gray-400 shrink-0" />
+                        <span class="font-medium whitespace-pre-line">
+                          {{ model.name }}
+                          <span
+                            v-if="getModelRuntimeStatus(model)"
+                            class="ml-2 text-xs font-normal text-gray-400"
+                          >
+                            {{ getModelRuntimeStatus(model) }}
+                          </span>
                         </span>
-                      </span>
-                    </div>
-                  </td>
-                  <td class="px-4 py-3 text-left text-gray-500">
-                    {{ formatDate(model.updatedAt) }}
-                  </td>
-                  <!-- <td class="px-4 py-3 text-center text-gray-500">
-                    {{ JSON.stringify(model.raw.lastVersion?.items?.[0] || '{}') }}
-                  </td> -->
-                  <td class="px-4 py-3 text-left text-gray-500">
-                    {{ model.versionsCount || 0 }}
-                  </td>
-                  <td class="px-4 py-3 text-left">
-                    <div class="flex items-center justify-start space-x-2">
-                      <button
-                        title="查看"
-                        class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
-                        @click.stop="openModel(model)"
-                      >
-                        <EyeIcon class="h-4 w-4" />
-                      </button>
-                      <button
-                        title="历史版本管理"
-                        class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
-                      >
-                        <ClockIcon class="h-4 w-4" />
-                      </button>
-                      <button
-                        v-if="
-                          model.raw.permissions.canCreateVersion.authorized &&
-                          hasModelOp('canEdit')
-                        "
-                        title="上传新版本"
-                        class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
-                        @click.stop="triggerVersionUploadPicker(model)"
-                      >
-                        <ArrowUpTrayIcon class="h-4 w-4" />
-                      </button>
-                      <button
-                        v-if="shouldShowSyncAction(model)"
-                        :title="
-                          isModelSyncing({
-                            projectId: props.projectId,
-                            modelId: model.id
-                          })
-                            ? '同步中'
-                            : '同步模型'
-                        "
-                        class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                        :disabled="
-                          isModelSyncing({
-                            projectId: props.projectId,
-                            modelId: model.id
-                          })
-                        "
-                        @click.stop="syncModelFile(model)"
-                      >
-                        <ArrowPathIcon
-                          class="h-4 w-4"
-                          :class="{
-                            'animate-spin': isModelSyncing({
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 text-left text-gray-500">
+                      {{ formatDate(model.updatedAt) }}
+                    </td>
+                    <td class="px-4 py-3 text-left text-gray-500">
+                      {{ model.versionsCount || 0 }}
+                    </td>
+                    <td class="px-4 py-3 text-left">
+                      <div class="flex items-center justify-start space-x-2">
+                        <button
+                          title="查看"
+                          class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
+                          @click.stop="openModel(model)"
+                        >
+                          <EyeIcon class="h-4 w-4" />
+                        </button>
+                        <button
+                          v-if="
+                            model.raw.permissions.canCreateVersion.authorized &&
+                            hasModelOp('canEdit')
+                          "
+                          title="上传新版本"
+                          class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
+                          @click.stop="triggerVersionUploadPicker(model)"
+                        >
+                          <ArrowUpTrayIcon class="h-4 w-4" />
+                        </button>
+                        <button
+                          v-if="shouldShowSyncAction(model)"
+                          :title="
+                            isModelSyncing({
                               projectId: props.projectId,
                               modelId: model.id
                             })
-                          }"
-                        />
-                      </button>
-                      <button
-                        v-if="hasModelOp('canDownload')"
-                        title="数据下载及导出"
-                        class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
-                      >
-                        <ArrowDownTrayIcon class="h-4 w-4" />
-                      </button>
-                      <button
-                        v-if="canDeleteModel(model)"
-                        title="删除"
-                        class="p-1.5 text-red-500 hover:bg-red-50 rounded"
-                        @click.stop="handleDeleteModel(model)"
-                      >
-                        <TrashIcon class="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <InfiniteLoading
-            v-if="displayedModels.length && moreToLoad"
-            :settings="{ identifier: infiniteLoaderId }"
-            @infinite="infiniteLoad"
-          />
+                              ? '同步中'
+                              : '同步模型'
+                          "
+                          class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                          :disabled="
+                            isModelSyncing({
+                              projectId: props.projectId,
+                              modelId: model.id
+                            })
+                          "
+                          @click.stop="syncModelFile(model)"
+                        >
+                          <ArrowPathIcon
+                            class="h-4 w-4"
+                            :class="{
+                              'animate-spin': isModelSyncing({
+                                projectId: props.projectId,
+                                modelId: model.id
+                              })
+                            }"
+                          />
+                        </button>
+                        <button
+                          v-if="hasModelOp('canDownload')"
+                          title="数据下载及导出"
+                          class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded"
+                        >
+                          <ArrowDownTrayIcon class="h-4 w-4" />
+                        </button>
+                        <button
+                          v-if="canDeleteModel(model)"
+                          title="删除"
+                          class="p-1.5 text-red-500 hover:bg-red-50 rounded"
+                          @click.stop="handleDeleteModel(model)"
+                        >
+                          <TrashIcon class="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <InfiniteLoading
+              v-if="displayedModels.length && moreToLoad"
+              :settings="{ identifier: infiniteLoaderId }"
+              @infinite="infiniteLoad"
+            />
+          </template>
+
+          <template v-else>
+            <DrawingsTab
+              :project-id="props.projectId"
+              :active-dir="activeDir"
+              :root-id="ROOT_ID"
+              :view-mode="viewMode"
+              :search-query="searchQuery"
+              :refresh-key="drawingsRefreshKey"
+            />
+          </template>
         </div>
       </div>
     </div>
@@ -366,6 +417,15 @@
       :skip-dtp-model-sync="true"
       class="hidden"
       @uploading="onModelUploading"
+    />
+    <label for="workbench-drawing-upload" class="sr-only">上传图纸</label>
+    <input
+      id="workbench-drawing-upload"
+      ref="drawingFileInputRef"
+      type="file"
+      accept=".dxf,.dwg"
+      class="hidden"
+      @change="onDrawingFilePicked"
     />
     <DeleteDialog
       v-if="deleteTargetModel"
@@ -474,7 +534,9 @@ import type { FileAreaUploadingPayload } from '~/lib/form/helpers/fileUpload'
 import { gql } from 'graphql-tag'
 import DeleteDialog from '~/components/project/page/models/card/DeleteDialog.vue'
 import ImportDialog from '~/components/projects/workbench/ImportDialog.vue'
+import DrawingsTab from '~/components/projects/workbench/DrawingsTab.vue'
 import ProjectCardImportFileArea from '~/components/project/CardImportFileArea.vue'
+import { useWorkbenchDrawingsApi } from '~/components/projects/workbench/drawingsApi'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import { useWorkbenchUploadSync } from '~~/lib/projects/composables/workbenchUploadSync'
@@ -531,6 +593,7 @@ const ROOT_ID = 'all'
 const projectName = computed(() => uploadProject.value?.name || '项目工作台')
 
 const activeDir = ref(ROOT_ID)
+const activeTab = ref<'models' | 'drawings'>('models')
 const viewMode = ref<'grid' | 'list'>('list')
 const searchQuery = ref('')
 
@@ -547,6 +610,10 @@ const selectedVersionUploadModel = ref<ModelListItem | null>(null)
 const showDeleteModelConfirm = ref(false)
 const deleteTargetModel = ref<ModelListItem | null>(null)
 const isImportingFromLibrary = ref(false)
+const drawingsRefreshKey = ref(0)
+const isDrawingUploading = ref(false)
+const drawingFileInputRef = ref<HTMLInputElement | null>(null)
+const drawingsApi = useWorkbenchDrawingsApi()
 
 const { tasks, registerPendingUpload, isModelSyncing, runFullModelSync } =
   useWorkbenchUploadSync()
@@ -566,8 +633,19 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
     return '模型处理中'
   }
 
+  const latestVersion = model.raw.lastVersion?.items?.[0]
+  const latestUpload = model.raw.lastUpload?.items?.[0]
+  if (!latestVersion?.id && !pendingUpload && !latestUpload?.id) {
+    return '暂无模型'
+  }
+
   if (model.raw.lastVersion?.items?.[0]?.seedId?.trim()) {
     return '已同步'
+  }
+
+  const latestUploadStatus = latestUpload?.convertedStatus
+  if (latestUploadStatus === FileUploadConvertedStatus.Error) {
+    return '转换失败'
   }
 
   if (
@@ -577,6 +655,10 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
     })
   ) {
     return '同步中'
+  }
+
+  if (latestUploadStatus === FileUploadConvertedStatus.Completed) {
+    return '待同步'
   }
 
   const latestTask =
@@ -609,6 +691,58 @@ const canDeleteModel = (model: ModelListItem) => {
 
 const triggerUploadPicker = () => {
   uploadAreaRef.value?.triggerPicker()
+}
+
+const triggerDrawingUpload = () => {
+  if (isDrawingUploading.value) return
+  drawingFileInputRef.value?.click()
+}
+
+const onDrawingFilePicked = async (e: Event) => {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  isDrawingUploading.value = true
+  try {
+    const { blobId, uploadUrl } = await drawingsApi.generateUploadUrl(
+      props.projectId,
+      file.name
+    )
+    const putRes = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: file
+    })
+    if (!putRes.ok) {
+      throw new Error('上传图纸文件失败')
+    }
+
+    const name = file.name.replace(/\.[^/.]+$/, '')
+    await drawingsApi.createDrawing(props.projectId, {
+      blobId,
+      fileName: file.name,
+      contentType: file.type || 'application/octet-stream',
+      fileSize: file.size,
+      folderId: activeDir.value === ROOT_ID ? null : activeDir.value,
+      name: name.trim() || file.name
+    })
+
+    drawingsRefreshKey.value++
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '上传成功',
+      description: file.name
+    })
+  } catch (err) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '上传失败',
+      description: ensureError(err).message
+    })
+  } finally {
+    isDrawingUploading.value = false
+  }
 }
 
 const triggerVersionUploadPicker = async (model: ModelListItem) => {
@@ -666,6 +800,21 @@ const uploadProject = computed(
     }) || null
 )
 const canUploadModel = computed(() => isLoggedIn.value && hasModelOp('canUpload'))
+
+const activeDirBaseName = computed(() => {
+  if (activeDir.value === ROOT_ID) return '全部'
+  return folderRows.value.find((dir) => dir.id === activeDir.value)?.name || '全部'
+})
+
+const searchInputId = computed(() =>
+  activeTab.value === 'models' ? 'workbench-model-search' : 'workbench-drawing-search'
+)
+const searchLabel = computed(() =>
+  activeTab.value === 'models' ? '搜索模型' : '搜索图纸'
+)
+const searchPlaceholder = computed(() =>
+  activeTab.value === 'models' ? '搜索模型...' : '搜索图纸...'
+)
 
 const projectFoldersByParentQuery = gql`
   query WorkbenchProjectFoldersByParent($projectId: String!, $parentId: String) {

@@ -984,12 +984,24 @@ const getModelRuntimeStatus = (model: Model) => {
     return '模型处理中'
   }
 
+  if (!model.hasModel && !model.latestUpload?.id) {
+    return '暂无模型'
+  }
+
   if (model.seedId?.trim()) {
     return '已同步'
   }
 
+  if (convertedStatus === FileUploadConvertedStatus.Error) {
+    return '转换失败'
+  }
+
   if (isModelSyncing({ projectId: model.projectId, modelId: model.id })) {
     return '同步中'
+  }
+
+  if (convertedStatus === FileUploadConvertedStatus.Completed) {
+    return '待同步'
   }
 
   const latestTask =
