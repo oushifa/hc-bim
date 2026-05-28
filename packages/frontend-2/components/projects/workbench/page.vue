@@ -119,13 +119,23 @@
                 {{ row.name }}
               </button>
             </div>
-            <button
-              class="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-[#00b4b6]"
-              title="添加子目录"
-              @click.stop="openAddDirModal(row.id)"
-            >
-              <PlusIcon class="w-3.5 h-3.5" />
-            </button>
+            <div class="flex items-center opacity-0 group-hover:opacity-100">
+              <button
+                class="p-1 text-gray-400 hover:text-[#00b4b6]"
+                title="添加子目录"
+                @click.stop="openAddDirModal(row.id)"
+              >
+                <PlusIcon class="w-3.5 h-3.5" />
+              </button>
+              <button
+                v-if="row.id !== ROOT_ID"
+                class="p-1 text-gray-400 hover:text-red-500"
+                title="删除目录"
+                @click.stop="openDeleteDirConfirm(row.id, row.name)"
+              >
+                <TrashIcon class="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -136,9 +146,9 @@
           class="py-4 border-b border-gray-100 flex justify-between items-center bg-white/80 backdrop-blur-md shrink-0"
         >
           <div class="flex items-center space-x-4 px-6 min-w-0">
-            <h3 class="text-sm font-medium text-[#333] truncate">
+            <!-- <h3 class="text-sm font-medium text-[#333] truncate">
               {{ activeDirBaseName }}
-            </h3>
+            </h3> -->
             <div
               class="flex items-center bg-[#f5f7fa] border border-gray-200 rounded-[10px] p-0.5"
               role="tablist"
@@ -480,6 +490,52 @@
       :use-auth-download="true"
       @downloaded="onUploadDownloaded"
     />
+
+    <!-- Delete Directory Confirm Modal -->
+    <div
+      v-if="showDeleteDirConfirm"
+      class="absolute inset-0 z-50 flex items-center justify-center bg-white/40 backdrop-blur-sm"
+    >
+      <div
+        class="bg-white/80 backdrop-blur-md rounded-[26px] shadow-2xl w-[400px] flex flex-col overflow-hidden"
+      >
+        <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+          <h3 class="text-lg font-medium text-[#333]">删除目录</h3>
+          <button class="text-gray-400 hover:text-gray-600" @click="closeDeleteDirConfirm">
+            关闭
+          </button>
+        </div>
+        <div class="p-6">
+          <p class="text-sm text-gray-700">
+            确定要删除目录
+            <span class="font-medium text-[#333]">「{{ deleteDirTargetName }}」</span>
+            吗？该操作不可恢复。
+          </p>
+        </div>
+        <div
+          class="p-4 border-t border-gray-100 flex justify-end space-x-3 bg-white/50"
+        >
+          <button
+            class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+            @click="closeDeleteDirConfirm"
+          >
+            取消
+          </button>
+          <button
+            :disabled="deletingDir"
+            :class="[
+              'px-4 py-2 text-sm font-medium text-white rounded-md transition-colors',
+              deletingDir
+                ? 'bg-gray-300 cursor-not-allowed'
+                : 'bg-red-500 hover:bg-red-600'
+            ]"
+            @click="deleteDirectory"
+          >
+            {{ deletingDir ? '删除中...' : '确认删除' }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <!-- Add Directory Modal -->
     <div
@@ -985,6 +1041,14 @@ const createFolderMutation = gql`
   }
 `
 
+const deleteFolderMutation = gql`
+  mutation WorkbenchDeleteFolder($input: DeleteFolderInput!) {
+    folderMutations {
+      delete(input: $input)
+    }
+  }
+`
+
 const importSourceModelQuery = gql`
   query WorkbenchImportSourceModel($projectId: String!, $modelId: String!) {
     project(id: $projectId) {
@@ -1211,6 +1275,61 @@ const closeDirModal = () => {
   showDirModal.value = false
   dirModalParentId.value = null
   newDirName.value = ''
+}
+
+const showDeleteDirConfirm = ref(false)
+const deleteDirTargetId = ref<string | null>(null)
+const deleteDirTargetName = ref('')
+const deletingDir = ref(false)
+
+const openDeleteDirConfirm = (id: string, name: string) => {
+  deleteDirTargetId.value = id
+  deleteDirTargetName.value = name
+  showDeleteDirConfirm.value = true
+}
+
+const closeDeleteDirConfirm = () => {
+  showDeleteDirConfirm.value = false
+  deleteDirTargetId.value = null
+  deleteDirTargetName.value = ''
+}
+
+const deleteDirectory = async () => {
+  if (!deleteDirTargetId.value) return
+  deletingDir.value = true
+  try {
+    await apollo.mutate({
+      mutation: deleteFolderMutation,
+      variables: {
+        input: {
+          projectId: props.projectId,
+          id: deleteDirTargetId.value
+        }
+      }
+    })
+    // If the active dir was the deleted one, reset to ROOT
+    if (activeDir.value === deleteDirTargetId.value) {
+      activeDir.value = ROOT_ID
+    }
+    expandedDirIds.value.delete(deleteDirTargetId.value)
+    expandedDirIds.value = new Set(expandedDirIds.value)
+    await loadFolders()
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '删除成功',
+      description: `目录「${deleteDirTargetName.value}」已删除`
+    })
+    closeDeleteDirConfirm()
+  } catch (err) {
+    const error = ensureError(err)
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '删除失败',
+      description: error.message
+    })
+  } finally {
+    deletingDir.value = false
+  }
 }
 
 const loadFolders = async () => {

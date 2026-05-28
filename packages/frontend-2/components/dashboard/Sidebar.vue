@@ -182,7 +182,7 @@
                             @click="openAddTwinWorkgroupModal"
                           >
                             <PlusIcon class="w-3.5 h-3.5" />
-                            <span>添加工作组</span>
+                            <span>创建团队</span>
                           </button>
                         </template>
                       </div>
@@ -683,17 +683,17 @@
         <LayoutDialog
           v-model:open="addTwinWorkgroupOpen"
           max-width="sm"
-          title="创建组"
+          title="创建团队"
         >
           <div class="space-y-6 pt-2">
             <div class="flex items-center gap-4">
-              <label class="w-16 shrink-0 text-sm text-gray-500">组名称</label>
+              <label class="w-16 shrink-0 text-sm text-gray-500">团队名称</label>
               <div class="flex-1 relative">
                 <input
                   v-model="newTwinWorkgroupName"
                   type="text"
                   maxlength="10"
-                  placeholder="请输入组名称"
+                  placeholder="请输入团队名称"
                   class="w-full bg-gray-50 border border-transparent rounded-[8px] p-2.5 pr-14 text-sm text-[#333] focus:outline-none focus:ring-0 focus:border-[#00b4b6] focus:bg-white"
                   @keydown.enter.prevent="confirmAddTwinWorkgroup"
                 />
