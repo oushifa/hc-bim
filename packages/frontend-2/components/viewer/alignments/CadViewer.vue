@@ -44,7 +44,7 @@
       >
         <div class="w-48 h-1.5 bg-outline-3 rounded-full overflow-hidden">
           <div
-            class="h-full bg-primary rounded-full transition-all duration-200"
+            class="h-full bg-[#00b4b6] rounded-full transition-all duration-200"
             :style="{ width: loadProgress + '%' }"
           />
         </div>
@@ -864,8 +864,8 @@ const pickPointFromEvent = (e: MouseEvent) => {
   )
 
   const raycaster = new Raycaster()
-  raycaster.params.Line.threshold = 4
-  raycaster.params.Points.threshold = 8
+  ;(raycaster.params as any).Line = { threshold: 4 }
+  ;(raycaster.params as any).Points = { threshold: 8 }
   raycaster.setFromCamera(ndc, activeCamera as unknown as never)
 
   const projectToScreen = (worldPoint: Vector3) => {
@@ -988,7 +988,7 @@ const pickPointFromEvent = (e: MouseEvent) => {
     }
   })
 
-  const intersects = raycaster.intersectObject(currentModel as never, true)
+  const intersects = raycaster.intersectObject(currentModel as never, true) as Array<{ point: Vector3 }>
   if (intersects[0]) {
     updateCandidate({
       point: intersects[0].point.clone(),
@@ -996,7 +996,12 @@ const pickPointFromEvent = (e: MouseEvent) => {
     })
   }
 
-  return bestCandidate?.point || null
+  // Use a separate variable to avoid TypeScript control flow analysis issues
+  let finalPoint: Vector3 | null = null
+  if (bestCandidate as unknown as { point: Vector3; distance: number } | null) {
+    finalPoint = (bestCandidate as unknown as { point: Vector3; distance: number }).point
+  }
+  return finalPoint
 }
 
 const onContainerClick = (e: MouseEvent) => {

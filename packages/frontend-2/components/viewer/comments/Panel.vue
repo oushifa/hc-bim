@@ -23,7 +23,7 @@
             size="sm"
             :class="
               showVisibilityOptions
-                ? '!text-primary-focus !dark:text-foreground-on-primary !bg-info-lighter'
+                ? '!text-[#00b4b6] !bg-[#00b4b6]/10'
                 : ''
             "
             @click="showVisibilityOptions = !showVisibilityOptions"

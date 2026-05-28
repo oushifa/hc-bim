@@ -18,12 +18,12 @@
           导入到: <span class="font-medium text-[#00b4b6]">{{ activeDirName }}</span>
         </span>
         <div class="relative">
-          <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none z-10" />
           <input 
             v-model="searchQuery"
             type="text" 
             placeholder="搜索模型库..." 
-            class="w-64 bg-white/80 backdrop-blur-md border border-gray-200 rounded-md py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-[#00b4b6] text-[#333]"
+            class="search-input w-64 bg-white border border-gray-200 rounded-md py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:border-[#00b4b6] text-[#333]"
           />
         </div>
       </div>
@@ -171,3 +171,14 @@ onMounted(() => {
   void loadModels()
 })
 </script>
+
+<style scoped>
+/* 强制覆盖搜索框聚焦时的边框颜色与背景色 */
+input.search-input:focus,
+input.search-input:focus-visible {
+  border: 1px solid #00b4b6 !important;
+  background-color: #ffffff !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+</style>

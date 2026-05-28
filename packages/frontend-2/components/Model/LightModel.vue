@@ -1133,6 +1133,8 @@ const formatDate = (date: string) => {
 }
 
 const openModelDetail = (model: Model) => {
+  // 设置来源标记，用于返回按钮判断
+  sessionStorage.setItem('viewer-from-page', 'light-models')
   router.push(`/projects/${model.projectId}/models/${model.id}`)
 }
 

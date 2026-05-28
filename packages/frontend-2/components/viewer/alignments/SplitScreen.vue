@@ -33,8 +33,8 @@
       @mousedown.prevent="startDrag"
     >
       <div
-        class="absolute inset-0 transition-colors duration-150 group-hover:bg-primary"
-        :class="isDragging ? 'bg-primary' : 'bg-outline-2'"
+        class="absolute inset-0 transition-colors duration-150 group-hover:bg-[#00b4b6]"
+        :class="isDragging ? 'bg-[#00b4b6]' : 'bg-outline-2'"
       />
       <div
         class="absolute inset-x-0 inset-y-0 flex flex-col items-center justify-center gap-1 pointer-events-none"

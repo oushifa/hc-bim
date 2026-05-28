@@ -2,7 +2,7 @@
   <ViewerLayoutSidePanel disable-scrollbar class="relative" @close="onClose">
     <template #title>
       <div class="flex items-center gap-2">
-        <BetweenVerticalStart class="h-4 w-4 text-primary" />
+        <BetweenVerticalStart class="h-4 w-4 text-[#00b4b6]" />
         <span>联动配置</span>
       </div>
     </template>
@@ -253,7 +253,7 @@
                 class="rounded-xl border px-3 py-3 text-left transition-colors w-full"
                 :class="
                   drawing.id === editorForm.drawingId
-                    ? 'border-primary bg-primary/10'
+                    ? 'border-[#00b4b6] bg-[#00b4b6]/10'
                     : 'border-outline-2 bg-foundation-2 hover:bg-foundation'
                 "
                 @click="selectDrawing(drawing.id)"
@@ -703,7 +703,7 @@ watch(
 }
 
 .panel-btn-primary {
-  @apply border-primary bg-primary text-white hover:opacity-90;
+  @apply border-[#00b4b6] bg-[#00b4b6] text-white hover:opacity-90 hover:text-black;
 }
 
 .panel-btn-danger {
