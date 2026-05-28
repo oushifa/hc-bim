@@ -19,7 +19,7 @@
       <div
         class="text-body-2xs bg-foundation-2 text-foreground p-1 rounded mb-2 text-center"
       >
-        这是一项实验性功能
+        <!-- This is an experimental feature. -->
       </div>
       <div class="flex space-x-2">
         <div class="grow w-1/2">

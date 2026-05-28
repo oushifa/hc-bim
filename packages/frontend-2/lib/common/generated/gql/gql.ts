@@ -178,6 +178,7 @@ type Documents = {
     "\n  query WorkbenchUploadProject($projectId: String!) {\n    project(id: $projectId) {\n      id\n      name\n      permissions {\n        canCreateModel {\n          authorized\n          code\n          message\n          payload\n          errorMessage\n        }\n      }\n    }\n  }\n": typeof types.WorkbenchUploadProjectDocument,
     "\n  query WorkbenchProjectFoldersByParent($projectId: String!, $parentId: String) {\n    project(id: $projectId) {\n      id\n      folders(limit: 100, filter: { parentId: $parentId }) {\n        items {\n          id\n          name\n          projectId\n          parentId\n          models {\n            id\n          }\n        }\n      }\n    }\n  }\n": typeof types.WorkbenchProjectFoldersByParentDocument,
     "\n  mutation WorkbenchCreateFolder($input: CreateFolderInput!) {\n    folderMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n": typeof types.WorkbenchCreateFolderDocument,
+    "\n  mutation WorkbenchDeleteFolder($input: DeleteFolderInput!) {\n    folderMutations {\n      delete(input: $input)\n    }\n  }\n": typeof types.WorkbenchDeleteFolderDocument,
     "\n  query WorkbenchImportSourceModel($projectId: String!, $modelId: String!) {\n    project(id: $projectId) {\n      id\n      model(id: $modelId) {\n        id\n        name\n        versions(limit: 1) {\n          items {\n            id\n            referencedObject\n          }\n        }\n      }\n    }\n  }\n": typeof types.WorkbenchImportSourceModelDocument,
     "\n  mutation WorkbenchCreateImportedModel($input: CreateModelInput!) {\n    modelMutations {\n      create(input: $input) {\n        id\n        name\n      }\n    }\n  }\n": typeof types.WorkbenchCreateImportedModelDocument,
     "\n  mutation WorkbenchCreateImportedVersion($input: CreateVersionInput!) {\n    versionMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n": typeof types.WorkbenchCreateImportedVersionDocument,
@@ -780,6 +781,7 @@ const documents: Documents = {
     "\n  query WorkbenchUploadProject($projectId: String!) {\n    project(id: $projectId) {\n      id\n      name\n      permissions {\n        canCreateModel {\n          authorized\n          code\n          message\n          payload\n          errorMessage\n        }\n      }\n    }\n  }\n": types.WorkbenchUploadProjectDocument,
     "\n  query WorkbenchProjectFoldersByParent($projectId: String!, $parentId: String) {\n    project(id: $projectId) {\n      id\n      folders(limit: 100, filter: { parentId: $parentId }) {\n        items {\n          id\n          name\n          projectId\n          parentId\n          models {\n            id\n          }\n        }\n      }\n    }\n  }\n": types.WorkbenchProjectFoldersByParentDocument,
     "\n  mutation WorkbenchCreateFolder($input: CreateFolderInput!) {\n    folderMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n": types.WorkbenchCreateFolderDocument,
+    "\n  mutation WorkbenchDeleteFolder($input: DeleteFolderInput!) {\n    folderMutations {\n      delete(input: $input)\n    }\n  }\n": types.WorkbenchDeleteFolderDocument,
     "\n  query WorkbenchImportSourceModel($projectId: String!, $modelId: String!) {\n    project(id: $projectId) {\n      id\n      model(id: $modelId) {\n        id\n        name\n        versions(limit: 1) {\n          items {\n            id\n            referencedObject\n          }\n        }\n      }\n    }\n  }\n": types.WorkbenchImportSourceModelDocument,
     "\n  mutation WorkbenchCreateImportedModel($input: CreateModelInput!) {\n    modelMutations {\n      create(input: $input) {\n        id\n        name\n      }\n    }\n  }\n": types.WorkbenchCreateImportedModelDocument,
     "\n  mutation WorkbenchCreateImportedVersion($input: CreateVersionInput!) {\n    versionMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n": types.WorkbenchCreateImportedVersionDocument,
@@ -1888,6 +1890,10 @@ export function graphql(source: "\n  query WorkbenchProjectFoldersByParent($proj
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation WorkbenchCreateFolder($input: CreateFolderInput!) {\n    folderMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation WorkbenchCreateFolder($input: CreateFolderInput!) {\n    folderMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation WorkbenchDeleteFolder($input: DeleteFolderInput!) {\n    folderMutations {\n      delete(input: $input)\n    }\n  }\n"): (typeof documents)["\n  mutation WorkbenchDeleteFolder($input: DeleteFolderInput!) {\n    folderMutations {\n      delete(input: $input)\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
