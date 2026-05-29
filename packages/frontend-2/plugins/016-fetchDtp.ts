@@ -24,6 +24,9 @@ const joinUrlPath = (base: string, path: string) => {
 export const clearDtpTokenCache = () => {
   cachedDtpToken = null
   pendingDtpTokenRequest = null
+  if (import.meta.client) {
+    localStorage.removeItem('dtp-token')
+  }
 }
 
 /**
@@ -85,16 +88,17 @@ export default defineNuxtPlugin(() => {
   }
 
   const getDtpToken = async (): Promise<string | null> => {
+    if (!import.meta.client) {
+      return null
+    }
     if (cachedDtpToken) {
       return cachedDtpToken
     }
 
-    if (import.meta.client) {
-      const storedToken = localStorage.getItem('dtp-token')
-      if (storedToken) {
-        cachedDtpToken = storedToken
-        return storedToken
-      }
+    const storedToken = localStorage.getItem('dtp-token')
+    if (storedToken) {
+      cachedDtpToken = storedToken
+      return storedToken
     }
 
     if (pendingDtpTokenRequest) {
