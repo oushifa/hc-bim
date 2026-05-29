@@ -131,13 +131,17 @@ export function useViewerObjectCustomAttributes() {
       fetchAttributes(projectId, modelId),
       $fetch<{
         fileName: string
+        versionId?: string
         payload: {
           model: { id: string; name: string; timestamp: string }
           elements: Array<{ id: string; parameters?: Record<string, unknown> }>
         }
-      }>(`/api/projects/${projectId}/models/${modelId}/bim-custom-label`, {
-        headers: getHeaders()
-      })
+      }>(
+        `${config.public.apiOrigin}/api/v1/projects/${projectId}/models/${modelId}/bim-custom-label`,
+        {
+          headers: getHeaders()
+        }
+      )
     ])
 
     const groupedByApplicationId = new Map<string, Record<string, string>>()
