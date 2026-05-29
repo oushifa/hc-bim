@@ -1,4 +1,10 @@
-import { createError, defineEventHandler, getRouterParam, parseCookies } from 'h3'
+import {
+  createError,
+  defineEventHandler,
+  getHeader,
+  getRouterParam,
+  parseCookies
+} from 'h3'
 import { CookieKeys } from '~/lib/common/helpers/constants'
 import { useApiOrigin } from '~/composables/env'
 
@@ -38,18 +44,23 @@ type SyncFlatPayload = {
   }
   elements: Array<{
     id: string
+    applicationId?: string
+    elementId?: string
     parameters: Record<string, FlatValue>
   }>
 }
+
+type SourceFileType = 'ifc' | 'rvt' | null
 
 const TREE_CHILD_KEYS = ['elements', 'children', '@elements', '@children', 'objects']
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
-const pickString = (...values: unknown[]): string | undefined => {
+const pickIdString = (...values: unknown[]): string | undefined => {
   for (const value of values) {
     if (typeof value === 'string' && value.trim().length) return value
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   }
   return undefined
 }
@@ -132,8 +143,33 @@ const collectReachableIds = (
   return visited
 }
 
-const getSyncElementId = (raw: Record<string, unknown>) => {
-  return pickString(raw.applicationId, raw.originalId, raw.originalID)
+const inferSourceFileType = (modelName: string): SourceFileType => {
+  const lower = modelName.trim().toLowerCase()
+  if (lower.endsWith('.ifc')) return 'ifc'
+  if (lower.endsWith('.rvt')) return 'rvt'
+  return null
+}
+
+const getSyncElementIds = (
+  raw: Record<string, unknown>,
+  sourceFileType: SourceFileType
+): { id?: string; applicationId?: string; elementId?: string } => {
+  const applicationId = pickIdString(raw.applicationId, raw.originalId, raw.originalID)
+  const elementId = pickIdString(raw.elementId, raw.elementID)
+
+  if (sourceFileType === 'rvt') {
+    return {
+      id: elementId || applicationId,
+      applicationId: applicationId || undefined,
+      elementId: elementId || undefined
+    }
+  }
+
+  return {
+    id: applicationId || elementId,
+    applicationId: applicationId || undefined,
+    elementId: elementId || undefined
+  }
 }
 
 const buildSyncFlatPayload = (params: {
@@ -144,16 +180,25 @@ const buildSyncFlatPayload = (params: {
   objectMap: Map<string, SyncObjectLite>
 }): SyncFlatPayload => {
   const reachableIds = collectReachableIds(params.rootId, params.objectMap)
-  const dedupedElements = new Set<string>()
+  const sourceFileType = inferSourceFileType(params.modelName)
+  const dedupedElements = new Map<
+    string,
+    { applicationId?: string; elementId?: string }
+  >()
 
   for (const id of reachableIds) {
     if (id === params.rootId) continue
     const item = params.objectMap.get(id)
     if (!item) continue
 
-    const elementId = getSyncElementId(item.raw)
-    if (!elementId) continue
-    dedupedElements.add(elementId)
+    const ids = getSyncElementIds(item.raw, sourceFileType)
+    if (!ids.id) continue
+    if (!dedupedElements.has(ids.id)) {
+      dedupedElements.set(ids.id, {
+        ...(ids.applicationId ? { applicationId: ids.applicationId } : {}),
+        ...(ids.elementId ? { elementId: ids.elementId } : {})
+      })
+    }
   }
 
   return {
@@ -162,8 +207,10 @@ const buildSyncFlatPayload = (params: {
       name: params.modelName,
       timestamp: params.versionCreatedAt
     },
-    elements: [...dedupedElements].map((id) => ({
+    elements: [...dedupedElements.entries()].map(([id, meta]) => ({
       id,
+      ...(meta.applicationId ? { applicationId: meta.applicationId } : {}),
+      ...(meta.elementId ? { elementId: meta.elementId } : {}),
       parameters: {}
     }))
   }
@@ -179,7 +226,12 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const authToken = parseCookies(event)[CookieKeys.AuthToken]
+  const cookies = parseCookies(event)
+  const authHeader = getHeader(event, 'authorization')
+  const authHeaderToken = authHeader?.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : undefined
+  const authToken = cookies[CookieKeys.AuthToken] || authHeaderToken
   if (!authToken) {
     throw createError({
       statusCode: 401,

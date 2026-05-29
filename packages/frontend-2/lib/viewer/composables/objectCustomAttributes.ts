@@ -134,14 +134,16 @@ export function useViewerObjectCustomAttributes() {
         versionId?: string
         payload: {
           model: { id: string; name: string; timestamp: string }
-          elements: Array<{ id: string; parameters?: Record<string, unknown> }>
+          elements: Array<{
+            id: string
+            applicationId?: string
+            elementId?: string
+            parameters?: Record<string, unknown>
+          }>
         }
-      }>(
-        `${config.public.apiOrigin}/api/v1/projects/${projectId}/models/${modelId}/bim-custom-label`,
-        {
-          headers: getHeaders()
-        }
-      )
+      }>(`/api/v1/projects/${projectId}/models/${modelId}/bim-custom-label`, {
+        headers: getHeaders()
+      })
     ])
 
     const groupedByApplicationId = new Map<string, Record<string, string>>()
@@ -156,9 +158,10 @@ export function useViewerObjectCustomAttributes() {
     for (const element of allElementsPayload.payload.elements) {
       if (!element?.id || uniqueElementIds.has(element.id)) continue
       uniqueElementIds.add(element.id)
+      const attributeKey = element.applicationId || element.id
       fullElements.push({
         id: element.id,
-        parameters: groupedByApplicationId.get(element.id) || {}
+        parameters: groupedByApplicationId.get(attributeKey) || {}
       })
     }
 
