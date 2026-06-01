@@ -51,13 +51,13 @@
             <span
               v-if="isRhinoFileImporterEnabled"
               v-tippy="
-                ['ifc', ...Array.from(rhinoImporterSupportedFileExtensions)].join(', ')
+                ['ifc', 'dxf', ...Array.from(rhinoImporterSupportedFileExtensions)].join(', ')
               "
               class="underline"
             >
               支持的文件
             </span>
-            <span v-else>IFC 文件</span>
+            <span v-else>IFC/DXF 文件</span>
             到这里上传。
           </p>
           <!-- <p v-if="!isDisabled" :class="paragraphClasses">
