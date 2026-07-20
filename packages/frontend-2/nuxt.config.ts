@@ -58,7 +58,7 @@ export default defineNuxtConfig({
       }
     ],
     '@speckle/ui-components-nuxt',
-    '@artmizu/nuxt-prometheus'
+    ['@artmizu/nuxt-prometheus', { verbose: false }]
   ],
   runtimeConfig: {
     redisUrl: '',
@@ -262,20 +262,6 @@ export default defineNuxtConfig({
     compressPublicAssets: true,
     externals: {
       external
-    },
-    devProxy: {
-      '/__dtp': {
-        target: 'http://192.168.20.157:30080/ui',
-        changeOrigin: true
-      },
-      '/__dtp-ui': {
-        target: 'http://192.168.20.157:30080/ui',
-        changeOrigin: true
-      },
-      '/__dtp-static': {
-        target: 'http://192.168.20.157:30080',
-        changeOrigin: true
-      }
     }
   },
 
@@ -299,11 +285,6 @@ export default defineNuxtConfig({
       'graphql/language/printer',
       'graphql/utilities/getOperationAST'
     ]
-  },
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-expect-error
-  prometheus: {
-    verbose: false
   },
   features: {
     devLogs: true
