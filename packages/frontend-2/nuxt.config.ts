@@ -184,15 +184,15 @@ export default defineNuxtConfig({
     },
     // Proxy DTP API requests (both dev and production)
     '/__dtp/**': {
-      proxy: 'http://10.66.8.185:30080/service/**'
+      proxy: 'http://192.168.20.157:30080/ui/**'
     },
     // Proxy DTP UI pages (iframe embedded pages)
     '/__dtp-ui/**': {
-      proxy: 'http://10.66.8.185:30080/ui/**'
+      proxy: 'http://192.168.20.157:30080/ui/**'
     },
     // Proxy DTP static resources (thumbnails, files, etc.)
     '/__dtp-static/**': {
-      proxy: 'http://10.66.8.185:30080/**'
+      proxy: 'http://192.168.20.157:30080/**'
     },
     '/functions': {
       redirect: {
@@ -265,15 +265,15 @@ export default defineNuxtConfig({
     },
     devProxy: {
       '/__dtp': {
-        target: 'http://10.66.8.185:30080/service',
+        target: 'http://192.168.20.157:30080/ui',
         changeOrigin: true
       },
       '/__dtp-ui': {
-        target: 'http://10.66.8.185:30080/ui',
+        target: 'http://192.168.20.157:30080/ui',
         changeOrigin: true
       },
       '/__dtp-static': {
-        target: 'http://10.66.8.185:30080',
+        target: 'http://192.168.20.157:30080',
         changeOrigin: true
       }
     }

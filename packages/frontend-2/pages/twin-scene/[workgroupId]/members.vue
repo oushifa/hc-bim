@@ -30,7 +30,7 @@ definePageMeta({
 
 /** 团队管理 iframe 基础路径（使用相对路径通过代理，避免混合内容问题） */
 const TEAM_MEMBER_BASE_URL =
-  'http://10.66.8.185:30080/ui/team-manage/team-member?embed=embed&theme=light'
+  'http://192.168.20.157:30080/ui/team-manage/team-member?embed=embed&theme=light'
 
 const iframeSrc = ref('')
 const loading = ref(true)
