@@ -186,17 +186,9 @@ export default defineNuxtConfig({
     '/__dtp/**': {
       proxy: 'http://192.168.20.157:30080/service/**'
     },
-    // Proxy DTP UI pages (iframe embedded pages)
-    '/__dtp-ui/**': {
-      proxy: 'http://192.168.20.157:30080/ui/**'
-    },
     // Proxy DTP static resources (thumbnails, files, etc.)
     '/__dtp-static/**': {
       proxy: 'http://192.168.20.157:30080/**'
-    },
-    // Proxy all DTP UI resources (CSS/JS/assets/API calls) referenced by iframe
-    '/ui/**': {
-      proxy: 'http://192.168.20.157:30080/ui/**'
     },
     '/functions': {
       redirect: {
