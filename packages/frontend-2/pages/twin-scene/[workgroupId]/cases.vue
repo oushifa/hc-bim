@@ -33,7 +33,7 @@ definePageMeta({
 
 /** 团队案例 iframe 基础路径（使用相对路径通过代理，避免混合内容问题） */
 const CASE_CREATE_BASE_URL =
-  'http://61.145.255.42:3300/ui/case-create?embed=embed&theme=light'
+  'http://61.145.255.42:30080/ui/case-create?embed=embed&theme=light'
 
 const caseCreateIframeSrc = ref('')
 const loading = ref(true)
