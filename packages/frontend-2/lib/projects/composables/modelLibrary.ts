@@ -143,31 +143,15 @@ export function useModelLibraryApi() {
     return res.data
   }
 
-  /**
-   * 改写上传 URL 的 hostname，使其与当前页面一致。
-   * 后端返回的 S3_PUBLIC_ENDPOINT 是公网地址，内网用户需要改写为内网地址才能上传。
-   */
-  const rewriteUploadUrl = (url: string): string => {
-    if (!import.meta.client) return url
-    try {
-      const urlObj = new URL(url)
-      const currentOrigin = window.location.origin
-      return currentOrigin + urlObj.pathname + urlObj.search + urlObj.hash
-    } catch {
-      return url
-    }
-  }
-
   const uploadToSignedUrl = async (
     file: File,
     uploadUrl: string,
     onProgress?: UploadProgressCallback
   ): Promise<{ etag: string }> => {
     const request = new XMLHttpRequest()
-    const targetUrl = rewriteUploadUrl(uploadUrl)
 
     return await new Promise<{ etag: string }>((resolve, reject) => {
-      request.open('PUT', targetUrl)
+      request.open('PUT', uploadUrl)
       request.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
 
       request.upload.addEventListener('progress', (e) => {
