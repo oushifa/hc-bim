@@ -146,6 +146,7 @@ export default defineNuxtConfig({
         },
         '/graphql': {
           target: 'http://61.145.255.42:3300',
+          ws: true,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\//, '')
         },

@@ -1712,8 +1712,8 @@ const activeDirName = computed(() => {
 })
 
 const openModel = (model: ModelListItem) => {
-  console.log(model)
-  // router.push(getModelItemRoute(model.raw))
+  // console.log(model)
+  router.push(getModelItemRoute(model.raw))
 }
 
 const handleDeleteModel = (model: ModelListItem) => {
