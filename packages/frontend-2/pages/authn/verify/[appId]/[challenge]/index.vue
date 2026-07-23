@@ -188,7 +188,7 @@ useHead({
   title: 'Authorize application'
 })
 
-const apiOrigin = useApiOrigin()
+const apiOrigin = useApiOrigin({ absolute: true })
 const route = useRoute()
 const { activeUser } = useActiveUser()
 const authToken = useAuthCookie()

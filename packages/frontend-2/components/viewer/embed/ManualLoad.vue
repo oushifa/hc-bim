@@ -22,9 +22,7 @@ import { PlayIcon } from '@heroicons/vue/20/solid'
 import { useAuthManager } from '~/lib/auth/composables/auth'
 
 const route = useRoute()
-const {
-  public: { apiOrigin }
-} = useRuntimeConfig()
+const apiOrigin = useApiOrigin({ absolute: true })
 
 const { embedToken } = useAuthManager()
 

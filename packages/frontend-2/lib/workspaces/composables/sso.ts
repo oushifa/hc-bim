@@ -12,7 +12,6 @@ import type { WorkspaceSsoProviderPublic } from '~/lib/workspaces/helpers/types'
  * This is used to determine if a workspace has SSO enabled before authentication
  */
 export const useWorkspacePublicSsoCheck = (workspaceSlug: Ref<string>) => {
-  const apiOrigin = useApiOrigin()
   const logger = useLogger()
 
   const {
@@ -20,9 +19,7 @@ export const useWorkspacePublicSsoCheck = (workspaceSlug: Ref<string>) => {
     status,
     error
   } = useFetch<WorkspaceSsoProviderPublic>(
-    computed(() =>
-      new URL(`/api/v1/workspaces/${workspaceSlug.value}/sso`, apiOrigin).toString()
-    ),
+    computed(() => `/api/v1/workspaces/${workspaceSlug.value}/sso`),
     {
       onResponseError: (err) => {
         logger.error('Failed to fetch workspace SSO provider:', err)

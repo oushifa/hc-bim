@@ -44,7 +44,7 @@ const props = defineProps<{
   newsletterConsent: boolean
 }>()
 
-const apiOrigin = useApiOrigin()
+const apiOrigin = useApiOrigin({ absolute: true })
 const { inviteToken } = useAuthManager()
 
 const NuxtLink = resolveComponent('NuxtLink')

@@ -21,7 +21,7 @@ export type ViewerCatalog = {
 }
 
 export function useViewerCatalogs() {
-  const config = useRuntimeConfig()
+  const apiOrigin = useApiOrigin()
   const authCookie = useAuthCookie()
 
   const getHeaders = () => {
@@ -39,7 +39,7 @@ export function useViewerCatalogs() {
     modelId: string
   ): Promise<ViewerCatalog[]> => {
     const res = await $fetch<{ data: ViewerCatalog[] }>(
-      `${config.public.apiOrigin}/api/projects/${projectId}/viewer-catalogs`,
+      `${apiOrigin}/api/projects/${projectId}/viewer-catalogs`,
       {
         headers: getHeaders(),
         query: { modelId }
@@ -55,7 +55,7 @@ export function useViewerCatalogs() {
     treeData: ViewerCatalogNode[] = []
   ): Promise<ViewerCatalog> => {
     const res = await $fetch<{ data: ViewerCatalog }>(
-      `${config.public.apiOrigin}/api/projects/${projectId}/viewer-catalogs`,
+      `${apiOrigin}/api/projects/${projectId}/viewer-catalogs`,
       {
         method: 'POST',
         headers: getHeaders(),
@@ -73,7 +73,7 @@ export function useViewerCatalogs() {
     payload: { title?: string; treeData?: ViewerCatalogNode[] }
   ): Promise<ViewerCatalog> => {
     const res = await $fetch<{ data: ViewerCatalog }>(
-      `${config.public.apiOrigin}/api/projects/${projectId}/viewer-catalogs/${catalogId}`,
+      `${apiOrigin}/api/projects/${projectId}/viewer-catalogs/${catalogId}`,
       {
         method: 'PUT',
         headers: getHeaders(),
@@ -90,7 +90,7 @@ export function useViewerCatalogs() {
     catalogId: string
   ): Promise<void> => {
     await $fetch(
-      `${config.public.apiOrigin}/api/projects/${projectId}/viewer-catalogs/${catalogId}`,
+      `${apiOrigin}/api/projects/${projectId}/viewer-catalogs/${catalogId}`,
       {
         method: 'DELETE',
         headers: getHeaders(),

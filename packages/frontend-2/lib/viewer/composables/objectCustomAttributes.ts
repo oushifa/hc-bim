@@ -29,7 +29,7 @@ export type ViewerObjectCustomAttributesDtpSyncResult = {
 }
 
 export function useViewerObjectCustomAttributes() {
-  const config = useRuntimeConfig()
+  const apiOrigin = useApiOrigin()
   const authCookie = useAuthCookie()
   const { $dtpFetch } = useNuxtApp()
   const { ensureDtpToken } = useDtpModelUpload()
@@ -61,7 +61,7 @@ export function useViewerObjectCustomAttributes() {
     applicationId?: string
   ): Promise<ViewerObjectCustomAttribute[]> => {
     const res = await $fetch<{ data: ViewerObjectCustomAttribute[] }>(
-      `${config.public.apiOrigin}/api/projects/${projectId}/viewer-object-custom-attributes`,
+      `${apiOrigin}/api/projects/${projectId}/viewer-object-custom-attributes`,
       {
         headers: getHeaders(),
         query: {
@@ -79,7 +79,7 @@ export function useViewerObjectCustomAttributes() {
     payload: { applicationId: string; name: string; value: string }
   ): Promise<ViewerObjectCustomAttribute> => {
     const res = await $fetch<{ data: ViewerObjectCustomAttribute }>(
-      `${config.public.apiOrigin}/api/projects/${projectId}/viewer-object-custom-attributes`,
+      `${apiOrigin}/api/projects/${projectId}/viewer-object-custom-attributes`,
       {
         method: 'POST',
         headers: getHeaders(),
@@ -96,7 +96,7 @@ export function useViewerObjectCustomAttributes() {
     attributeId: string
   ): Promise<void> => {
     await $fetch(
-      `${config.public.apiOrigin}/api/projects/${projectId}/viewer-object-custom-attributes/${attributeId}`,
+      `${apiOrigin}/api/projects/${projectId}/viewer-object-custom-attributes/${attributeId}`,
       {
         method: 'DELETE',
         headers: getHeaders(),
@@ -112,7 +112,7 @@ export function useViewerObjectCustomAttributes() {
     payload: { name: string; value: string }
   ): Promise<ViewerObjectCustomAttribute> => {
     const res = await $fetch<{ data: ViewerObjectCustomAttribute }>(
-      `${config.public.apiOrigin}/api/projects/${projectId}/viewer-object-custom-attributes/${attributeId}`,
+      `${apiOrigin}/api/projects/${projectId}/viewer-object-custom-attributes/${attributeId}`,
       {
         method: 'PATCH',
         headers: getHeaders(),

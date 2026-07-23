@@ -59,7 +59,7 @@ export type ModelLibraryListResponse = {
 type UploadProgressCallback = (percentage: number) => void
 
 export function useModelLibraryApi() {
-  const config = useRuntimeConfig()
+  const apiOrigin = useApiOrigin()
   const authCookie = useAuthCookie()
 
   const getHeaders = () => {
@@ -76,7 +76,7 @@ export function useModelLibraryApi() {
 
   const ensureProject = async (): Promise<ModelLibraryProject> => {
     const res = await $fetch<{ data: ModelLibraryProject }>(
-      `${config.public.apiOrigin}/api/internal/model-library-project`,
+      `${apiOrigin}/api/internal/model-library-project`,
       {
         headers: getHeaders()
       }
@@ -91,7 +91,7 @@ export function useModelLibraryApi() {
     pageSize?: number
   }): Promise<ModelLibraryListResponse> => {
     const res = await $fetch<{ data: ModelLibraryListItem[]; total?: number }>(
-      `${config.public.apiOrigin}/api/v1/models`,
+      `${apiOrigin}/api/v1/models`,
       {
         headers: getHeaders(),
         params: {
@@ -115,7 +115,7 @@ export function useModelLibraryApi() {
     description?: string
   }): Promise<ModelLibraryEnsureModelResponse> => {
     const res = await $fetch<{ data: ModelLibraryEnsureModelResponse }>(
-      `${config.public.apiOrigin}/api/internal/model-library/models/ensure`,
+      `${apiOrigin}/api/internal/model-library/models/ensure`,
       {
         method: 'POST',
         headers: getHeaders(),
@@ -132,7 +132,7 @@ export function useModelLibraryApi() {
     modelDescription?: string
   }): Promise<ModelLibraryPrepareUploadResponse> => {
     const res = await $fetch<{ data: ModelLibraryPrepareUploadResponse }>(
-      `${config.public.apiOrigin}/api/internal/model-library/uploads/prepare`,
+      `${apiOrigin}/api/internal/model-library/uploads/prepare`,
       {
         method: 'POST',
         headers: getHeaders(),
@@ -190,7 +190,7 @@ export function useModelLibraryApi() {
     modelDescription?: string
   }): Promise<ModelLibraryImportResponse> => {
     const res = await $fetch<{ data: ModelLibraryImportResponse }>(
-      `${config.public.apiOrigin}/api/internal/model-library/uploads/import`,
+      `${apiOrigin}/api/internal/model-library/uploads/import`,
       {
         method: 'POST',
         headers: getHeaders(),

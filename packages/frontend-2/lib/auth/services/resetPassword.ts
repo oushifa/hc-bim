@@ -14,7 +14,9 @@ type PasswordResetFinalizationParams = {
 export async function requestResetEmail(params: RequestResetEmailParams) {
   const { email, apiOrigin } = params
 
-  const url = new URL('/auth/pwdreset/request', apiOrigin)
+  const url = apiOrigin
+    ? new URL('/auth/pwdreset/request', apiOrigin).toString()
+    : '/auth/pwdreset/request'
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -30,7 +32,9 @@ export async function requestResetEmail(params: RequestResetEmailParams) {
 export async function finalizePasswordReset(params: PasswordResetFinalizationParams) {
   const { password, token, apiOrigin } = params
 
-  const url = new URL('/auth/pwdreset/finalize', apiOrigin)
+  const url = apiOrigin
+    ? new URL('/auth/pwdreset/finalize', apiOrigin).toString()
+    : '/auth/pwdreset/finalize'
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -8,8 +8,7 @@ withDefaults(
     size?: string
   }>(),
   {
-    title:
-      'If you would like help from the server administrators, click to copy the error reference.',
+    title: '.',
     size: 'text-body-3xs'
   }
 )

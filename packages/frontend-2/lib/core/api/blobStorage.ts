@@ -45,9 +45,9 @@ export async function downloadBlobWithUrl(params: {
 
   // Create anchor w/ target _blank and trigger click to download the file
   // Not using fetch() here cause that would download the entire file into memory before even showing the browser download dialog
-  const dlUrl = new URL(`/api/stream/${principal.streamId}/blob/${blobId}`, apiOrigin)
+  const dlUrl = `${apiOrigin}/api/stream/${principal.streamId}/blob/${blobId}`
   const dlAnchor = document.createElement('a')
-  dlAnchor.href = dlUrl.toString()
+  dlAnchor.href = dlUrl
   dlAnchor.target = '_blank'
   dlAnchor.rel = 'noopener noreferrer'
   dlAnchor.style.display = 'none'
@@ -65,7 +65,7 @@ export async function downloadBlobWithAuth(params: {
   apiOrigin: string
 }) {
   const { blobId, fileName, principal, token, apiOrigin } = params
-  const dlUrl = new URL(`/api/stream/${principal.streamId}/blob/${blobId}`, apiOrigin)
+  const dlUrl = `${apiOrigin}/api/stream/${principal.streamId}/blob/${blobId}`
   const res = await fetch(dlUrl, {
     method: 'GET',
     headers: {
@@ -119,8 +119,7 @@ export async function getBlobUrl(params: {
 }) {
   const { blobId, principal, apiOrigin } = params
 
-  const url = new URL(`/api/stream/${principal.streamId}/blob/${blobId}`, apiOrigin)
-  return url.toString()
+  return `${apiOrigin}/api/stream/${principal.streamId}/blob/${blobId}`
 }
 
 /**
@@ -195,7 +194,7 @@ export function uploadFiles(params: {
 
   // Init req
   const req = new XMLHttpRequest()
-  req.open('POST', new URL(`/api/stream/${principal.streamId}/blob`, apiOrigin))
+  req.open('POST', `${apiOrigin}/api/stream/${principal.streamId}/blob`)
   req.responseType = 'json'
 
   if (authToken) {
@@ -276,15 +275,12 @@ export async function deleteBlob(params: {
   const { blobId, principal, authToken, apiOrigin } = params
   const { streamId } = principal
 
-  const res = await fetch(
-    new URL(`/api/stream/${streamId}/blob/${blobId}`, apiOrigin),
-    {
-      method: 'DELETE',
-      headers: {
-        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
-      }
+  const res = await fetch(`${apiOrigin}/api/stream/${streamId}/blob/${blobId}`, {
+    method: 'DELETE',
+    headers: {
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
     }
-  )
+  })
 
   if (res.status !== 204) {
     throw new BlobDeleteFailedError()

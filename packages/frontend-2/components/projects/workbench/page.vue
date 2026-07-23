@@ -501,7 +501,10 @@
       >
         <div class="p-4 border-b border-gray-100 flex justify-between items-center">
           <h3 class="text-lg font-medium text-[#333]">删除目录</h3>
-          <button class="text-gray-400 hover:text-gray-600" @click="closeDeleteDirConfirm">
+          <button
+            class="text-gray-400 hover:text-gray-600"
+            @click="closeDeleteDirConfirm"
+          >
             关闭
           </button>
         </div>
@@ -1709,7 +1712,8 @@ const activeDirName = computed(() => {
 })
 
 const openModel = (model: ModelListItem) => {
-  router.push(getModelItemRoute(model.raw))
+  console.log(model)
+  // router.push(getModelItemRoute(model.raw))
 }
 
 const handleDeleteModel = (model: ModelListItem) => {

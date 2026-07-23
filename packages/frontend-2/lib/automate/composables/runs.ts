@@ -172,7 +172,6 @@ export const useAutomationRunLogs = (params: {
   runId: MaybeRef<Optional<string>>
 }) => {
   const { projectId, automationId, runId } = params
-  const apiOrigin = useApiOrigin()
 
   const authToken = useAuthCookie()
   const { triggerNotification } = useGlobalToast()
@@ -206,7 +205,7 @@ export const useAutomationRunLogs = (params: {
       return
     }
 
-    const res = await fetch(new URL(url.value, apiOrigin), {
+    const res = await fetch(url.value, {
       signal: aborts.pop().signal,
       headers: {
         Authorization: `Bearer ${authToken.value}`

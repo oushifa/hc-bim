@@ -50,7 +50,7 @@ useHead({
   title: 'Developer Settings'
 })
 
-const apiOrigin = useApiOrigin()
+const apiOrigin = useApiOrigin({ absolute: true })
 
 const itemToModify = ref<TokenItem | ApplicationItem | AuthorizedAppItem | null>(null)
 const showDeleteDialog = ref(false)

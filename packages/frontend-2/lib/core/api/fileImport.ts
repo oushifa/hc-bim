@@ -43,13 +43,8 @@ export const importFileLegacy: ImportFile = (params, callbacks) => {
   const formKey = 'file'
   data.append(formKey, file)
 
-  const endpointUrl = new URL(
-    `/api/file/autodetect/${projectId}/${finalModelName}`,
-    apiOrigin
-  )
-
   const request = new XMLHttpRequest()
-  request.open('POST', endpointUrl.toString())
+  request.open('POST', `${apiOrigin}/api/file/autodetect/${projectId}/${finalModelName}`)
   request.responseType = 'json'
 
   request.setRequestHeader('Authorization', `Bearer ${authToken}`)

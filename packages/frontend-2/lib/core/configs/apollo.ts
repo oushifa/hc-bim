@@ -641,6 +641,7 @@ const defaultConfigResolver: ApolloConfigResolver = () => {
     public: { speckleServerVersion = 'unknown' }
   } = useRuntimeConfig()
   const apiOrigin = useApiOrigin()
+  const absoluteApiOrigin = useApiOrigin({ absolute: true })
   const nuxtApp = useNuxtApp()
   const reqId = useRequestId()
   const { effectiveAuthToken, logout } = useAuthManager({
@@ -648,7 +649,9 @@ const defaultConfigResolver: ApolloConfigResolver = () => {
   })
 
   const httpEndpoint = `${apiOrigin}/graphql`
-  const wsEndpoint = httpEndpoint.replace('http', 'ws')
+  const wsEndpoint = new URL('/graphql', absoluteApiOrigin)
+    .toString()
+    .replace(/^http/, 'ws')
 
   const wsClient = import.meta.client
     ? createWsClient({ wsEndpoint, authToken: effectiveAuthToken, reqId })

@@ -7,17 +7,27 @@ import type { FeatureFlags } from '@speckle/shared/environment/featureFlags'
 export const useApiOrigin = (
   options?: Partial<{
     forcePublic: boolean
+    absolute: boolean
   }>
 ) => {
   const {
     public: { apiOrigin, backendApiOrigin }
   } = useRuntimeConfig()
 
-  if (import.meta.server && backendApiOrigin.length > 1 && !options?.forcePublic) {
-    return backendApiOrigin
+  const serverOrigin =
+    backendApiOrigin.length > 1 && !options?.forcePublic ? backendApiOrigin : apiOrigin
+
+  if (options?.absolute) {
+    if (import.meta.client) return window.location.origin
+    if (serverOrigin.length) return serverOrigin
+    return useRequestURL().origin
   }
 
-  return apiOrigin
+  if (import.meta.server) {
+    return serverOrigin
+  }
+
+  return ''
 }
 
 export const useFeatureFlags = (): FeatureFlags => {

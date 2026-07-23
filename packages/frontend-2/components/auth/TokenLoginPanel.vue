@@ -61,7 +61,7 @@ enum LoginState {
 }
 
 const route = useRoute()
-const apiOrigin = useApiOrigin()
+const apiOrigin = useApiOrigin({ absolute: true })
 const { loginWithToken } = useAuthManager()
 
 const state = ref<LoginState>(LoginState.TokenChecking)

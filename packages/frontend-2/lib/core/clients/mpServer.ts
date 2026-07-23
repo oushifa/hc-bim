@@ -26,7 +26,7 @@ export const useServersideMixpanelClientBuilder = () => {
   } = useRuntimeConfig()
   const nuxtApp = useNuxtApp()
   const route = useRoute()
-  const apiOrigin = useApiOrigin({ forcePublic: true })
+  const apiOrigin = useApiOrigin({ forcePublic: true, absolute: true })
   const { distinctId } = useActiveUser()
   const logger = useLogger()
   const ssrContext = nuxtApp.ssrContext

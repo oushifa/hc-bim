@@ -137,6 +137,28 @@ export default defineNuxtConfig({
       fs: {
         // Allowing symlinks
         // allow: ['/home/fabis/Code/random/vue-apollo/']
+      },
+      proxy: {
+        '/api': {
+          target: 'http://61.145.255.42:3300',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\//, '')
+        },
+        '/graphql': {
+          target: 'http://61.145.255.42:3300',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\//, '')
+        },
+        '/auth': {
+          target: 'http://61.145.255.42:3300',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\//, '')
+        },
+        '/objects': {
+          target: 'http://61.145.255.42:3300',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\//, '')
+        }
       }
     },
 

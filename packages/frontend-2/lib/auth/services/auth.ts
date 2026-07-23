@@ -83,10 +83,9 @@ export async function getAccessCode(params: LoginParams) {
     )
   }
 
-  const loginUrl = new URL(
-    `/auth/local/login?challenge=${challenge}`,
-    apiOrigin
-  ).toString()
+  const loginUrl = apiOrigin
+    ? new URL(`/auth/local/login?challenge=${challenge}`, apiOrigin).toString()
+    : `/auth/local/login?challenge=${challenge}`
 
   const res = await fetch(loginUrl, {
     method: 'POST',
@@ -116,25 +115,32 @@ export async function registerAndGetAccessCode(params: RegisterParams) {
     )
   }
 
-  const registerUrl = new URL(`/auth/local/register`, apiOrigin)
-  registerUrl.searchParams.append('challenge', challenge)
+  const registerUrl = apiOrigin ? new URL('/auth/local/register', apiOrigin) : null
+  const registerPath = registerUrl?.pathname || '/auth/local/register'
+  const searchParams = registerUrl?.searchParams || new URLSearchParams()
+
+  searchParams.append('challenge', challenge)
   if (inviteToken) {
-    registerUrl.searchParams.append('token', inviteToken)
+    searchParams.append('token', inviteToken)
   }
 
   if (newsletter) {
-    registerUrl.searchParams.append('newsletter', 'true')
+    searchParams.append('newsletter', 'true')
   }
 
   if (superRegisterOnly) {
-    registerUrl.searchParams.append('superRegisterOnly', 'true')
+    searchParams.append('superRegisterOnly', 'true')
   }
 
   if (superRegisterToken) {
-    registerUrl.searchParams.append('superRegisterToken', superRegisterToken)
+    searchParams.append('superRegisterToken', superRegisterToken)
   }
 
-  const res = await fetch(registerUrl, {
+  const finalRegisterUrl = registerUrl
+    ? registerUrl.toString()
+    : `${registerPath}?${searchParams.toString()}`
+
+  const res = await fetch(finalRegisterUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -149,7 +155,7 @@ export async function registerAndGetAccessCode(params: RegisterParams) {
 export async function getTokenFromAccessCode(params: TokenParams) {
   const { apiOrigin, accessCode, challenge } = params
 
-  const url = new URL('/auth/token', apiOrigin)
+  const url = apiOrigin ? new URL('/auth/token', apiOrigin).toString() : '/auth/token'
   const response = await fetch(url, {
     method: 'POST',
     headers: {

@@ -1,8 +1,7 @@
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
 
 export default defineNuxtPlugin(() => {
-  const apiOrigin = useApiOrigin()
-  const apiBase = new URL(apiOrigin)
+  const apiBase = new URL(useApiOrigin({ absolute: true }))
   const authToken = useAuthCookie()
 
   const authFetch = $fetch.create({
