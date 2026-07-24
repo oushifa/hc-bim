@@ -23,21 +23,17 @@
 <script setup lang="ts">
 import {
   buildDtpIframeSrc,
-  DTP_TOKEN_STORAGE_KEY
+  getDtpUIOrigin
 } from '~~/composables/useDtpIframeSrc'
-import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 
 definePageMeta({
   middleware: ['auth', 'permission']
 })
 
-/** 团队案例 iframe 基础路径（使用相对路径通过代理，避免混合内容问题） */
-const CASE_CREATE_BASE_URL =
-  'http://61.145.255.42:30080/ui/case-create?embed=embed&theme=light'
+/** 团队案例 iframe 路径（host 由 getDtpUIOrigin() 动态获取） */
+const CASE_CREATE_PATH = '/ui/case-create?embed=embed&theme=light'
 
 const caseCreateIframeSrc = ref('')
-const loading = ref(true)
-const { activeUser } = useActiveUser()
 
 /** 确保 DTP token 存在，如果不存在或过期则重新获取 */
 // const ensureDtpToken = async (): Promise<boolean> => {
@@ -91,12 +87,11 @@ const { activeUser } = useActiveUser()
 //   }
 // }
 
-onMounted(async () => {
-  // 先确保 token 存在
-  // await ensureDtpToken()
-  // 然后构建 iframe URL
-  caseCreateIframeSrc.value = buildDtpIframeSrc(CASE_CREATE_BASE_URL)
-  loading.value = false
+onMounted(() => {
+  const origin = getDtpUIOrigin()
+  if (origin) {
+    caseCreateIframeSrc.value = buildDtpIframeSrc(`${origin}${CASE_CREATE_PATH}`)
+  }
 })
 
 useHead({
