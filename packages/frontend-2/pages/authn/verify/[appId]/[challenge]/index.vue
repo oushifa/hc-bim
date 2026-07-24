@@ -159,7 +159,7 @@ import { useQuery } from '@vue/apollo-composable'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { useAuthCookie, useAuthManager } from '~~/lib/auth/composables/auth'
 import { authorizableAppMetadataQuery } from '~~/lib/auth/graphql/queries'
-import { Disclosure, DisclosureButton, DisclosurePanel } from '@headlessui/vue'
+import { Disclosure, DisclosureButton } from '@headlessui/vue'
 import { ensureError, type Nullable } from '@speckle/shared'
 import { useMixpanel } from '~~/lib/core/composables/mp'
 import { homeRoute } from '~~/lib/common/helpers/route'
@@ -169,8 +169,6 @@ import {
   ChevronUpIcon
 } from '@heroicons/vue/24/outline'
 import { useServerInfo } from '~/lib/core/composables/server'
-import { upperFirst } from 'lodash-es'
-import { toNewProductTerminology } from '~/lib/common/helpers/resources'
 import { FetchError } from 'ofetch'
 import { usePostAuthRedirect } from '~/lib/auth/composables/postAuthRedirect'
 
@@ -223,34 +221,14 @@ const allowUrl = computed(() => {
   finalUrl.searchParams.set('appId', app.value.id)
   finalUrl.searchParams.set('challenge', challenge.value)
   finalUrl.searchParams.set('token', authToken.value)
+  finalUrl.searchParams.set('frontendOrigin', apiOrigin)
   finalUrl.searchParams.set('preventRedirect', 'true')
 
   return finalUrl.toString()
 })
 
-const translatedScopes = computed(() => {
-  return app.value?.scopes.map((scope) => {
-    return {
-      description: toNewProductTerminology(scope.description),
-      name: toNewProductTerminology(scope.name)
-    }
-  })
-})
-
 const trustByDefault = computed(() => {
   return app.value?.trustByDefault
-})
-
-const groupedScopes = computed(() => {
-  if (!translatedScopes.value) return []
-
-  return translatedScopes.value.reduce((acc, scope) => {
-    const key = upperFirst(scope.name.split(':')[0])
-
-    if (!acc[key]) acc[key] = []
-    acc[key].push(scope.description)
-    return acc
-  }, {} as Record<string, string[]>)
 })
 
 const goToFinalUrl = (url: string) => {

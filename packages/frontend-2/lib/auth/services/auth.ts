@@ -37,6 +37,11 @@ type RegisterParams = {
   }
 }
 
+const getFrontendOrigin = (): string | undefined => {
+  if (typeof window === 'undefined') return undefined
+  return window.location.origin
+}
+
 async function resolveAccessCode(res: Response): Promise<string> {
   if (!res.redirected) {
     // for some reason the error response structure differs between /login and /register...
@@ -76,6 +81,7 @@ async function resolveAccessCode(res: Response): Promise<string> {
 
 export async function getAccessCode(params: LoginParams) {
   const { apiOrigin, email, password, challenge } = params
+  const frontendOrigin = getFrontendOrigin()
 
   if (!email || !password) {
     throw new InvalidLoginParametersError(
@@ -83,14 +89,19 @@ export async function getAccessCode(params: LoginParams) {
     )
   }
 
-  const loginUrl = apiOrigin
-    ? new URL(`/auth/local/login?challenge=${challenge}`, apiOrigin).toString()
-    : `/auth/local/login?challenge=${challenge}`
+  const query = new URLSearchParams({ challenge })
+  if (frontendOrigin) {
+    query.set('frontendOrigin', frontendOrigin)
+  }
+
+  const loginPath = `/auth/local/login?${query.toString()}`
+  const loginUrl = apiOrigin ? new URL(loginPath, apiOrigin).toString() : loginPath
 
   const res = await fetch(loginUrl, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...(frontendOrigin ? { 'X-Frontend-Origin': frontendOrigin } : {})
     },
     redirect: 'follow',
     body: JSON.stringify({ email, password })
@@ -109,6 +120,7 @@ export async function registerAndGetAccessCode(params: RegisterParams) {
     superRegisterToken,
     superRegisterOnly
   } = params
+  const frontendOrigin = getFrontendOrigin()
   if (!user.email || !user.password || !user.name) {
     throw new InvalidRegisterParametersError(
       "Can't register without a valid email, password and name!"
@@ -120,6 +132,9 @@ export async function registerAndGetAccessCode(params: RegisterParams) {
   const searchParams = registerUrl?.searchParams || new URLSearchParams()
 
   searchParams.append('challenge', challenge)
+  if (frontendOrigin) {
+    searchParams.set('frontendOrigin', frontendOrigin)
+  }
   if (inviteToken) {
     searchParams.append('token', inviteToken)
   }
@@ -143,7 +158,8 @@ export async function registerAndGetAccessCode(params: RegisterParams) {
   const res = await fetch(finalRegisterUrl, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      ...(frontendOrigin ? { 'X-Frontend-Origin': frontendOrigin } : {})
     },
     redirect: 'follow',
     body: JSON.stringify(user)
