@@ -55,6 +55,7 @@
 import { computedAsync } from '@vueuse/core'
 import type { ProjectPageLatestItemsModelItemFragment } from '~/lib/common/generated/gql/graphql'
 import { useAuthManager } from '~~/lib/auth/composables/auth'
+import { useInternalUrlUtils } from '~~/lib/common/composables/url'
 import dayjs from 'dayjs'
 import { ClockIcon } from '@heroicons/vue/24/outline'
 import { CubeTransparentIcon } from '@heroicons/vue/20/solid'
@@ -66,6 +67,7 @@ const props = defineProps<{
 }>()
 
 const { authToken } = useAuthManager()
+const { toRelativeInternalUrl } = useInternalUrlUtils()
 
 const folderPath = computed(() => {
   const splitName = props.model.name.split('/')
@@ -88,11 +90,15 @@ async function usePreviewUrl(
   previewUrl?: string
 ): Promise<string | undefined> {
   if (!previewUrl) return previewUrl
-  const res = await fetch(previewUrl, {
-    headers: { Authorization: `Bearer ${token}` }
+  const normalizedPreviewUrl = toRelativeInternalUrl(previewUrl) || previewUrl
+  const res = await fetch(normalizedPreviewUrl, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'X-Frontend-Origin': window.location.origin
+    }
   })
 
-  if (!res.ok) return previewUrl
+  if (!res.ok) return normalizedPreviewUrl
   const blob = await res.blob()
   return URL.createObjectURL(blob)
 }

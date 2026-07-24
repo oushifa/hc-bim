@@ -3,8 +3,14 @@ import type { Nullable, Optional } from '@speckle/shared'
 import { writableAsyncComputed } from '~~/lib/common/composables/async'
 
 const RELATIVE_URL_BASE = 'http://speckle-internal.local'
+const KNOWN_INTERNAL_PATH_PREFIXES = ['/preview/', '/auth/', '/api/', '/objects/']
+const KNOWN_INTERNAL_PATHS = ['/graphql']
 
 const buildRelativeUrl = (url: URL) => `${url.pathname}${url.search}${url.hash}`
+
+const isKnownInternalPath = (pathname: string) =>
+  KNOWN_INTERNAL_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
+  KNOWN_INTERNAL_PATHS.includes(pathname)
 
 const normalizeOrigin = (value?: string) => {
   if (!value?.length) return null
@@ -114,7 +120,9 @@ export const useInternalUrlUtils = () => {
 
     try {
       const parsedUrl = new URL(url)
-      return internalOrigins.has(parsedUrl.origin) ? buildRelativeUrl(parsedUrl) : url
+      return internalOrigins.has(parsedUrl.origin) || isKnownInternalPath(parsedUrl.pathname)
+        ? buildRelativeUrl(parsedUrl)
+        : url
     } catch {
       return url
     }

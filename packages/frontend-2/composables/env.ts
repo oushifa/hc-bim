@@ -30,6 +30,12 @@ export const useApiOrigin = (
   return ''
 }
 
+export const useFrontendOrigin = () => {
+  if (import.meta.client) return window.location.origin
+
+  return useRequestURL().origin
+}
+
 export const useFeatureFlags = (): FeatureFlags => {
   const { public: featureFlags } = useRuntimeConfig()
   return featureFlags

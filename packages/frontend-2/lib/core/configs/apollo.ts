@@ -396,8 +396,9 @@ function createWsClient(params: {
   wsEndpoint: string
   authToken: CookieRef<Optional<string>>
   reqId: string
+  frontendOrigin: string
 }): SubscriptionClient {
-  const { wsEndpoint, authToken, reqId } = params
+  const { wsEndpoint, authToken, reqId, frontendOrigin } = params
 
   // WS IN SSR DOESN'T WORK CURRENTLY CAUSE OF SOME NUXT TRANSPILATION WEIRDNESS
   // SO DON'T RUN createWsClient in SSR
@@ -409,9 +410,13 @@ function createWsClient(params: {
       reconnect: true,
       connectionParams: () => {
         const Authorization = authToken.value ? `Bearer ${authToken.value}` : null
+        const headers = {
+          'x-request-id': reqId,
+          'x-frontend-origin': frontendOrigin
+        }
         return Authorization
-          ? { Authorization, headers: { Authorization, 'x-request-id': reqId } }
-          : {}
+          ? { Authorization, headers: { Authorization, ...headers } }
+          : { headers }
       }
     }
     // wsImplementation
@@ -444,8 +449,10 @@ function createLink(params: {
   nuxtApp: NuxtApp
   reqId: string
   logout: ReturnType<typeof useAuthManager>['logout']
+  frontendOrigin: string
 }): ApolloLink {
-  const { httpEndpoint, wsClient, authToken, nuxtApp, reqId, logout } = params
+  const { httpEndpoint, wsClient, authToken, nuxtApp, reqId, logout, frontendOrigin } =
+    params
   const {
     registerError,
     preventHttpCalls,
@@ -572,7 +579,8 @@ function createLink(params: {
       headers: {
         ...headers,
         ...authHeader,
-        'x-request-id': reqId
+        'x-request-id': reqId,
+        'x-frontend-origin': frontendOrigin
       }
     }
   })
@@ -642,6 +650,7 @@ const defaultConfigResolver: ApolloConfigResolver = () => {
   } = useRuntimeConfig()
   const apiOrigin = useApiOrigin()
   const absoluteApiOrigin = useApiOrigin({ absolute: true })
+  const frontendOrigin = useFrontendOrigin()
   const nuxtApp = useNuxtApp()
   const reqId = useRequestId()
   const { effectiveAuthToken, logout } = useAuthManager({
@@ -654,7 +663,12 @@ const defaultConfigResolver: ApolloConfigResolver = () => {
     .replace(/^http/, 'ws')
 
   const wsClient = import.meta.client
-    ? createWsClient({ wsEndpoint, authToken: effectiveAuthToken, reqId })
+    ? createWsClient({
+        wsEndpoint,
+        authToken: effectiveAuthToken,
+        reqId,
+        frontendOrigin
+      })
     : undefined
   const link = createLink({
     httpEndpoint,
@@ -662,7 +676,8 @@ const defaultConfigResolver: ApolloConfigResolver = () => {
     authToken: effectiveAuthToken,
     nuxtApp,
     reqId,
-    logout
+    logout,
+    frontendOrigin
   })
 
   return {

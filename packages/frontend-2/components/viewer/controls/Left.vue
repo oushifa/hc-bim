@@ -396,13 +396,14 @@ const exitSettingsRoute = computed(() => {
 const goBackToPreviousPage = async () => {
   // 获取当前路由
   const currentRoute = useRoute()
-  
+
   // 尝试从路由参数中获取项目 ID
-  const projectId = currentRoute.params.projectId as string || currentRoute.params.id as string
-  
+  const projectId =
+    (currentRoute.params.projectId as string) || (currentRoute.params.id as string)
+
   // 检查来源页面，决定返回目标
   const fromPage = sessionStorage.getItem('viewer-from-page')
-  
+
   if (fromPage === 'light-models' && projectId) {
     // 从轻量模型页面进入，返回到轻量模型列表
     const target = `/models/light`

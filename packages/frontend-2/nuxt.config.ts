@@ -26,7 +26,6 @@ const buildSourceMaps = ['1', 'true', true, 1].includes(BUILD_SOURCEMAPS)
 const hydrationMismatchReportingEnabled = ['1', 'true', true, 1].includes(
   HYDRATION_MISMATCH_REPORTING
 )
-const isDev = process.argv.includes('dev') || process.env.NODE_ENV === 'development'
 
 const external = ['ioredis', 'jsdom']
 
@@ -138,58 +137,54 @@ export default defineNuxtConfig({
       fs: {
         // Allowing symlinks
         // allow: ['/home/fabis/Code/random/vue-apollo/']
-      },
-      proxy: {
-        '/api': {
-          target: 'http://61.145.255.42:3300',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\//, '')
-        },
-        '/graphql': {
-          target: 'http://61.145.255.42:3300',
-          ws: true,
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\//, '')
-        },
-        '/auth': {
-          target: 'http://61.145.255.42:3300',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\//, '')
-        },
-        '/objects': {
-          target: 'http://61.145.255.42:3300',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\//, '')
-        }
       }
+      // proxy: {
+      //   '/api': {
+      //     target: 'http://61.145.255.42:3300',
+      //     changeOrigin: true,
+      //     rewrite: (path) => path.replace(/^\//, '')
+      //   },
+      //   '/graphql': {
+      //     target: 'http://61.145.255.42:3300',
+      //     ws: true,
+      //     changeOrigin: true,
+      //     rewrite: (path) => path.replace(/^\//, '')
+      //   },
+      //   '/auth': {
+      //     target: 'http://61.145.255.42:3300',
+      //     changeOrigin: true,
+      //     rewrite: (path) => path.replace(/^\//, '')
+      //   },
+      //   '/objects': {
+      //     target: 'http://61.145.255.42:3300',
+      //     changeOrigin: true,
+      //     rewrite: (path) => path.replace(/^\//, '')
+      //   }
+      // }
     },
 
     build: {
       rollupOptions: {
-        ...(isDev
-          ? {}
-          : {
-              output: {
-                /**
-                 * Overriding some output file names to avoid adblock.
-                 * Keep Nuxt's default dev filenames so Vite can serve virtual assets correctly.
-                 */
-                entryFileNames: (chunkInfo) => {
-                  if (chunkInfo.name.includes('mixpanel')) {
-                    return buildOutputFileName('mp')
-                  }
+        output: {
+          /**
+           * Overriding some output file names to avoid adblock.
+           * Keep Nuxt's default dev filenames so Vite can serve virtual assets correctly.
+           */
+          entryFileNames: (chunkInfo) => {
+            if (chunkInfo.name.includes('mixpanel')) {
+              return buildOutputFileName('mp')
+            }
 
-                  return buildOutputFileName(chunkInfo.name)
-                },
-                chunkFileNames: (chunkInfo) => {
-                  if (chunkInfo.name.includes('mixpanel')) {
-                    return buildOutputFileName('mp-chunk')
-                  }
+            return buildOutputFileName(chunkInfo.name)
+          },
+          chunkFileNames: (chunkInfo) => {
+            if (chunkInfo.name.includes('mixpanel')) {
+              return buildOutputFileName('mp-chunk')
+            }
 
-                  return buildOutputFileName(chunkInfo.name)
-                }
-              }
-            }),
+            return buildOutputFileName(chunkInfo.name)
+          }
+        },
         // Leave imports as is, they're server-side only
         external: ['jsdom']
       }
