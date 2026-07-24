@@ -2,26 +2,28 @@
 export const DTP_TOKEN_STORAGE_KEY = 'dtp-token'
 
 /**
- * hostname → DTP UI 端口映射表
- * 不同部署环境的 DTP UI 服务端口不同，根据访问 hostname 自动匹配
- * 未匹配到的 hostname 走回退逻辑
+ * hostname → DTP UI origin 映射表
+ * key：前端访问的 hostname，value：对应的 DTP UI 完整 origin
+ * 两个 hostname 可以指向同一个 DTP 服务器
  */
-const DTP_UI_PORT_MAP: Record<string, string> = {
-  '61.145.255.42': '30080',
-  '192.168.20.157': '30443'
+const DTP_UI_ORIGIN_MAP: Record<string, string> = {
+  '61.145.255.42': 'http://61.145.255.42:30080',
+  '192.168.20.157': 'http://192.168.20.157:30080',
+  '192.168.20.155': 'http://192.168.20.157:30080'
 }
 
 /**
- * 根据运行时配置或 hostname 端口映射动态获取 DTP UI 服务的 origin
+ * 根据运行时配置或 hostname 映射动态获取 DTP UI 服务的 origin
  *
  * 优先级：
  * 1. 环境变量 NUXT_PUBLIC_DTP_UI_ORIGIN（手动覆盖）
- * 2. hostname 端口映射表 DTP_UI_PORT_MAP（自动匹配已知环境）
+ * 2. hostname 映射表 DTP_UI_ORIGIN_MAP（自动匹配已知环境）
  * 3. window.location.origin（回退，同 host + 同 port）
  *
  * 示例：
- *   访问 http://61.145.255.42 → http://61.145.255.42:30080
- *   访问 http://192.168.20.157 → http://192.168.20.157:30443
+ *   访问 http://61.145.255.42:任端口 → http://61.145.255.42:30080
+ *   访问 http://192.168.20.157:任端口 → http://192.168.20.157:30080
+ *   访问 http://192.168.20.155:任端口 → http://192.168.20.157:30080
  */
 export function getDtpUIOrigin(): string {
   // 1. 优先使用运行时配置的环境变量
@@ -33,10 +35,10 @@ export function getDtpUIOrigin(): string {
 
   if (typeof window !== 'undefined' && window.location.hostname) {
     const hostname = window.location.hostname
-    // 2. 查 hostname 端口映射表
-    const mappedPort = DTP_UI_PORT_MAP[hostname]
-    if (mappedPort) {
-      return `http://${hostname}:${mappedPort}`
+    // 2. 查 hostname → origin 映射表
+    const mappedOrigin = DTP_UI_ORIGIN_MAP[hostname]
+    if (mappedOrigin) {
+      return mappedOrigin
     }
     // 3. 回退：同源
     return window.location.origin
