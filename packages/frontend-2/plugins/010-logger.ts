@@ -100,6 +100,12 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         'req',
         'res'
       ])
+    })
+
+    if (import.meta.dev) {
+      const { consola } = await initSsrDevLogs({ logLevel })
+      if (consola) {
+        const unhandledHandler: AbstractUnhandledErrorHandler = ({
           error,
           message,
           isUnhandledRejection
