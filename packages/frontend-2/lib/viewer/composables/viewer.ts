@@ -291,7 +291,8 @@ export function useSelectionEvents(
 }
 
 export function useGetObjectUrl() {
-  const apiOrigin = useApiOrigin()
+  // SpeckleLoader parses this with `new URL(resource)`, so it must stay absolute.
+  const apiOrigin = useApiOrigin({ absolute: true })
   return (projectId: string, objectId: string) =>
     `${apiOrigin}/streams/${projectId}/objects/${objectId}`
 }

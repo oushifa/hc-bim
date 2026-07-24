@@ -52,8 +52,8 @@ export type UnifiedVirtualItem = {
 
 function createTreeStateManager() {
   const flattenedTreeCache = new Map<string, UnifiedVirtualItem[]>()
-  const lastCacheKey = ref('')
-  const isInitialized = ref(false)
+  let lastCacheKey = ''
+  let isInitialized = false
 
   let viewer: {
     on: <T extends ViewerEvent>(
@@ -68,7 +68,7 @@ function createTreeStateManager() {
 
   const clearCache = () => {
     flattenedTreeCache.clear()
-    lastCacheKey.value = ''
+    lastCacheKey = ''
   }
 
   const getCacheKey = (
@@ -97,10 +97,10 @@ function createTreeStateManager() {
   }
 
   const initialize = (viewerInstance: typeof viewer) => {
-    if (isInitialized.value || !viewerInstance) return
+    if (isInitialized || !viewerInstance) return
 
     viewer = viewerInstance
-    isInitialized.value = true
+    isInitialized = true
 
     const onLoadComplete = () => clearCache()
     viewer.on(ViewerEvent.LoadComplete, onLoadComplete)
@@ -144,7 +144,7 @@ function createTreeStateManager() {
       detachedObjects
     )
 
-    if (lastCacheKey.value === cacheKey && flattenedTreeCache.has(cacheKey)) {
+    if (lastCacheKey === cacheKey && flattenedTreeCache.has(cacheKey)) {
       return flattenedTreeCache.get(cacheKey)!
     }
 
@@ -224,7 +224,7 @@ function createTreeStateManager() {
 
     // Cache the result
     flattenedTreeCache.set(cacheKey, result)
-    lastCacheKey.value = cacheKey
+    lastCacheKey = cacheKey
 
     return result
   }
