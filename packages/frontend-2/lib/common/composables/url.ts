@@ -2,6 +2,20 @@ import { reduce } from 'lodash-es'
 import type { Nullable, Optional } from '@speckle/shared'
 import { writableAsyncComputed } from '~~/lib/common/composables/async'
 
+const RELATIVE_URL_BASE = 'http://speckle-internal.local'
+
+const buildRelativeUrl = (url: URL) => `${url.pathname}${url.search}${url.hash}`
+
+const normalizeOrigin = (value?: string) => {
+  if (!value?.length) return null
+
+  try {
+    return new URL(value).origin
+  } catch {
+    return null
+  }
+}
+
 export function serializeHashState(
   state: Record<string, Nullable<string>>
 ): Optional<string> {
@@ -79,5 +93,63 @@ export const useAppUrlUtils = () => {
      * Build full/absolute URL
      */
     buildUrl
+  }
+}
+
+export const useInternalUrlUtils = () => {
+  const {
+    public: { apiOrigin, backendApiOrigin }
+  } = useRuntimeConfig()
+
+  const internalOrigins = new Set(
+    [
+      normalizeOrigin(apiOrigin),
+      normalizeOrigin(backendApiOrigin),
+      import.meta.client ? window.location.origin : null
+    ].filter((value): value is string => !!value)
+  )
+
+  const toRelativeInternalUrl = (url: Optional<string>) => {
+    if (!url?.length || url.startsWith('/') || /^(data|blob):/i.test(url)) return url
+
+    try {
+      const parsedUrl = new URL(url)
+      return internalOrigins.has(parsedUrl.origin) ? buildRelativeUrl(parsedUrl) : url
+    } catch {
+      return url
+    }
+  }
+
+  const updateUrlSearchParams = (
+    url: string,
+    update: (searchParams: URLSearchParams) => void
+  ) => {
+    const isRelative = url.startsWith('/')
+    const parsedUrl = new URL(url, RELATIVE_URL_BASE)
+    update(parsedUrl.searchParams)
+
+    if (isRelative || internalOrigins.has(parsedUrl.origin)) {
+      return buildRelativeUrl(parsedUrl)
+    }
+
+    return parsedUrl.toString()
+  }
+
+  const appendUrlPath = (url: string, suffix: string) => {
+    const isRelative = url.startsWith('/')
+    const parsedUrl = new URL(url, RELATIVE_URL_BASE)
+    parsedUrl.pathname = `${parsedUrl.pathname.replace(/\/$/, '')}${suffix}`
+
+    if (isRelative || internalOrigins.has(parsedUrl.origin)) {
+      return buildRelativeUrl(parsedUrl)
+    }
+
+    return parsedUrl.toString()
+  }
+
+  return {
+    toRelativeInternalUrl,
+    updateUrlSearchParams,
+    appendUrlPath
   }
 }

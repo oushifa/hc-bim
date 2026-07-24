@@ -36,6 +36,7 @@ import { isRequired } from '~/lib/common/helpers/validation'
 import { useUpdatePresentationSlide } from '~/lib/presentations/composables/mangament'
 import { useForm } from 'vee-validate'
 import { useAuthManager } from '~~/lib/auth/composables/auth'
+import { useInternalUrlUtils } from '~~/lib/common/composables/url'
 
 graphql(`
   fragment PresentationSlideEditDialog_SavedView on SavedView {
@@ -57,6 +58,7 @@ const open = defineModel<boolean>('open', { required: true })
 const { mutate: updateSlide, loading } = useUpdatePresentationSlide()
 const { handleSubmit } = useForm()
 const { presentationToken } = useAuthManager()
+const { toRelativeInternalUrl, updateUrlSearchParams } = useInternalUrlUtils()
 
 const name = ref<string>('')
 const description = ref<string>('')
@@ -64,11 +66,13 @@ const description = ref<string>('')
 const thumbnailUrlWithToken = computed(() => {
   if (!props.slide?.thumbnailUrl) return props.slide?.thumbnailUrl
 
-  const url = new URL(props.slide.thumbnailUrl)
-  if (presentationToken.value) {
-    url.searchParams.set('embedToken', presentationToken.value)
-  }
-  return url.toString()
+  const thumbnailUrl =
+    toRelativeInternalUrl(props.slide.thumbnailUrl) || props.slide.thumbnailUrl
+  if (!presentationToken.value) return thumbnailUrl
+
+  return updateUrlSearchParams(thumbnailUrl, (searchParams) => {
+    searchParams.set('embedToken', presentationToken.value as string)
+  })
 })
 
 const onSubmit = handleSubmit(async () => {

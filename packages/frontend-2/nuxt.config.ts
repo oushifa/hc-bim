@@ -26,6 +26,7 @@ const buildSourceMaps = ['1', 'true', true, 1].includes(BUILD_SOURCEMAPS)
 const hydrationMismatchReportingEnabled = ['1', 'true', true, 1].includes(
   HYDRATION_MISMATCH_REPORTING
 )
+const isDev = process.argv.includes('dev') || process.env.NODE_ENV === 'development'
 
 const external = ['ioredis', 'jsdom']
 
@@ -165,25 +166,30 @@ export default defineNuxtConfig({
 
     build: {
       rollupOptions: {
-        output: {
-          /**
-           * Overriding some output file names to avoid adblock
-           */
-          entryFileNames: (chunkInfo) => {
-            if (chunkInfo.name.includes('mixpanel')) {
-              return buildOutputFileName('mp')
-            }
+        ...(isDev
+          ? {}
+          : {
+              output: {
+                /**
+                 * Overriding some output file names to avoid adblock.
+                 * Keep Nuxt's default dev filenames so Vite can serve virtual assets correctly.
+                 */
+                entryFileNames: (chunkInfo) => {
+                  if (chunkInfo.name.includes('mixpanel')) {
+                    return buildOutputFileName('mp')
+                  }
 
-            return buildOutputFileName(chunkInfo.name)
-          },
-          chunkFileNames: (chunkInfo) => {
-            if (chunkInfo.name.includes('mixpanel')) {
-              return buildOutputFileName('mp-chunk')
-            }
+                  return buildOutputFileName(chunkInfo.name)
+                },
+                chunkFileNames: (chunkInfo) => {
+                  if (chunkInfo.name.includes('mixpanel')) {
+                    return buildOutputFileName('mp-chunk')
+                  }
 
-            return buildOutputFileName(chunkInfo.name)
-          }
-        },
+                  return buildOutputFileName(chunkInfo.name)
+                }
+              }
+            }),
         // Leave imports as is, they're server-side only
         external: ['jsdom']
       }

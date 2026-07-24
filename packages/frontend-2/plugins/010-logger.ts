@@ -100,15 +100,6 @@ export default defineNuxtPlugin(async (nuxtApp) => {
         'req',
         'res'
       ])
-    })
-
-    // Send to consola for SSR log streaming in dev mode
-    if (import.meta.dev) {
-      const ssrDevLogs = await initSsrDevLogs({ logLevel })
-      const consola = ssrDevLogs.consola
-
-      if (consola) {
-        const unhandledHandler: AbstractUnhandledErrorHandler = ({
           error,
           message,
           isUnhandledRejection

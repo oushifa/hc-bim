@@ -6,6 +6,7 @@ import { useLock } from '~~/lib/common/composables/singleton'
 import PreviewPlaceholder from '~~/assets/images/preview_placeholder.png'
 import { isValidBase64Image } from '@speckle/shared/images/base64'
 import { nanoid } from 'nanoid'
+import { useInternalUrlUtils } from '~~/lib/common/composables/url'
 
 /**
  * Eager loading previews ensures a better LCP score, but also hits the preview endpoint more often.
@@ -72,15 +73,26 @@ export function usePreviewImageBlob(
 
   // Continue on with normal operation
   const { enabled = ref(true) } = options || {}
-  const logger = useLogger()
+  const logger = useLogger() as { error: (...args: unknown[]) => void }
   const lazyLoad = !eagerLoad
+  const { toRelativeInternalUrl, updateUrlSearchParams, appendUrlPath } =
+    useInternalUrlUtils()
 
   const url = ref<Nullable<string>>(PreviewPlaceholder)
   const hasDoneFirstLoad = ref(false)
   const panoramaUrl = ref(null as Nullable<string>)
   const isLoadingPanorama = ref(false)
   const shouldLoadPanorama = ref(false)
-  const basePanoramaUrl = computed(() => unref(previewUrl) + '/all')
+  const normalizedPreviewUrl = computed(() => {
+    const rawPreviewUrl = unref(previewUrl)
+    if (!rawPreviewUrl || isValidBase64Image(rawPreviewUrl)) return rawPreviewUrl
+    return toRelativeInternalUrl(rawPreviewUrl)
+  })
+  const basePanoramaUrl = computed(() => {
+    const normalizedUrl = normalizedPreviewUrl.value
+    if (!normalizedUrl || isValidBase64Image(normalizedUrl)) return normalizedUrl
+    return appendUrlPath(normalizedUrl, '/all')
+  })
   const isEnabled = computed(() => {
     if (import.meta.server) return true // always true on server
     return unref(enabled)
@@ -99,10 +111,10 @@ export function usePreviewImageBlob(
   }
 
   const previewUrlPath = computed(() => {
-    const basePreviewUrl = unref(previewUrl)
+    const basePreviewUrl = normalizedPreviewUrl.value
     if (!basePreviewUrl) return null
 
-    const urlObj = new URL(basePreviewUrl)
+    const urlObj = new URL(basePreviewUrl, 'http://speckle-internal.local')
     return urlObj.pathname
   })
 
@@ -163,7 +175,7 @@ export function usePreviewImageBlob(
   async function processBasePreviewUrl() {
     if (!isEnabled.value) return
 
-    const basePreviewUrl = unref(previewUrl)
+    const basePreviewUrl = normalizedPreviewUrl.value
     try {
       if (!basePreviewUrl) {
         url.value = PreviewPlaceholder
@@ -178,9 +190,9 @@ export function usePreviewImageBlob(
         return
       }
 
-      const blobUrlConfig = new URL(basePreviewUrl)
-      blobUrlConfig.searchParams.set('v', cacheBust.value.toString())
-      const blobUrl = blobUrlConfig.toString()
+      const blobUrl = updateUrlSearchParams(basePreviewUrl, (searchParams) => {
+        searchParams.set('v', cacheBust.value.toString())
+      })
 
       // Load img in browser first, before we set the url
       if (import.meta.client && lazyLoad) {
@@ -204,7 +216,7 @@ export function usePreviewImageBlob(
   async function processPanoramaPreviewUrl() {
     if (!isEnabled.value || import.meta.server) return
 
-    const basePreviewUrl = unref(previewUrl)
+    const basePreviewUrl = normalizedPreviewUrl.value
     try {
       isLoadingPanorama.value = true
       if (!basePreviewUrl) {
@@ -217,9 +229,15 @@ export function usePreviewImageBlob(
         return
       }
 
-      const blobUrlConfig = new URL(basePanoramaUrl.value)
-      blobUrlConfig.searchParams.set('v', cacheBust.value.toString())
-      const blobUrl = blobUrlConfig.toString()
+      const panoramaBaseUrl = basePanoramaUrl.value
+      if (!panoramaBaseUrl) {
+        panoramaUrl.value = null
+        return
+      }
+
+      const blobUrl = updateUrlSearchParams(panoramaBaseUrl, (searchParams) => {
+        searchParams.set('v', cacheBust.value.toString())
+      })
 
       // Load img in browser first, before we set the url
       if (import.meta.client) {

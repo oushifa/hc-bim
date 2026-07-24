@@ -20,11 +20,11 @@
 <script setup lang="ts">
 import { PlayIcon } from '@heroicons/vue/20/solid'
 import { useAuthManager } from '~/lib/auth/composables/auth'
+import { useInternalUrlUtils } from '~~/lib/common/composables/url'
 
 const route = useRoute()
-const apiOrigin = useApiOrigin({ absolute: true })
-
 const { embedToken } = useAuthManager()
+const { updateUrlSearchParams } = useInternalUrlUtils()
 
 const projectUrl = route.path
 
@@ -32,19 +32,18 @@ const projectId = route.params.id as string
 const modelId = route.params.modelId as string
 
 const previewUrl = computed(() => {
-  if (modelId) {
-    const url = new URL(`/preview/${projectId}/commits/${modelId}`, apiOrigin)
-    if (embedToken.value) {
-      url.searchParams.set('embedToken', embedToken.value)
-    }
-    return url.toString()
-  } else if (projectId) {
-    const url = new URL(`/preview/${projectId}`, apiOrigin)
-    if (embedToken.value) {
-      url.searchParams.set('embedToken', embedToken.value)
-    }
-    return url.toString()
-  } else return null
+  const previewPath = modelId
+    ? `/preview/${projectId}/commits/${modelId}`
+    : projectId
+    ? `/preview/${projectId}`
+    : null
+  if (!previewPath) return null
+
+  if (!embedToken.value) return previewPath
+
+  return updateUrlSearchParams(previewPath, (searchParams) => {
+    searchParams.set('embedToken', embedToken.value as string)
+  })
 })
 
 defineEmits<{

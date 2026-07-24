@@ -30,6 +30,7 @@ import type { PresentationSlideListSlide_SavedViewFragment } from '~~/lib/common
 import { useInjectedPresentationState } from '~/lib/presentations/composables/setup'
 import { useAuthManager } from '~~/lib/auth/composables/auth'
 import { useResetViewUtils } from '~/lib/presentations/composables/utils'
+import { useInternalUrlUtils } from '~~/lib/common/composables/url'
 
 graphql(`
   fragment PresentationSlideListSlide_SavedView on SavedView {
@@ -50,17 +51,20 @@ const {
 } = useInjectedPresentationState()
 const { presentationToken } = useAuthManager()
 const { resetView } = useResetViewUtils()
+const { toRelativeInternalUrl, updateUrlSearchParams } = useInternalUrlUtils()
 
 const isCurrentSlide = computed(() => currentSlide.value?.id === props.slide.id)
 
 const thumbnailUrlWithToken = computed(() => {
   if (!props.slide.thumbnailUrl) return props.slide.thumbnailUrl
 
-  const url = new URL(props.slide.thumbnailUrl)
-  if (presentationToken.value) {
-    url.searchParams.set('embedToken', presentationToken.value)
-  }
-  return url.toString()
+  const thumbnailUrl =
+    toRelativeInternalUrl(props.slide.thumbnailUrl) || props.slide.thumbnailUrl
+  if (!presentationToken.value) return thumbnailUrl
+
+  return updateUrlSearchParams(thumbnailUrl, (searchParams) => {
+    searchParams.set('embedToken', presentationToken.value as string)
+  })
 })
 
 const onSelectSlide = () => {

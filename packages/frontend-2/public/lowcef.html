@@ -329,6 +329,7 @@
           finalUrl.searchParams.set('appId', state.app.id)
           finalUrl.searchParams.set('challenge', state.context.challenge)
           finalUrl.searchParams.set('token', authToken)
+          finalUrl.searchParams.set('frontendOrigin', apiOrigin)
           finalUrl.searchParams.set('preventRedirect', 'true')
           return finalUrl.toString()
         }
@@ -663,10 +664,14 @@
         function getAccessCode(email, password) {
           var loginUrl = new URL('/auth/local/login', apiOrigin)
           loginUrl.searchParams.set('challenge', state.context.challenge)
+          loginUrl.searchParams.set('frontendOrigin', apiOrigin)
           return fetch(loginUrl.toString(), {
             method: 'POST',
             cache: 'no-store',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Frontend-Origin': apiOrigin
+            },
             redirect: 'follow',
             body: JSON.stringify({ email: email, password: password })
           }).then(resolveAccessCode)
