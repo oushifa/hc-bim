@@ -2,6 +2,9 @@ import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 
 let cachedDtpToken: string | null = null
 let pendingDtpTokenRequest: Promise<string | null> | null = null
+let pendingDtpTokenValidation: Promise<string | null> | null = null
+// 清缓存时递增：使清除前发起的在途登录请求作废，避免其回填过期 token
+let dtpTokenGeneration = 0
 
 type DtpFetchOptions = {
   originPath?: boolean
@@ -22,6 +25,7 @@ const joinUrlPath = (base: string, path: string) => {
 }
 
 export const clearDtpTokenCache = () => {
+  dtpTokenGeneration++
   cachedDtpToken = null
   pendingDtpTokenRequest = null
   if (import.meta.client) {
@@ -105,7 +109,9 @@ export default defineNuxtPlugin(() => {
       return pendingDtpTokenRequest
     }
 
-    pendingDtpTokenRequest = (async () => {
+    // 记录发起时的代次：若期间缓存被清除（探活失败/登出），结果作废不回填
+    const generation = dtpTokenGeneration
+    const request = (async (): Promise<string | null> => {
       try {
         const mobile = activeUser.value?.email?.trim()
         if (!mobile) {
@@ -154,6 +160,11 @@ export default defineNuxtPlugin(() => {
           return null
         }
 
+        // 请求期间缓存被清除过（代次已变）→ 该 token 已过时，丢弃不回填
+        if (generation !== dtpTokenGeneration) {
+          return null
+        }
+
         cachedDtpToken = dtpToken
         if (import.meta.client) {
           localStorage.setItem('dtp-token', dtpToken)
@@ -164,21 +175,86 @@ export default defineNuxtPlugin(() => {
         // eslint-disable-next-line no-console
         console.error('Error getting DTP token:', error)
         return null
-      } finally {
-        pendingDtpTokenRequest = null
       }
     })()
 
-    try {
-      return await pendingDtpTokenRequest
-    } finally {
-      pendingDtpTokenRequest = null
-    }
+    pendingDtpTokenRequest = request
+    // 仅当引用仍指向本次请求时才清除，避免误清后续新发起请求的去重引用
+    void request.finally(() => {
+      if (pendingDtpTokenRequest === request) {
+        pendingDtpTokenRequest = null
+      }
+    })
+
+    return request
   }
 
   // 仅在客户端预取 token，避免服务端对相对 DTP 地址发起无效请求。
   if (import.meta.client) {
     void getDtpToken()
+  }
+
+  /**
+   * 校验当前 token 在 DTP 服务端是否仍然有效；失效则清除缓存并重新走第三方登录获取。
+   * 解决 localStorage 中 token 已被服务端作废（此前需退出重登才能恢复）的问题。
+   * 并发调用共享同一次「探活 + 刷新」流程，避免探活失败时多路并发各自清缓存、
+   * 重复触发第三方登录导致 token 互相覆盖。
+   */
+  const ensureValidDtpToken = async (): Promise<string | null> => {
+    if (pendingDtpTokenValidation) {
+      return pendingDtpTokenValidation
+    }
+
+    const validation = (async (): Promise<string | null> => {
+      const token = await getDtpToken()
+      if (!token) return null
+
+      try {
+        // 用轻量接口探活，验证 token 是否仍被 DTP 服务端认可
+        const response = await fetch(
+          `${getDtpBaseURL()}/v1/team/workingTeam/info`,
+          {
+            method: 'GET',
+            headers: {
+              Accept: 'application/json',
+              Authorization: `Bearer ${token}`
+            }
+          }
+        )
+
+        if (response.status === 401 || response.status === 403) {
+          // token 已失效 → 清除并强制重新登录获取
+          clearDtpTokenCache()
+          return getDtpToken()
+        }
+
+        if (response.ok) {
+          const data = (await response.json().catch(() => null)) as {
+            success?: boolean
+          } | null
+          // HTTP 200 但业务层判定未认证（部分 DTP 接口以 success:false 表达）
+          if (data && data.success === false) {
+            clearDtpTokenCache()
+            return getDtpToken()
+          }
+        }
+
+        // 其余情况（探活成功或服务端异常）不判失效，沿用现有 token
+        return token
+      } catch {
+        // 网络异常时不视为 token 失效，避免误清可用 token
+        return token
+      }
+    })()
+
+    pendingDtpTokenValidation = validation
+    void validation.finally(() => {
+      if (pendingDtpTokenValidation === validation) {
+        pendingDtpTokenValidation = null
+      }
+    })
+
+    return validation
   }
 
   // Create a dedicated fetch instance for DTP API
@@ -251,10 +327,12 @@ export default defineNuxtPlugin(() => {
     }
   })
 
-  // Make it available globally as $dtpFetch
+  // Make it available globally as $dtpFetch / $getDtpToken / $ensureValidDtpToken
   return {
     provide: {
-      dtpFetch
+      dtpFetch,
+      getDtpToken,
+      ensureValidDtpToken
     }
   }
 })

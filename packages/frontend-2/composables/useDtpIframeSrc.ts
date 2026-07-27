@@ -61,6 +61,35 @@ export function buildDtpIframeSrc(baseUrl: string): string {
 }
 
 /**
+ * 异步版本：先等待 dtp-token 就绪并经服务端探活校验（不存在或已失效时
+ * 由插件自动重新发起第三方登录获取），再拼接 iframe src。
+ * 覆盖两类问题：
+ * 1. 页面挂载早于 token 预取完成（竞态）导致 iframe 打开 DTP 登录页
+ * 2. 本地 token 已被 DTP 服务端作废，此前需退出重登才能恢复
+ *
+ * token 最终仍为空（如 DTP 登录接口失败、手机号未注册）时返回 null，
+ * 调用方应据此展示错误提示而非渲染注定打开登录页的 iframe。
+ */
+export async function buildDtpIframeSrcEnsured(
+  baseUrl: string
+): Promise<string | null> {
+  let token = ''
+  try {
+    const { $ensureValidDtpToken } = useNuxtApp()
+    token = (await $ensureValidDtpToken()) ?? ''
+  } catch {
+    // 插件不可用时回退到直接读 localStorage
+    token =
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem(DTP_TOKEN_STORAGE_KEY) ?? ''
+        : ''
+  }
+  if (!token) return null
+  const joiner = baseUrl.includes('?') ? '&' : '?'
+  return `${baseUrl}${joiner}token=${encodeURIComponent(token)}`
+}
+
+/**
  * 仅在客户端挂载后生成 iframe src，避免 SSR 读取 localStorage
  */
 export function useDtpIframeSrc(baseUrl: string) {
