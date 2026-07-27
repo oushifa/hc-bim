@@ -757,6 +757,82 @@ export const useWorkbenchUploadSync = () => {
     return false
   }
 
+  const tryAdvancePendingTask = async (taskId: string) => {
+    const task = taskMap.value[taskId]
+    if (!task || task.status !== 'pending_version_created') return false
+    if (!task.projectId || !task.modelId) return false
+
+    try {
+      const latestVersion = await fetchLatestVersionInfo({
+        projectId: task.projectId,
+        modelId: task.modelId
+      })
+
+      if (!latestVersion?.versionId) {
+        return false
+      }
+
+      if (latestVersion.seedId?.trim()) {
+        removeTasksForModel({
+          projectId: task.projectId,
+          modelId: task.modelId
+        })
+        return true
+      }
+
+      let matchedUpload: Awaited<ReturnType<typeof fetchModelUploadForVersion>> | null =
+        null
+      try {
+        matchedUpload = await fetchModelUploadForVersion({
+          projectId: task.projectId,
+          modelId: task.modelId,
+          versionId: latestVersion.versionId,
+          uploadId: task.uploadId,
+          fileName: task.fileName
+        })
+      } catch {
+        matchedUpload = null
+      }
+
+      if (!matchedUpload) {
+        return false
+      }
+
+      if (matchedUpload.convertedStatus === FileUploadConvertedStatus.Error) {
+        patchTask(taskId, {
+          status: 'error',
+          error: matchedUpload.convertedMessage?.trim() || '模型转换失败，请先处理转换错误'
+        })
+        return false
+      }
+
+      if (matchedUpload.convertedStatus !== FileUploadConvertedStatus.Completed) {
+        return false
+      }
+
+      patchTask(taskId, {
+        modelId: task.modelId,
+        versionId: latestVersion.versionId,
+        uploadId: matchedUpload.id,
+        fileName: matchedUpload.fileName,
+        status: 'matched',
+        error: null
+      })
+
+      void executeTask(taskId)
+      return true
+    } catch (error) {
+      logger.warn(
+        {
+          taskId,
+          error
+        },
+        '自动推进待同步模型任务失败，后续会继续重试'
+      )
+      return false
+    }
+  }
+
   const retryTask = async (taskId: string) => {
     const task = taskMap.value[taskId]
     if (!task) return false
@@ -781,6 +857,11 @@ export const useWorkbenchUploadSync = () => {
     ]
 
     for (const task of tasks.value) {
+      if (task.status === 'pending_version_created') {
+        await tryAdvancePendingTask(task.id)
+        continue
+      }
+
       if (!resumableStatuses.includes(task.status)) continue
       void executeTask(task.id)
     }

@@ -1,5 +1,10 @@
 <template>
   <div class="h-full flex flex-col relative">
+    <WorkbenchUploadSyncProjectSubscriber
+      :project-id="props.projectId"
+      :on-version-update="refreshModels"
+    />
+
     <!-- Header -->
     <div
       class="h-14 border-b border-gray-100 bg-gray-50 flex items-center justify-between shrink-0 px-4"
@@ -644,6 +649,7 @@ import UploadsDialog from '~/components/project/page/models/UploadsDialog.vue'
 import ImportDialog from '~/components/projects/workbench/ImportDialog.vue'
 import DrawingsTab from '~/components/projects/workbench/DrawingsTab.vue'
 import ProjectCardImportFileArea from '~/components/project/CardImportFileArea.vue'
+import WorkbenchUploadSyncProjectSubscriber from '~/components/singleton/WorkbenchUploadSyncProjectSubscriber.vue'
 import { useWorkbenchDrawingsApi } from '~/components/projects/workbench/drawingsApi'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
@@ -653,6 +659,7 @@ import { ensureError, Roles } from '@speckle/shared'
 import type { ModelLibraryListItem } from '~/lib/projects/composables/modelLibrary'
 import { useApiOrigin } from '~~/composables/env'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
+import { useInternalUrlUtils } from '~~/lib/common/composables/url'
 import { useFileDownload } from '~~/lib/core/composables/fileUpload'
 
 const props = defineProps<{
@@ -665,6 +672,7 @@ const apollo = useApolloClient().client
 const { triggerNotification } = useGlobalToast()
 const apiOrigin = useApiOrigin()
 const authToken = useAuthCookie()
+const { updateUrlSearchParams } = useInternalUrlUtils()
 const { downloadWithAuth } = useFileDownload()
 const { activeUser, isLoggedIn } = useActiveUser()
 const { ensureLoaded: ensureUserPermsLoaded, hasModelOp } = useUserPermissions()
@@ -967,7 +975,7 @@ const onModelUploading = async (payload: FileAreaUploadingPayload) => {
     }
     selectedVersionUploadModel.value = null
     loadCacheBuster.value++
-    await Promise.all([loadFolders()])
+    await Promise.all([loadFolders(), refreshModels()])
   }
 }
 
@@ -999,11 +1007,6 @@ const uploadProject = computed(
     }) || null
 )
 const canUploadModel = computed(() => isLoggedIn.value && hasModelOp('canUpload'))
-
-const activeDirBaseName = computed(() => {
-  if (activeDir.value === ROOT_ID) return '全部'
-  return folderRows.value.find((dir) => dir.id === activeDir.value)?.name || '全部'
-})
 
 const searchInputId = computed(() =>
   activeTab.value === 'models' ? 'workbench-model-search' : 'workbench-drawing-search'
@@ -1166,14 +1169,14 @@ const loadSourceModelObjectTree = async (params: {
 
   let cursor: string | null = null
   do {
-    const objectsUrl = new URL(
-      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/objects`
+    const objectsUrl = updateUrlSearchParams(
+      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/objects`,
+      (searchParams) => {
+        searchParams.set('limit', '100')
+        if (cursor) searchParams.set('cursor', cursor)
+      }
     )
-    objectsUrl.searchParams.set('limit', '100')
-    if (cursor) objectsUrl.searchParams.set('cursor', cursor)
-    const response = await requestJson<ProjectModelObjectsResponse>(
-      objectsUrl.toString()
-    )
+    const response = await requestJson<ProjectModelObjectsResponse>(objectsUrl)
     response.items.forEach((item: ProjectModelObjectsResponse['items'][number]) => {
       if (item.data) objects.push(item.data)
     })
@@ -1524,6 +1527,10 @@ const displayedModels = computed<ModelListItem[]>(() =>
     raw: model
   }))
 )
+
+const refreshModels = async () => {
+  await Promise.allSettled([refetchBaseModels(), refetchExtraModels()])
+}
 
 const modelsLoading = computed(() => {
   if (shouldSkipModelsQuery.value) return false
