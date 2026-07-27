@@ -23,9 +23,15 @@ const PREVIEWS_EAGER_LOAD_COUNT = 20
 
 const previewUrlProjectIdRegexp = /\/preview\/([\w\d]+)\//i
 const previewUrlCommitIdRegexp = /\/commits\/([\w\d]+)/i
-const previewUrlObjectIdRegexp = /\/commits\/([\w\d]+)/i
+const previewUrlObjectIdRegexp = /\/objects\/([\w\d]+)/i
 
 class AngleNotFoundError extends Error {}
+
+type PreviewFetchMetadata = {
+  status: Nullable<string>
+  errorCode: Nullable<string>
+  error: Nullable<string>
+}
 
 const usePreviewsState = () =>
   useState('preview_images_load_state', () => ({
@@ -73,7 +79,10 @@ export function usePreviewImageBlob(
 
   // Continue on with normal operation
   const { enabled = ref(true) } = options || {}
-  const logger = useLogger() as { error: (...args: unknown[]) => void }
+  const logger = useLogger() as {
+    error: (...args: unknown[]) => void
+    warn: (...args: unknown[]) => void
+  }
   const lazyLoad = !eagerLoad
   const { toRelativeInternalUrl, updateUrlSearchParams, appendUrlPath } =
     useInternalUrlUtils()
@@ -83,6 +92,14 @@ export function usePreviewImageBlob(
   const panoramaUrl = ref(null as Nullable<string>)
   const isLoadingPanorama = ref(false)
   const shouldLoadPanorama = ref(false)
+  const previewStatus = ref<Nullable<string>>(null)
+  const previewErrorCode = ref<Nullable<string>>(null)
+  const previewError = ref<Nullable<string>>(null)
+  const panoramaPreviewStatus = ref<Nullable<string>>(null)
+  const panoramaPreviewErrorCode = ref<Nullable<string>>(null)
+  const panoramaPreviewError = ref<Nullable<string>>(null)
+  const currentPreviewBlobUrl = ref<Nullable<string>>(null)
+  const currentPanoramaBlobUrl = ref<Nullable<string>>(null)
   const normalizedPreviewUrl = computed(() => {
     const rawPreviewUrl = unref(previewUrl)
     if (!rawPreviewUrl || isValidBase64Image(rawPreviewUrl)) return rawPreviewUrl
@@ -107,6 +124,12 @@ export function usePreviewImageBlob(
     shouldLoadPanorama,
     hasDoneFirstLoad: computed(() => hasDoneFirstLoad.value),
     isPanoramaPlaceholder: computed(() => isPanoramaPlaceholder.value),
+    previewStatus: computed(() => previewStatus.value),
+    previewErrorCode: computed(() => previewErrorCode.value),
+    previewError: computed(() => previewError.value),
+    panoramaPreviewStatus: computed(() => panoramaPreviewStatus.value),
+    panoramaPreviewErrorCode: computed(() => panoramaPreviewErrorCode.value),
+    panoramaPreviewError: computed(() => panoramaPreviewError.value),
     wasEagerLoaded: eagerLoad
   }
 
@@ -172,42 +195,156 @@ export function usePreviewImageBlob(
     }
   })
 
+  const updatePreviewMetadata = (
+    target: 'main' | 'panorama',
+    metadata?: Partial<PreviewFetchMetadata>
+  ) => {
+    const statusRef = target === 'main' ? previewStatus : panoramaPreviewStatus
+    const errorCodeRef = target === 'main' ? previewErrorCode : panoramaPreviewErrorCode
+    const errorRef = target === 'main' ? previewError : panoramaPreviewError
+
+    statusRef.value = metadata?.status || null
+    errorCodeRef.value = metadata?.errorCode || null
+    errorRef.value = metadata?.error || null
+  }
+
+  const revokeBlobUrl = (target: 'main' | 'panorama') => {
+    const targetRef = target === 'main' ? currentPreviewBlobUrl : currentPanoramaBlobUrl
+    if (!targetRef.value) return
+
+    URL.revokeObjectURL(targetRef.value)
+    targetRef.value = null
+  }
+
+  const setResolvedUrl = (target: 'main' | 'panorama', nextUrl: Nullable<string>) => {
+    revokeBlobUrl(target)
+
+    if (target === 'main') {
+      url.value = nextUrl
+      currentPreviewBlobUrl.value = nextUrl?.startsWith('blob:') ? nextUrl : null
+      return
+    }
+
+    panoramaUrl.value = nextUrl
+    currentPanoramaBlobUrl.value = nextUrl?.startsWith('blob:') ? nextUrl : null
+  }
+
+  const maybeLogPreviewMetadata = (
+    target: 'main' | 'panorama',
+    requestUrl: string,
+    metadata: PreviewFetchMetadata
+  ) => {
+    if (!metadata.status && !metadata.errorCode && !metadata.error) return
+    if (metadata.status === 'done' && !metadata.errorCode && !metadata.error) return
+
+    logger.warn('[Preview image] Preview response metadata', {
+      target,
+      requestUrl,
+      previewStatus: metadata.status,
+      previewErrorCode: metadata.errorCode,
+      previewError: metadata.error
+    })
+  }
+
+  const loadImageDimensions = async (blobUrl: string) => {
+    const img = new Image()
+    img.src = blobUrl
+    await new Promise((resolve, reject) => {
+      img.onload = resolve
+      img.onerror = reject
+    })
+
+    return {
+      naturalWidth: img.naturalWidth
+    }
+  }
+
+  const fetchPreviewImage = async (
+    requestUrl: string,
+    target: 'main' | 'panorama',
+    options?: {
+      measureImage?: boolean
+      throwOnAngleNotFound?: boolean
+    }
+  ) => {
+    const response = await fetch(requestUrl, {
+      credentials: 'include'
+    })
+
+    if (!response.ok) {
+      throw new Error(`Preview request failed with status ${response.status}`)
+    }
+
+    const metadata: PreviewFetchMetadata = {
+      status: response.headers.get('X-Preview-Status'),
+      errorCode: response.headers.get('X-Preview-Error-Code'),
+      error: response.headers.get('X-Preview-Error')
+    }
+
+    updatePreviewMetadata(target, metadata)
+    maybeLogPreviewMetadata(target, requestUrl, metadata)
+
+    if (options?.throwOnAngleNotFound && metadata.errorCode === 'ANGLE_NOT_FOUND') {
+      throw new AngleNotFoundError(metadata.error || 'Preview angle not found')
+    }
+
+    const blob = await response.blob()
+    const blobUrl = URL.createObjectURL(blob)
+
+    try {
+      const dimensions = options?.measureImage
+        ? await loadImageDimensions(blobUrl)
+        : undefined
+
+      return {
+        blobUrl,
+        ...metadata,
+        ...dimensions
+      }
+    } catch (e) {
+      URL.revokeObjectURL(blobUrl)
+      throw e
+    }
+  }
+
   async function processBasePreviewUrl() {
     if (!isEnabled.value) return
 
     const basePreviewUrl = normalizedPreviewUrl.value
     try {
       if (!basePreviewUrl) {
-        url.value = PreviewPlaceholder
+        updatePreviewMetadata('main')
+        setResolvedUrl('main', PreviewPlaceholder)
         hasDoneFirstLoad.value = true
         return
       }
 
       if (isValidBase64Image(basePreviewUrl)) {
         // return as is
-        url.value = basePreviewUrl
+        updatePreviewMetadata('main')
+        setResolvedUrl('main', basePreviewUrl)
         hasDoneFirstLoad.value = true
         return
       }
 
-      const blobUrl = updateUrlSearchParams(basePreviewUrl, (searchParams) => {
+      const requestUrl = updateUrlSearchParams(basePreviewUrl, (searchParams) => {
         searchParams.set('v', cacheBust.value.toString())
       })
 
-      // Load img in browser first, before we set the url
-      if (import.meta.client && lazyLoad) {
-        const img = new Image()
-        img.src = blobUrl
-        await new Promise((resolve, reject) => {
-          img.onload = resolve
-          img.onerror = reject
-        })
+      if (import.meta.server) {
+        updatePreviewMetadata('main')
+        setResolvedUrl('main', requestUrl)
+        return
       }
 
-      url.value = blobUrl
+      const { blobUrl } = await fetchPreviewImage(requestUrl, 'main', {
+        measureImage: lazyLoad
+      })
+      setResolvedUrl('main', blobUrl)
     } catch (e) {
       logger.error('Preview image load error', e)
-      url.value = PreviewPlaceholder
+      updatePreviewMetadata('main')
+      setResolvedUrl('main', PreviewPlaceholder)
     } finally {
       hasDoneFirstLoad.value = true
     }
@@ -220,45 +357,47 @@ export function usePreviewImageBlob(
     try {
       isLoadingPanorama.value = true
       if (!basePreviewUrl) {
-        url.value = PreviewPlaceholder
+        updatePreviewMetadata('panorama')
+        setResolvedUrl('panorama', null)
         return
       }
 
       if (isValidBase64Image(basePreviewUrl)) {
-        panoramaUrl.value = null // panorama unsupported
+        updatePreviewMetadata('panorama')
+        setResolvedUrl('panorama', null) // panorama unsupported
         return
       }
 
       const panoramaBaseUrl = basePanoramaUrl.value
       if (!panoramaBaseUrl) {
-        panoramaUrl.value = null
+        updatePreviewMetadata('panorama')
+        setResolvedUrl('panorama', null)
         return
       }
 
-      const blobUrl = updateUrlSearchParams(panoramaBaseUrl, (searchParams) => {
+      const requestUrl = updateUrlSearchParams(panoramaBaseUrl, (searchParams) => {
         searchParams.set('v', cacheBust.value.toString())
       })
 
-      // Load img in browser first, before we set the url
-      if (import.meta.client) {
-        const img = new Image()
-        img.src = blobUrl
-        await new Promise((resolve, reject) => {
-          img.onload = resolve
-          img.onerror = reject
-        })
+      const { blobUrl, naturalWidth = 0 } = await fetchPreviewImage(
+        requestUrl,
+        'panorama',
+        {
+          measureImage: true,
+          throwOnAngleNotFound: true
+        }
+      )
 
-        // If width is 700px or less, it's the placeholder not the actual panorama
-        isPanoramaPlaceholder.value = img.naturalWidth <= 700
-      }
-
-      panoramaUrl.value = blobUrl
+      // If width is 700px or less, it's the placeholder not the actual panorama
+      isPanoramaPlaceholder.value = naturalWidth <= 700
+      setResolvedUrl('panorama', blobUrl)
     } catch (e) {
       if (!(e instanceof AngleNotFoundError)) {
         logger.error('Panorama preview image load error:', e)
       }
 
-      panoramaUrl.value = null
+      updatePreviewMetadata('panorama')
+      setResolvedUrl('panorama', null)
     } finally {
       isLoadingPanorama.value = false
     }
@@ -310,6 +449,11 @@ export function usePreviewImageBlob(
     void regeneratePreviews()
   }
   init()
+
+  onScopeDispose(() => {
+    revokeBlobUrl('main')
+    revokeBlobUrl('panorama')
+  })
 
   return ret
 }

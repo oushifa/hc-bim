@@ -4,6 +4,8 @@
   <div
     ref="parent"
     class="relative w-full h-full"
+    :data-preview-status="previewStatus || undefined"
+    :data-preview-error-code="previewErrorCode || undefined"
     @mouseenter="hovered = true"
     @mouseleave="hovered = false"
     @mousemove="(e: MouseEvent) => calculatePanoramaStyle(e)"
@@ -112,7 +114,9 @@ const {
   shouldLoadPanorama,
   isLoadingPanorama,
   hasDoneFirstLoad,
-  isPanoramaPlaceholder
+  isPanoramaPlaceholder,
+  previewStatus,
+  previewErrorCode
 } = usePreviewImageBlob(basePreviewUrl, {
   enabled: computed(() => props.eagerLoad || isInViewport.value),
   eagerLoad: props.eagerLoad
