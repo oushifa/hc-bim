@@ -23,11 +23,14 @@
             >
               {{ project.name }}
             </NuxtLink>
-            <div v-if="isOwner" class="flex items-center gap-1 text-foreground-2">
+            <div
+              v-if="isOwner || isServerAdmin"
+              class="flex items-center gap-1 text-foreground-2"
+            >
               <button
                 type="button"
                 class="p-1 rounded hover:bg-highlight-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                :disabled="!isOwner || updatingProjectInfo"
+                :disabled="!(isOwner || isServerAdmin) || updatingProjectInfo"
                 @click.stop="openEditDialog"
               >
                 <IconEdit class="h-4 w-4" />
@@ -35,7 +38,7 @@
               <button
                 type="button"
                 class="p-1 rounded hover:bg-highlight-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                :disabled="!isOwner || deletingProject"
+                :disabled="!(isOwner || isServerAdmin) || deletingProject"
                 @click.stop="openDeleteDialog"
               >
                 <IconDelete class="h-4 w-4" />
@@ -120,12 +123,16 @@
             </FormButton>
             <div
               v-if="!project.workspace?.id && isWorkspacesEnabled"
-              v-tippy="!isOwner ? '只能项目所有者才能将项目移动到工作空间' : undefined"
+              v-tippy="
+                !isOwner && !isServerAdmin
+                  ? '只能项目所有者才能将项目移动到工作空间'
+                  : undefined
+              "
             >
               <FormButton
                 size="sm"
                 color="outline"
-                :disabled="!isOwner"
+                :disabled="!(isOwner || isServerAdmin)"
                 @click="$emit('moveProject')"
               >
                 移动项目
@@ -299,6 +306,7 @@ import {
   useDeleteProject,
   useUpdateProject
 } from '~/lib/projects/composables/projectManagement'
+import { useActiveUser } from '~/lib/auth/composables/activeUser'
 
 defineEmits<{
   (e: 'moveProject'): void
@@ -311,6 +319,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const { isAdmin: isServerAdmin } = useActiveUser()
 const isWorkspacesEnabled = useIsWorkspacesEnabled()
 const { formattedRelativeDate, formattedFullDate } = useDateFormatters()
 const logger = useLogger()
@@ -364,11 +373,15 @@ const modelItemTotalCount = computed(
   () => props.project.models.totalCount + pendingModels.value.length
 )
 const canConfirmDelete = computed(
-  () => isOwner.value && deleteProjectNameInput.value === props.project.name
+  () =>
+    (isOwner.value || isServerAdmin.value) &&
+    deleteProjectNameInput.value === props.project.name
 )
 const canSaveEdit = computed(
   () =>
-    isOwner.value && !updatingProjectInfo.value && !!editForm.value.name.trim().length
+    (isOwner.value || isServerAdmin.value) &&
+    !updatingProjectInfo.value &&
+    !!editForm.value.name.trim().length
 )
 
 const gridClasses = computed(() => [
@@ -440,20 +453,20 @@ const setEditFormValues = () => {
 }
 
 const openEditDialog = () => {
-  if (!isOwner.value) return
+  if (!isOwner.value && !isServerAdmin.value) return
   setEditFormValues()
   originalDescription.value = editForm.value.description
   showEditDialog.value = true
 }
 
 const openDeleteDialog = () => {
-  if (!isOwner.value) return
+  if (!isOwner.value && !isServerAdmin.value) return
   deleteProjectNameInput.value = ''
   showDeleteDialog.value = true
 }
 
 const onSaveProjectInfo = async () => {
-  if (!isOwner.value || updatingProjectInfo.value) return
+  if ((!isOwner.value && !isServerAdmin.value) || updatingProjectInfo.value) return
   updatingProjectInfo.value = true
   try {
     const updatePayload: Record<string, unknown> = {}

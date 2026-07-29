@@ -49,7 +49,7 @@
           class="absolute right-0 bottom-full mb-2 w-32 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-20 overflow-hidden"
         >
           <button
-            v-if="isOwner"
+            v-if="isOwner || isServerAdmin"
             type="button"
             class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-600 hover:bg-[#f5f7fa] hover:text-[#00b4b6] transition-colors"
             @click.stop="openEditDialog"
@@ -66,7 +66,7 @@
             <span>分享</span>
           </button>
           <button
-            v-if="isOwner"
+            v-if="isOwner || isServerAdmin"
             type="button"
             class="w-full flex items-center space-x-2 px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
             @click.stop="openDeleteDialog"
@@ -88,6 +88,7 @@ import {
   TrashIcon
 } from '@heroicons/vue/24/outline'
 import { projectRoute } from '~~/lib/common/helpers/route'
+import { useActiveUser } from '~/lib/auth/composables/activeUser'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/zh-cn'
@@ -127,6 +128,7 @@ const emit = defineEmits<{
   closeMenu: []
 }>()
 
+const { isAdmin: isServerAdmin } = useActiveUser()
 const isOwner = computed(() => props.project.role === 'stream:owner')
 
 const updatedAt = computed(() => {
