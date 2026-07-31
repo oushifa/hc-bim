@@ -42,7 +42,7 @@
                 class="h-6 w-auto object-contain"
                 referrerpolicy="no-referrer"
               />
-              <span class="text-lg font-bold text-[#333] tracking-wide">中建海创</span>
+              <span class="text-lg font-bold text-[#333] tracking-wide">海创制造</span>
             </div>
           </div>
           <LayoutSidebarMenu>

@@ -18,7 +18,7 @@ import { useFixBraveSafariCookies } from '~~/lib/common/composables/reactiveCook
 
 useHead({
   // Title suffix
-  titleTemplate: (titleChunk) => (titleChunk ? `${titleChunk} | 中建海创` : '中建海创'),
+  titleTemplate: (titleChunk) => (titleChunk ? `${titleChunk} | 海创制造` : '海创制造'),
   link: [
     {
       rel: 'icon',
