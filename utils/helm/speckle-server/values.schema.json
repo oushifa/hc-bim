@@ -1492,7 +1492,7 @@
             "enabled": {
               "type": "boolean",
               "description": "If enabled, rate limiting will be applied to the Speckle server.",
-              "default": true
+              "default": false
             },
             "all_requests": {
               "type": "number",

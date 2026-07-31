@@ -19,6 +19,7 @@
     "lint:css": "stylelint \"**/*.{css,vue}\"",
     "lint": "yarn lint:js && yarn lint:tsc && yarn lint:prettier && yarn lint:css",
     "lint:ci": "yarn lint:tsc && yarn lint:css",
+    "test:api-availability": "node ../../node_modules/vitest/vitest.mjs run tests/dtp-api-availability.spec.ts",
     "gqlgen": "graphql-codegen",
     "gqlgen:watch": "graphql-codegen --watch",
     "eslint:inspect": "eslint-config-inspector"
