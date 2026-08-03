@@ -121,7 +121,7 @@ PRIVATE_OBJECTS_SERVER_URL=http://speckle-server:3000
 | `S3_PUBLIC_ENDPOINT`                | 默认返回给前端的 MinIO/S3 外部地址 | `https://minio.example.com`                          |
 | `S3_CREATE_BUCKET`                  | 启动时自动建桶                     | `true`                                               |
 | `S3_REGION`                         | S3 区域，MinIO 可留空              | ``                                                   |
-| `FILE_SIZE_LIMIT_MB`                | 上传大小限制                       | `1000`                                               |
+| `FILE_SIZE_LIMIT_MB`                | 上传大小限制                       | `1536`                                               |
 | `EMAIL_FROM`                        | 默认发信地址                       | `no-reply@example.org`                               |
 | `EMAIL_SECURE`                      | 是否强制 SSL                       | `false`                                              |
 | `EMAIL_REQUIRE_TLS`                 | 是否强制 TLS                       | `false`                                              |
@@ -286,7 +286,7 @@ S3_REGION=
 FRONTEND_ORIGIN=https://bim.example.com
 FILEIMPORT_QUEUE_POSTGRES_URL=postgresql://speckle:strong-password@postgres/speckle
 FF_NEXT_GEN_FILE_IMPORTER_ENABLED=true
-FILE_SIZE_LIMIT_MB=1000
+FILE_SIZE_LIMIT_MB=1536
 EMAIL_FROM=no-reply@example.org
 EMAIL_SECURE=false
 EMAIL_REQUIRE_TLS=false

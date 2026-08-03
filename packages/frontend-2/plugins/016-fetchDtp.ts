@@ -195,6 +195,23 @@ export default defineNuxtPlugin(() => {
   }
 
   /**
+   * 判断响应体业务码是否为 401（token 过期，契约：成功 code=200，token 过期 code=401）
+   */
+  const isBodyCode401 = (data: unknown): boolean => {
+    if (!data || typeof data !== 'object') return false
+    return (data as { code?: unknown }).code === 401
+  }
+
+  /**
+   * 判断错误是否为 HTTP 401
+   */
+  const isHttp401Error = (err: unknown): boolean => {
+    if (!err || typeof err !== 'object') return false
+    const response = (err as { response?: { status?: number } }).response
+    return response?.status === 401
+  }
+
+  /**
    * 校验当前 token 在 DTP 服务端是否仍然有效；失效则清除缓存并重新走第三方登录获取。
    * 解决 localStorage 中 token 已被服务端作废（此前需退出重登才能恢复）的问题。
    * 并发调用共享同一次「探活 + 刷新」流程，避免探活失败时多路并发各自清缓存、
@@ -232,8 +249,8 @@ export default defineNuxtPlugin(() => {
           const data = (await response.json().catch(() => null)) as {
             success?: boolean
           } | null
-          // HTTP 200 但业务层判定未认证（部分 DTP 接口以 success:false 表达）
-          if (data && data.success === false) {
+          // HTTP 200 但业务层判定未认证（部分 DTP 接口以 success:false 或业务码 401 表达）
+          if (data && (data.success === false || isBodyCode401(data))) {
             clearDtpTokenCache()
             return getDtpToken()
           }
@@ -258,7 +275,7 @@ export default defineNuxtPlugin(() => {
   }
 
   // Create a dedicated fetch instance for DTP API
-  const dtpFetch = $fetch.create({
+  const baseFetch = $fetch.create({
     baseURL: getDtpBaseURL(),
     async onRequest(ctx) {
       const { options } = ctx
@@ -326,6 +343,51 @@ export default defineNuxtPlugin(() => {
       }
     }
   })
+
+  /**
+   * 统一处理 DTP 接口 token 过期（响应体业务码 code === 401 或 HTTP 401）：
+   * 清除 token 缓存 → 重新调用登录接口获取新 token → 重试原请求一次，
+   * 使孪生模型等模块在 token 过期时自动恢复，无需用户手动重新登录。
+   */
+  const dtpFetch = async <T = unknown>(
+    request: Parameters<typeof baseFetch>[0],
+    options?: Parameters<typeof baseFetch>[1] & DtpFetchOptions
+  ): Promise<T> => {
+    let retried = false
+
+    const execute = async (): Promise<T> => {
+      // 每次执行使用独立副本，避免 onRequest 删除 prefix/originPath 后影响重试的 URL 解析
+      const callOptions = options ? { ...options } : undefined
+      try {
+        const response = await baseFetch.raw<T>(request, callOptions)
+        return response._data as T
+      } catch (err) {
+        // HTTP 401：token 已失效（onResponseError 已清缓存），重新登录后重试一次
+        if (!retried && isHttp401Error(err)) {
+          retried = true
+          const newToken = await getDtpToken()
+          if (newToken) {
+            return execute()
+          }
+        }
+        throw err
+      }
+    }
+
+    const data = await execute()
+
+    // 响应体业务码 401：token 过期 → 重新调用登录接口获取新 token 后重试一次
+    if (!retried && isBodyCode401(data)) {
+      retried = true
+      clearDtpTokenCache()
+      const newToken = await getDtpToken()
+      if (newToken) {
+        return execute()
+      }
+    }
+
+    return data
+  }
 
   // Make it available globally as $dtpFetch / $getDtpToken / $ensureValidDtpToken
   return {
