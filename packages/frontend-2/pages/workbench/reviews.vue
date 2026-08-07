@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6">
     <Portal to="navigation">
-      <div>中建海创</div>
+      <div>海创制造</div>
     </Portal>
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-3">

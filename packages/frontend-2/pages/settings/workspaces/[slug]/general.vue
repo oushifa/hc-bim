@@ -75,10 +75,10 @@
         <div class="grid grid-cols-2 gap-4 pt-1">
           <div class="flex flex-col">
             <span class="text-body-xs font-medium text-foreground">
-              嵌入模型时是否显示中建海创 logo
+              嵌入模型时是否显示海创制造 logo
             </span>
             <span class="text-body-2xs text-foreground-2 max-w-[230px]">
-              控制模型嵌入时是否显示中建海创 logo
+              控制模型嵌入时是否显示海创制造 logo
             </span>
           </div>
           <div class="flex h-full flex-col justify-center gap-y-2">
@@ -399,7 +399,7 @@ const updateShowBranding = async () => {
 
     triggerNotification({
       type: ToastNotificationType.Success,
-      title: `已${showBranding.value ? '启用' : '禁用'}嵌入中的中建海创徽标`
+      title: `已${showBranding.value ? '启用' : '禁用'}嵌入中的海创制造徽标`
     })
   }
 }

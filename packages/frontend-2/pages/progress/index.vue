@@ -2,7 +2,7 @@
   <div>
     <Portal to="navigation">
       <!-- <HeaderNavLink :to="projectsRoute" name="Projects" :separator="false" /> -->
-      <div>中建海创</div>
+      <div>海创制造</div>
     </Portal>
     <ProgressPage />
   </div>

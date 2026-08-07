@@ -8,7 +8,7 @@
     <img
       class="block -ml-2 mr-1"
       src="~~/assets/images/layout/logo.png"
-      alt="中建海创"
+      alt="海创制造"
     />
   </Component>
 </template>

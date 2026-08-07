@@ -11,7 +11,7 @@
           referrerpolicy="no-referrer"
         />
         <span class="text-2xl font-bold text-gray-800 tracking-widest drop-shadow-sm">
-          中建海创
+          海创制造
         </span>
       </div>
 
@@ -46,7 +46,7 @@
       <!-- Content -->
       <div class="relative z-10 w-full px-16 text-left">
         <h1 class="text-5xl xl:text-6xl font-bold tracking-widest mb-6 drop-shadow-lg">
-          中建海创
+          海创制造
         </h1>
         <p
           class="text-xl xl:text-2xl font-light tracking-widest opacity-90 drop-shadow-md"

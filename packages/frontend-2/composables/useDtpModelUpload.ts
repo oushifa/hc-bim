@@ -183,7 +183,7 @@ const resolveIdentity = (
 
 export const useDtpModelUpload = () => {
   const apollo = useApolloClient().client
-  const { $dtpFetch } = useNuxtApp()
+  const { $dtpFetch, $ensureValidDtpToken } = useNuxtApp()
   const logger = useLogger()
   const { track } = useLog()
   const { triggerNotification } = useGlobalToast()
@@ -344,7 +344,13 @@ export const useDtpModelUpload = () => {
 
   const ensureDtpToken = async (identity?: DtpTokenIdentity) => {
     const existing = getStoredDtpToken()
-    if (existing) return existing
+    if (existing) {
+      // 已有 token：先探活校验有效性（失效时插件自动重新登录获取新 token），
+      // 避免携带过期 token 直接发起上传配置/分片上传请求
+      const validated = await $ensureValidDtpToken()
+      if (validated) return validated
+      // 探活刷新失败（如登录接口异常、无有效登录身份）时回退到下方本地登录流程
+    }
 
     const resolvedIdentity = resolveIdentity(activeUser.value, identity)
     if (!resolvedIdentity) return null
