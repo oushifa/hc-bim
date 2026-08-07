@@ -5,25 +5,23 @@ import {
   latestModelsPaginationQuery,
   latestModelsQuery
 } from '~/lib/projects/graphql/queries'
-import { gql } from 'graphql-tag'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
-import { useDtpModelUpload } from '~~/composables/useDtpModelUpload'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
-import { FileUploadConvertedStatus } from '~~/lib/core/api/fileImport'
 import { useScopedState } from '~~/lib/common/composables/scopedState'
 
 const WORKBENCH_UPLOAD_SYNC_TASK_STORAGE_KEY = 'workbench-upload-sync-tasks'
-const MODEL_TRANSFORM_API_VERSION = '2.3.0'
-const MODEL_TRANSFORM_POLL_INTERVAL = 10000
+const TASK_POLL_INTERVAL = 3000
+const AUTO_RETRY_LIMIT = 2
 
 export type WorkbenchUploadSyncTaskStatus =
-  | 'pending_version_created'
-  | 'matched'
+  | 'waiting_upload'
+  | 'speckle_converting'
   | 'syncing_dtp_model'
   | 'syncing_external_ids'
   | 'triggering_model_transform'
   | 'polling_model_transform'
-  | 'error'
+  | 'succeeded'
+  | 'failed'
 
 export type WorkbenchUploadSyncTask = {
   id: string
@@ -38,132 +36,46 @@ export type WorkbenchUploadSyncTask = {
   transformTaskId: string | null
   status: WorkbenchUploadSyncTaskStatus
   error: string | null
+  errorCode: string | null
+  retriable: boolean
   retryCount: number
   createdAt: string
   updatedAt: string
 }
 
-type LatestModelUploadResponse = {
-  project?: {
-    model?: {
-      id: string
-      uploads?: {
-        items?: Array<{
-          id: string
-          fileName: string
-          uploadComplete: boolean
-          convertedStatus?: number | null
-          convertedMessage?: string | null
-          convertedVersionId?: string | null
-        }>
-      }
-    }
+type ServerModelSyncTask = {
+  id: string
+  projectId: string
+  modelId: string
+  fileId: string | null
+  fileUploadId: string | null
+  versionId: string | null
+  fileName: string
+  fileType: string | null
+  fileSize: number | null
+  status: WorkbenchUploadSyncTaskStatus
+  seedId: string | null
+  assetId: string | null
+  assetName: string | null
+  transformTaskId: string | null
+  error: string | null
+  errorCode: string | null
+  retriable: boolean
+  retryCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+type CreateUploadTaskResponse = {
+  data: ServerModelSyncTask
+  upload?: {
+    fileId: string
+    uploadUrl: string
   }
 }
 
-type SyncLatestVersionResponse = {
-  project?: {
-    model?: {
-      id: string
-      name?: string | null
-      versions?: {
-        items?: Array<{
-          id: string
-          createdAt: string
-          referencedObject?: string | null
-          seedId?: string | null
-          assetId?: string | null
-          assetName?: string | null
-        }>
-      }
-    }
-  }
-}
-
-type VersionExternalIds = Partial<{
-  seedId: string
-  assetId: string
-  assetName: string
-}>
-
-type ModelTransformResponse = {
-  code?: number
-  success?: boolean
-  msg?: string
-  messages?: string
-  results?: {
-    taskId?: string
-  }
-  result?: {
-    taskId?: string
-  }
-}
-
-type ModelTransformStatusResponse = {
-  code?: number
-  status?: string
-  messages?: string
-  msg?: string
-  result?: {
-    taskId?: string
-    assetId?: string
-    assetName?: string
-    status?: 'SUCCEEDED' | 'FAILED' | 'QUEUING' | 'STOPPED' | 'RUNNING' | string
-  }
-}
-
-const latestModelUploadQuery = gql`
-  query WorkbenchLatestModelUpload($projectId: String!, $modelId: String!) {
-    project(id: $projectId) {
-      id
-      model(id: $modelId) {
-        id
-        uploads(input: { limit: 50 }) {
-          items {
-            id
-            fileName
-            uploadComplete
-            convertedStatus
-            convertedMessage
-            convertedVersionId
-          }
-        }
-      }
-    }
-  }
-`
-
-const syncModelLatestVersionQuery = gql`
-  query WorkbenchSyncModelLatestVersion($projectId: String!, $modelId: String!) {
-    project(id: $projectId) {
-      id
-      model(id: $modelId) {
-        id
-        name
-        versions(limit: 1) {
-          items {
-            id
-            createdAt
-            referencedObject
-            seedId
-            assetId
-            assetName
-          }
-        }
-      }
-    }
-  }
-`
-
-const updateVersionExternalIdsMutation = gql`
-  mutation WorkbenchUpdateVersionExternalIds($input: UpdateVersionInput!) {
-    versionMutations {
-      update(input: $input) {
-        id
-      }
-    }
-  }
-`
+const FINAL_STATUSES: WorkbenchUploadSyncTaskStatus[] = ['succeeded', 'failed']
+const CLIENT_UPLOAD_ONLY_STATUSES: WorkbenchUploadSyncTaskStatus[] = ['waiting_upload']
 
 const useWorkbenchUploadSyncTaskMap = () => {
   const serverFallback = ref<Record<string, WorkbenchUploadSyncTask>>({})
@@ -175,67 +87,82 @@ const useWorkbenchUploadSyncTaskMap = () => {
       )
 }
 
-const useWorkbenchUploadSyncRunningIds = () =>
-  useScopedState('workbenchUploadSyncRunningIds', () => ref<string[]>([]))
+const useWorkbenchUploadSyncEventSources = () =>
+  useScopedState('workbenchUploadSyncEventSources', () =>
+    ref<Record<string, EventSource | null>>({})
+  )
 
-const useWorkbenchUploadSyncingModelKeys = () =>
-  useScopedState('workbenchUploadSyncingModelKeys', () => ref<string[]>([]))
-
-const sleep = async (ms: number) =>
-  await new Promise((resolve) => setTimeout(resolve, ms))
+const useWorkbenchUploadSyncTaskPollers = () =>
+  useScopedState('workbenchUploadSyncTaskPollers', () =>
+    ref<Record<string, number | null>>({})
+  )
 
 const buildSyncingModelKey = (projectId: string, modelId: string) =>
   `${projectId}:${modelId}`
 
-const buildTaskId = (params: {
-  projectId: string
-  modelId: string | null
-  fileName: string
-  uploadId: string | null
-}) =>
-  params.uploadId?.trim() ||
-  `${params.projectId}:${params.modelId || 'new-model'}:${params.fileName}`
+const mapServerTask = (task: ServerModelSyncTask): WorkbenchUploadSyncTask => ({
+  id: task.id,
+  projectId: task.projectId,
+  modelId: task.modelId,
+  fileName: task.fileName,
+  uploadId: task.fileUploadId || task.fileId,
+  versionId: task.versionId,
+  seedId: task.seedId,
+  assetId: task.assetId,
+  assetName: task.assetName,
+  transformTaskId: task.transformTaskId,
+  status: task.status,
+  error: task.error,
+  errorCode: task.errorCode,
+  retriable: task.retriable,
+  retryCount: task.retryCount,
+  createdAt: task.createdAt,
+  updatedAt: task.updatedAt
+})
 
 export const useWorkbenchUploadSync = () => {
   const apollo = useApolloClient().client
-  const logger = useLogger()
   const apiOrigin = useApiOrigin()
+  const logger = useLogger()
   const authToken = useAuthCookie()
-  const { $dtpFetch } = useNuxtApp()
   const { triggerNotification } = useGlobalToast()
-  const {
-    syncModelFileForVersion,
-    clearVersionMetadataSyncRecord,
-    getVersionMetadataSyncRecord
-  } = useDtpModelUpload()
 
   const taskMap = useWorkbenchUploadSyncTaskMap()
-  const runningIds = useWorkbenchUploadSyncRunningIds()
-  const syncingModelKeys = useWorkbenchUploadSyncingModelKeys()
+  const eventSources = useWorkbenchUploadSyncEventSources()
+  const taskPollers = useWorkbenchUploadSyncTaskPollers()
 
-  const dtpFetch = $dtpFetch as <T = unknown>(
-    request: string,
-    options?: {
-      method?: string
-      headers?: HeadersInit
-      body?: BodyInit | Record<string, unknown> | null
-      originPath?: boolean
-      prefix?: string
-    }
-  ) => Promise<T>
+  const getHeaders = () =>
+    authToken.value
+      ? {
+          Authorization: `Bearer ${authToken.value}`
+        }
+      : undefined
 
   const tasks = computed(() =>
     Object.values(taskMap.value).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   )
 
   const tasksSignature = computed(() =>
-    tasks.value.map((task) => `${task.id}:${task.status}:${task.updatedAt}`).join('|')
+    tasks.value
+      .map(
+        (task) =>
+          `${task.id}:${task.status}:${task.updatedAt}:${task.retryCount}:${task.retriable}`
+      )
+      .join('|')
   )
+
+  const canResumeServerExecution = (task: Pick<WorkbenchUploadSyncTask, 'status'>) =>
+    !FINAL_STATUSES.includes(task.status) &&
+    !CLIENT_UPLOAD_ONLY_STATUSES.includes(task.status)
+
+  const canAutoRetryTask = (
+    task: Pick<WorkbenchUploadSyncTask, 'status' | 'retriable' | 'retryCount'>
+  ) => task.status === 'failed' && task.retriable && task.retryCount < AUTO_RETRY_LIMIT
 
   const activeProjectIds = computed(() => {
     const projectIds = new Set<string>()
     for (const task of tasks.value) {
-      if (task.status === 'error') continue
+      if (!canResumeServerExecution(task) && !canAutoRetryTask(task)) continue
       projectIds.add(task.projectId)
     }
     return [...projectIds]
@@ -249,155 +176,30 @@ export const useWorkbenchUploadSync = () => {
     return task
   }
 
-  const patchTask = (
-    taskId: string,
-    patch: Partial<Omit<WorkbenchUploadSyncTask, 'id' | 'createdAt'>>
-  ) => {
-    const current = taskMap.value[taskId]
-    if (!current) return null
-    const next = {
-      ...current,
-      ...patch,
-      updatedAt: new Date().toISOString()
-    }
-    return upsertTask(next)
-  }
-
   const removeTask = (taskId: string) => {
     const next = { ...taskMap.value }
     delete next[taskId]
     taskMap.value = next
   }
 
-  const removeTasksForModel = (params: { projectId: string; modelId: string }) => {
-    const next = { ...taskMap.value }
-    let changed = false
-
-    for (const task of Object.values(next)) {
-      if (task.projectId !== params.projectId || task.modelId !== params.modelId)
-        continue
-      delete next[task.id]
-      changed = true
-    }
-
-    if (changed) {
-      taskMap.value = next
+  const stopTaskEventSource = (taskId: string) => {
+    const source = eventSources.value[taskId]
+    source?.close()
+    eventSources.value = {
+      ...eventSources.value,
+      [taskId]: null
     }
   }
 
-  const isTaskRunning = (taskId: string) => runningIds.value.includes(taskId)
-
-  const setTaskRunning = (taskId: string, running: boolean) => {
-    const next = new Set(runningIds.value)
-    if (running) next.add(taskId)
-    else next.delete(taskId)
-    runningIds.value = [...next]
-  }
-
-  const setModelSyncing = (params: {
-    projectId: string
-    modelId: string
-    syncing: boolean
-  }) => {
-    const key = buildSyncingModelKey(params.projectId, params.modelId)
-    const next = new Set(syncingModelKeys.value)
-    if (params.syncing) next.add(key)
-    else next.delete(key)
-    syncingModelKeys.value = [...next]
-  }
-
-  const isModelSyncing = (params: { projectId: string; modelId: string }) =>
-    syncingModelKeys.value.includes(
-      buildSyncingModelKey(params.projectId, params.modelId)
-    )
-
-  const fetchLatestVersionInfo = async (params: {
-    projectId: string
-    modelId: string
-  }) => {
-    const response = await apollo.query<SyncLatestVersionResponse>({
-      query: syncModelLatestVersionQuery,
-      variables: {
-        projectId: params.projectId,
-        modelId: params.modelId
-      },
-      fetchPolicy: 'no-cache'
-    })
-
-    const version = response.data?.project?.model?.versions?.items?.[0]
-    if (!version?.id) {
-      return null
+  const stopTaskPolling = (taskId: string) => {
+    const current = taskPollers.value[taskId]
+    if (current !== null && current !== undefined) {
+      window.clearInterval(current)
     }
-
-    return {
-      modelName: response.data?.project?.model?.name || '',
-      versionId: version.id,
-      createdAt: version.createdAt,
-      referencedObject: version.referencedObject || null,
-      seedId: version.seedId || null,
-      assetId: version.assetId || null,
-      assetName: version.assetName || null
+    taskPollers.value = {
+      ...taskPollers.value,
+      [taskId]: null
     }
-  }
-
-  const fetchLatestModelUpload = async (params: {
-    projectId: string
-    modelId: string
-  }) => {
-    const response = await apollo.query<LatestModelUploadResponse>({
-      query: latestModelUploadQuery,
-      variables: {
-        projectId: params.projectId,
-        modelId: params.modelId
-      },
-      fetchPolicy: 'no-cache'
-    })
-
-    const upload = response.data?.project?.model?.uploads?.items?.[0]
-    if (!upload?.id || !upload.fileName) {
-      throw new Error('未找到最近一次模型上传记录，无法补同步模型')
-    }
-    if (!upload.uploadComplete) {
-      throw new Error('最近一次模型上传尚未完成，请稍后再试')
-    }
-
-    return upload
-  }
-
-  const registerPendingUpload = (params: {
-    projectId: string
-    modelId: string | null
-    fileName: string
-    uploadId: string | null
-  }) => {
-    const fileName = params.fileName.trim()
-    if (!fileName) return null
-
-    const taskId = buildTaskId({
-      projectId: params.projectId,
-      modelId: params.modelId,
-      fileName,
-      uploadId: params.uploadId
-    })
-    const now = new Date().toISOString()
-
-    return upsertTask({
-      id: taskId,
-      projectId: params.projectId,
-      modelId: params.modelId,
-      fileName,
-      uploadId: params.uploadId,
-      versionId: null,
-      seedId: taskMap.value[taskId]?.seedId || null,
-      assetId: taskMap.value[taskId]?.assetId || null,
-      assetName: taskMap.value[taskId]?.assetName || null,
-      transformTaskId: taskMap.value[taskId]?.transformTaskId || null,
-      status: 'pending_version_created',
-      error: null,
-      retryCount: taskMap.value[taskId]?.retryCount || 0,
-      createdAt: taskMap.value[taskId]?.createdAt || now,
-      updatedAt: now
-    })
   }
 
   const refreshModelList = async () => {
@@ -408,546 +210,438 @@ export const useWorkbenchUploadSync = () => {
     ])
   }
 
-  const fetchModelUploadForVersion = async (params: {
-    projectId: string
-    modelId: string
-    versionId: string
-    uploadId?: string | null
-    fileName?: string
-  }) => {
-    const response = await apollo.query<LatestModelUploadResponse>({
-      query: latestModelUploadQuery,
-      variables: {
-        projectId: params.projectId,
-        modelId: params.modelId
-      },
-      fetchPolicy: 'no-cache'
+  const uploadToSignedUrl = async (
+    file: File,
+    uploadUrl: string,
+    onProgress?: (percentage: number) => void
+  ): Promise<{ etag: string }> => {
+    const request = new XMLHttpRequest()
+
+    return await new Promise<{ etag: string }>((resolve, reject) => {
+      request.open('PUT', uploadUrl)
+      request.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+
+      request.upload.addEventListener('progress', (e) => {
+        if (!e.lengthComputable) return
+        onProgress?.((e.loaded / e.total) * 100)
+      })
+
+      request.addEventListener('load', () => {
+        if (request.status < 200 || request.status >= 300) {
+          return reject(
+            new Error(`模型文件上传失败${request.status ? ` (${request.status})` : ''}`)
+          )
+        }
+
+        const etag = request.getResponseHeader('ETag')
+        if (!etag) {
+          return reject(new Error('模型文件上传成功，但未返回 ETag'))
+        }
+
+        resolve({ etag })
+      })
+
+      request.addEventListener('error', () => {
+        reject(new Error('模型文件上传失败'))
+      })
+
+      request.send(file)
     })
-
-    const uploads = response.data?.project?.model?.uploads?.items || []
-    const uploadByVersionId = uploads.find(
-      (item) => item.convertedVersionId === params.versionId
-    )
-    const uploadById = params.uploadId
-      ? uploads.find((item) => item.id === params.uploadId)
-      : undefined
-
-    const upload = params.uploadId
-      ? uploadByVersionId?.id === params.uploadId
-        ? uploadByVersionId
-        : uploadById?.convertedVersionId === params.versionId
-        ? uploadById
-        : undefined
-      : uploadByVersionId || uploads.find((item) => item.fileName === params.fileName)
-
-    if (!upload?.id || !upload.fileName) {
-      throw new Error('未找到版本对应的模型上传记录，无法同步中海模型')
-    }
-    if (!upload.uploadComplete) {
-      throw new Error('模型上传尚未完成，暂时无法同步中海模型')
-    }
-
-    return upload
   }
 
-  const fetchModelUploadFile = async (params: {
-    projectId: string
-    uploadId: string
-    fileName: string
-  }) => {
-    const response = await fetch(
-      `${apiOrigin}/api/stream/${params.projectId}/blob/${params.uploadId}`,
-      {
-        method: 'GET',
-        credentials: 'same-origin',
-        headers: authToken.value
-          ? { Authorization: `Bearer ${authToken.value}` }
-          : undefined
-      }
-    )
+  const handleTaskUpdate = async (
+    serverTask: ServerModelSyncTask,
+    options?: Partial<{ silentSuccess: boolean; silentFailure: boolean }>
+  ) => {
+    const nextTask = upsertTask(mapServerTask(serverTask))
 
-    if (!response.ok) {
-      let message = `下载模型源文件失败 (${response.status})`
+    if (nextTask.status === 'succeeded') {
+      stopTaskEventSource(nextTask.id)
+      stopTaskPolling(nextTask.id)
+      await refreshModelList()
+      removeTask(nextTask.id)
+
+      if (!options?.silentSuccess) {
+        triggerNotification({
+          type: ToastNotificationType.Success,
+          title: '模型同步成功',
+          description: '后端已完成模型转换与同步'
+        })
+      }
+    }
+
+    if (nextTask.status === 'failed') {
+      stopTaskEventSource(nextTask.id)
+      stopTaskPolling(nextTask.id)
+      if (!options?.silentFailure && !canAutoRetryTask(nextTask)) {
+        triggerNotification({
+          type: ToastNotificationType.Danger,
+          title: '模型同步失败',
+          description: nextTask.error || '模型同步失败'
+        })
+      }
+    }
+
+    return nextTask
+  }
+
+  const startTaskPolling = (task: WorkbenchUploadSyncTask) => {
+    if (import.meta.server) return
+    if (!canResumeServerExecution(task)) return
+    if (taskPollers.value[task.id]) return
+
+    const timer = window.setInterval(async () => {
       try {
-        const body = (await response.json()) as {
-          error?: string | { message?: string }
-        }
-        if (typeof body.error === 'string') message = body.error
-        else if (body.error?.message) message = body.error.message
-      } catch {
-        // Ignore non-JSON error bodies
-      }
-      throw new Error(message)
-    }
-
-    const blob = await response.blob()
-    return new File([blob], params.fileName, {
-      type: blob.type || 'application/octet-stream',
-      lastModified: Date.now()
-    })
-  }
-
-  const updateVersionExternalIds = async (params: {
-    projectId: string
-    versionId: string
-    externalIds?: VersionExternalIds
-  }) => {
-    if (
-      !params.externalIds?.seedId &&
-      !params.externalIds?.assetId &&
-      !params.externalIds?.assetName
-    ) {
-      throw new Error('中海上传完成，但未拿到可回填的 seedId/assetId/assetName')
-    }
-
-    const { data, errors } = await apollo.mutate<{
-      versionMutations?: {
-        update?: {
-          id: string
-        } | null
-      } | null
-    }>({
-      mutation: updateVersionExternalIdsMutation,
-      variables: {
-        input: {
-          projectId: params.projectId,
-          versionId: params.versionId,
-          ...(params.externalIds?.seedId ? { seedId: params.externalIds.seedId } : {}),
-          ...(params.externalIds?.assetId
-            ? { assetId: params.externalIds.assetId }
-            : {}),
-          ...(params.externalIds?.assetName
-            ? { assetName: params.externalIds.assetName }
-            : {})
-        }
-      } as Record<string, unknown>
-    })
-
-    if (!data?.versionMutations?.update?.id) {
-      throw new Error(
-        (errors?.[0]?.message as string | undefined) ||
-          '回填 seedId/assetId/assetName 失败'
-      )
-    }
-  }
-
-  const triggerModelTransform = async (params: {
-    assetId: string
-    assetName: string
-  }) => {
-    const response = await dtpFetch<ModelTransformResponse>(
-      '/v1/asset/model/transform',
-      {
-        method: 'POST',
-        body: {
-          assetId: params.assetId,
-          assetName: params.assetName,
-          apiVersion: MODEL_TRANSFORM_API_VERSION
-        }
-      }
-    )
-
-    const taskId = response.results?.taskId || response.result?.taskId
-    if (!response.success || !taskId) {
-      throw new Error(response.msg || response.messages || '触发模型转换失败')
-    }
-
-    return taskId
-  }
-
-  const pollModelTransformUntilFinished = async (taskId: string) => {
-    while (true) {
-      const response = await dtpFetch<ModelTransformStatusResponse>(
-        `/v1/daas/pipeline/task/${taskId}`,
-        {
-          method: 'GET'
-        }
-      )
-      const status = response.result?.status
-
-      if (status === 'SUCCEEDED') {
-        return response
-      }
-      if (status === 'FAILED' || status === 'STOPPED') {
-        throw new Error(
-          response.messages || response.msg || `模型转换失败，当前状态为 ${status}`
-        )
-      }
-      if (status !== 'QUEUING' && status !== 'RUNNING') {
+        if (!task.modelId) return
+        const response = await fetchTask({
+          projectId: task.projectId,
+          modelId: task.modelId,
+          taskId: task.id
+        })
+        await handleTaskUpdate(response.data, {
+          silentSuccess: true
+        })
+      } catch (error) {
         logger.warn(
           {
-            taskId,
-            status,
-            response
+            taskId: task.id,
+            error
           },
-          '模型转换返回了未知状态，继续轮询'
+          '轮询模型同步任务失败'
         )
       }
+    }, TASK_POLL_INTERVAL)
 
-      await sleep(MODEL_TRANSFORM_POLL_INTERVAL)
+    taskPollers.value = {
+      ...taskPollers.value,
+      [task.id]: timer
     }
   }
 
-  const executeTask = async (taskId: string) => {
-    const task = taskMap.value[taskId]
-    if (!task || isTaskRunning(taskId)) return false
-    if (!task.projectId || !task.modelId || !task.versionId || !task.uploadId)
-      return false
+  const subscribeTask = (task: WorkbenchUploadSyncTask) => {
+    if (import.meta.server) return
+    if (!task.modelId || !canResumeServerExecution(task)) return
+    if (eventSources.value[task.id]) return
 
-    setTaskRunning(taskId, true)
-    setModelSyncing({
-      projectId: task.projectId,
-      modelId: task.modelId,
-      syncing: true
+    stopTaskPolling(task.id)
+
+    const streamUrl = `/api/projects/${task.projectId}/models/${task.modelId}/model-sync/tasks/${task.id}/events`
+    const source = new EventSource(streamUrl, {
+      withCredentials: true
     })
 
-    try {
-      let latestTask = taskMap.value[taskId] || task
-      let externalIds: VersionExternalIds = {
-        seedId: latestTask.seedId || undefined,
-        assetId: latestTask.assetId || undefined,
-        assetName: latestTask.assetName || undefined
+    const handleMessage = async (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as ServerModelSyncTask
+        await handleTaskUpdate(payload, {
+          silentSuccess: true
+        })
+      } catch (error) {
+        logger.warn(
+          {
+            taskId: task.id,
+            error
+          },
+          '解析模型同步 SSE 消息失败'
+        )
       }
+    }
 
-      if (!externalIds.seedId || !externalIds.assetId || !externalIds.assetName) {
-        patchTask(taskId, {
-          status: 'syncing_dtp_model',
-          error: null
-        })
+    source.addEventListener('snapshot', (event) => {
+      void handleMessage(event as MessageEvent<string>)
+    })
+    source.addEventListener('update', (event) => {
+      void handleMessage(event as MessageEvent<string>)
+    })
+    source.onerror = () => {
+      stopTaskEventSource(task.id)
+      startTaskPolling(task)
+    }
 
-        const file = await fetchModelUploadFile({
-          projectId: task.projectId,
-          uploadId: task.uploadId,
-          fileName: task.fileName
-        })
-        const uploadedExternalIds = await syncModelFileForVersion({
-          file,
-          fileUploadId: task.uploadId,
-          projectId: task.projectId,
-          modelId: task.modelId,
-          versionId: task.versionId
-        })
-        const storedExternalIds = getVersionMetadataSyncRecord(task.uploadId)
-        externalIds = {
-          seedId: uploadedExternalIds?.seedId || storedExternalIds?.seedId,
-          assetId: uploadedExternalIds?.assetId || storedExternalIds?.assetId,
-          assetName: uploadedExternalIds?.assetName || storedExternalIds?.assetName
-        }
-        patchTask(taskId, {
-          seedId: externalIds.seedId || null,
-          assetId: externalIds.assetId || null,
-          assetName: externalIds.assetName || null
-        })
-      }
-
-      patchTask(taskId, {
-        status: 'syncing_external_ids',
-        seedId: externalIds.seedId || null,
-        assetId: externalIds.assetId || null,
-        assetName: externalIds.assetName || null
-      })
-      await updateVersionExternalIds({
-        projectId: task.projectId,
-        versionId: task.versionId,
-        externalIds
-      })
-      clearVersionMetadataSyncRecord(task.uploadId)
-
-      latestTask = taskMap.value[taskId] || latestTask
-      let transformTaskId = latestTask.transformTaskId
-      if (!transformTaskId) {
-        if (!externalIds.assetId || !externalIds.assetName) {
-          throw new Error('模型转换前缺少 assetId 或 assetName')
-        }
-        patchTask(taskId, {
-          status: 'triggering_model_transform'
-        })
-        transformTaskId = await triggerModelTransform({
-          assetId: externalIds.assetId,
-          assetName: externalIds.assetName
-        })
-        patchTask(taskId, {
-          transformTaskId
-        })
-      }
-
-      patchTask(taskId, {
-        status: 'polling_model_transform',
-        transformTaskId
-      })
-      await pollModelTransformUntilFinished(transformTaskId)
-
-      await refreshModelList()
-
-      triggerNotification({
-        type: ToastNotificationType.Success,
-        title: '模型同步成功',
-        description: '已回填 seedId/assetId/assetName，并完成中海模型转换'
-      })
-
-      removeTask(taskId)
-      return true
-    } catch (error) {
-      if (task.uploadId) {
-        clearVersionMetadataSyncRecord(task.uploadId)
-      }
-      const message = error instanceof Error ? error.message : '模型同步失败'
-      logger.error(error, '全局自动同步中海模型失败')
-      patchTask(taskId, {
-        status: 'error',
-        error: message,
-        retryCount: (taskMap.value[taskId]?.retryCount || 0) + 1
-      })
-      return false
-    } finally {
-      setTaskRunning(taskId, false)
-      if (task.modelId) {
-        setModelSyncing({
-          projectId: task.projectId,
-          modelId: task.modelId,
-          syncing: false
-        })
-      }
+    eventSources.value = {
+      ...eventSources.value,
+      [task.id]: source
     }
   }
 
-  const consumeVersionCreated = async (params: {
+  const fetchTask = async (params: {
+    projectId: string
+    modelId: string
+    taskId: string
+  }) => {
+    return await $fetch<{ data: ServerModelSyncTask }>(
+      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/model-sync/tasks/${params.taskId}`,
+      {
+        headers: getHeaders()
+      }
+    )
+  }
+
+  const fetchProjectResumableTasks = async (params: { projectId: string }) => {
+    return await $fetch<{ data: ServerModelSyncTask[] }>(
+      `${apiOrigin}/api/v1/projects/${params.projectId}/model-sync/tasks`,
+      {
+        headers: getHeaders(),
+        query: {
+          status: 'resumable'
+        }
+      }
+    )
+  }
+
+  const createUploadTask = async (params: {
+    projectId: string
+    modelId: string
+    fileName: string
+  }) => {
+    return await $fetch<CreateUploadTaskResponse>(
+      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/model-sync/tasks`,
+      {
+        method: 'POST',
+        headers: getHeaders(),
+        body: {
+          mode: 'upload',
+          fileName: params.fileName
+        }
+      }
+    )
+  }
+
+  const completeUploadTask = async (params: {
+    projectId: string
+    modelId: string
+    taskId: string
+    etag: string
+  }) => {
+    return await $fetch<{ data: ServerModelSyncTask }>(
+      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/model-sync/tasks/${params.taskId}/complete-upload`,
+      {
+        method: 'POST',
+        headers: getHeaders(),
+        body: {
+          etag: params.etag
+        }
+      }
+    )
+  }
+
+  const retryServerTask = async (params: {
+    projectId: string
+    modelId: string
+    taskId: string
+  }) => {
+    return await $fetch<{ data: ServerModelSyncTask }>(
+      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/model-sync/tasks/${params.taskId}/retry`,
+      {
+        method: 'POST',
+        headers: getHeaders()
+      }
+    )
+  }
+
+  const uploadModelFile = async (params: {
+    projectId: string
+    modelId: string
+    file: File
+    onProgress?: (percentage: number) => void
+  }) => {
+    const createResponse = await createUploadTask({
+      projectId: params.projectId,
+      modelId: params.modelId,
+      fileName: params.file.name
+    })
+
+    const createdTask = await handleTaskUpdate(createResponse.data, {
+      silentSuccess: true
+    })
+
+    if (!createResponse.upload?.uploadUrl) {
+      throw new Error('创建上传任务成功，但未返回上传地址')
+    }
+
+    const { etag } = await uploadToSignedUrl(
+      params.file,
+      createResponse.upload.uploadUrl,
+      params.onProgress
+    )
+
+    const completeResponse = await completeUploadTask({
+      projectId: params.projectId,
+      modelId: params.modelId,
+      taskId: createdTask.id,
+      etag
+    })
+
+    const task = await handleTaskUpdate(completeResponse.data, {
+      silentSuccess: true
+    })
+    subscribeTask(task)
+    return task
+  }
+
+  const retryTask = async (taskId: string) => {
+    const task = taskMap.value[taskId]
+    if (!task?.modelId) return false
+
+    if (canAutoRetryTask(task)) {
+      const response = await retryServerTask({
+        projectId: task.projectId,
+        modelId: task.modelId,
+        taskId: task.id
+      })
+      const nextTask = await handleTaskUpdate(response.data, {
+        silentSuccess: true
+      })
+      subscribeTask(nextTask)
+      return nextTask.status === 'succeeded'
+    }
+
+    return await runFullModelSync({
+      projectId: task.projectId,
+      modelId: task.modelId
+    })
+  }
+
+  const autoRetryTask = async (task: WorkbenchUploadSyncTask) => {
+    if (!task.modelId || !canAutoRetryTask(task)) return false
+
+    const response = await retryServerTask({
+      projectId: task.projectId,
+      modelId: task.modelId,
+      taskId: task.id
+    })
+    const nextTask = await handleTaskUpdate(response.data, {
+      silentSuccess: true
+    })
+    subscribeTask(nextTask)
+    return true
+  }
+
+  const resumeProjectTasks = async (projectId: string) => {
+    try {
+      const response = await fetchProjectResumableTasks({ projectId })
+      const resumableTasks = response.data
+      const resumableTaskIds = new Set(resumableTasks.map((task) => task.id))
+
+      for (const serverTask of resumableTasks) {
+        const mappedTask = mapServerTask(serverTask)
+        if (canAutoRetryTask(mappedTask)) {
+          try {
+            await autoRetryTask(mappedTask)
+            continue
+          } catch (error) {
+            logger.warn(
+              {
+                projectId,
+                taskId: mappedTask.id,
+                error
+              },
+              '自动重试模型同步任务失败'
+            )
+          }
+        }
+
+        const nextTask = await handleTaskUpdate(serverTask, {
+          silentSuccess: true,
+          silentFailure: true
+        })
+        subscribeTask(nextTask)
+      }
+
+      const localProjectTasks = tasks.value.filter(
+        (task) => task.projectId === projectId && task.status !== 'succeeded'
+      )
+
+      for (const task of localProjectTasks) {
+        if (resumableTaskIds.has(task.id)) continue
+
+        if (CLIENT_UPLOAD_ONLY_STATUSES.includes(task.status)) {
+          stopTaskEventSource(task.id)
+          stopTaskPolling(task.id)
+          removeTask(task.id)
+          continue
+        }
+
+        if (!task.modelId) continue
+
+        try {
+          const taskResponse = await fetchTask({
+            projectId: task.projectId,
+            modelId: task.modelId,
+            taskId: task.id
+          })
+          const nextTask = await handleTaskUpdate(taskResponse.data, {
+            silentSuccess: true,
+            silentFailure: true
+          })
+
+          if (canAutoRetryTask(nextTask)) {
+            await autoRetryTask(nextTask)
+            continue
+          }
+
+          subscribeTask(nextTask)
+        } catch (error) {
+          logger.warn(
+            {
+              projectId,
+              taskId: task.id,
+              error
+            },
+            '补偿查询模型同步任务失败'
+          )
+        }
+      }
+    } catch (error) {
+      logger.warn(
+        {
+          projectId,
+          error
+        },
+        '按项目恢复模型同步任务失败'
+      )
+    }
+  }
+
+  const resumeInterruptedTasks = async (projectIds?: string[]) => {
+    const ids = projectIds?.length
+      ? [...new Set(projectIds)]
+      : [...new Set(tasks.value.map((task) => task.projectId))]
+
+    for (const projectId of ids) {
+      await resumeProjectTasks(projectId)
+    }
+  }
+
+  const consumeVersionCreated = async (_params: {
     projectId: string
     version: NonNullable<
       OnProjectVersionsUpdateSubscription['projectVersionsUpdated']
     >['version']
   }) => {
-    const version = params.version
-    if (!version) return false
-
-    const candidates = tasks.value.filter((task) => {
-      if (task.projectId !== params.projectId) return false
-      if (task.status !== 'pending_version_created') return false
-      if (task.modelId && task.modelId !== version.model.id) return false
-      return true
-    })
-
-    for (const candidate of candidates) {
-      try {
-        const upload = await fetchModelUploadForVersion({
-          projectId: params.projectId,
-          modelId: version.model.id,
-          versionId: version.id,
-          uploadId: candidate.uploadId,
-          fileName: candidate.fileName
-        })
-
-        patchTask(candidate.id, {
-          modelId: version.model.id,
-          versionId: version.id,
-          uploadId: upload.id,
-          fileName: upload.fileName,
-          transformTaskId: null,
-          status: 'matched',
-          error: null
-        })
-
-        void executeTask(candidate.id)
-        return true
-      } catch {
-        // Try the next candidate. This can happen when multiple versions share the same file name.
-      }
-    }
-
     return false
-  }
-
-  const tryAdvancePendingTask = async (taskId: string) => {
-    const task = taskMap.value[taskId]
-    if (!task || task.status !== 'pending_version_created') return false
-    if (!task.projectId || !task.modelId) return false
-
-    try {
-      const latestVersion = await fetchLatestVersionInfo({
-        projectId: task.projectId,
-        modelId: task.modelId
-      })
-
-      if (!latestVersion?.versionId) {
-        return false
-      }
-
-      if (latestVersion.seedId?.trim()) {
-        removeTasksForModel({
-          projectId: task.projectId,
-          modelId: task.modelId
-        })
-        return true
-      }
-
-      let matchedUpload: Awaited<ReturnType<typeof fetchModelUploadForVersion>> | null =
-        null
-      try {
-        matchedUpload = await fetchModelUploadForVersion({
-          projectId: task.projectId,
-          modelId: task.modelId,
-          versionId: latestVersion.versionId,
-          uploadId: task.uploadId,
-          fileName: task.fileName
-        })
-      } catch {
-        matchedUpload = null
-      }
-
-      if (!matchedUpload) {
-        return false
-      }
-
-      if (matchedUpload.convertedStatus === FileUploadConvertedStatus.Error) {
-        patchTask(taskId, {
-          status: 'error',
-          error: matchedUpload.convertedMessage?.trim() || '模型转换失败，请先处理转换错误'
-        })
-        return false
-      }
-
-      if (matchedUpload.convertedStatus !== FileUploadConvertedStatus.Completed) {
-        return false
-      }
-
-      patchTask(taskId, {
-        modelId: task.modelId,
-        versionId: latestVersion.versionId,
-        uploadId: matchedUpload.id,
-        fileName: matchedUpload.fileName,
-        status: 'matched',
-        error: null
-      })
-
-      void executeTask(taskId)
-      return true
-    } catch (error) {
-      logger.warn(
-        {
-          taskId,
-          error
-        },
-        '自动推进待同步模型任务失败，后续会继续重试'
-      )
-      return false
-    }
-  }
-
-  const retryTask = async (taskId: string) => {
-    const task = taskMap.value[taskId]
-    if (!task) return false
-    patchTask(taskId, {
-      status:
-        task.modelId && task.versionId && task.uploadId
-          ? 'matched'
-          : 'pending_version_created',
-      transformTaskId: null,
-      error: null
-    })
-    return await executeTask(taskId)
-  }
-
-  const resumeInterruptedTasks = async () => {
-    const resumableStatuses: WorkbenchUploadSyncTaskStatus[] = [
-      'matched',
-      'syncing_dtp_model',
-      'syncing_external_ids',
-      'triggering_model_transform',
-      'polling_model_transform'
-    ]
-
-    for (const task of tasks.value) {
-      if (task.status === 'pending_version_created') {
-        await tryAdvancePendingTask(task.id)
-        continue
-      }
-
-      if (!resumableStatuses.includes(task.status)) continue
-      void executeTask(task.id)
-    }
   }
 
   const runFullModelSync = async (params: { projectId: string; modelId: string }) => {
     if (isModelSyncing(params)) return false
 
     try {
-      const latestVersion = await fetchLatestVersionInfo(params)
-      if (latestVersion?.seedId?.trim()) {
-        removeTasksForModel(params)
-        return true
-      }
-
-      const upload = await fetchLatestModelUpload(params)
-      if (upload.convertedStatus === FileUploadConvertedStatus.Error) {
-        throw new Error(
-          upload.convertedMessage?.trim() || '模型转换失败，请先处理转换错误'
-        )
-      }
-      if (upload.convertedStatus !== FileUploadConvertedStatus.Completed) {
-        throw new Error('模型尚未转换成功，请稍后再试')
-      }
-
-      const task = registerPendingUpload({
-        projectId: params.projectId,
-        modelId: params.modelId,
-        fileName: upload.fileName,
-        uploadId: upload.id
-      })
-      if (!task) {
-        throw new Error('未找到可登记的同步任务')
-      }
-
-      if (!latestVersion?.versionId) {
-        triggerNotification({
-          type: ToastNotificationType.Info,
-          title: '等待版本创建',
-          description: '已登记模型同步任务，版本创建后会自动继续执行'
-        })
-        return false
-      }
-
-      let matchedUpload: Awaited<ReturnType<typeof fetchModelUploadForVersion>> | null =
-        null
-      try {
-        matchedUpload = await fetchModelUploadForVersion({
-          projectId: params.projectId,
-          modelId: params.modelId,
-          versionId: latestVersion.versionId,
-          uploadId: upload.id,
-          fileName: upload.fileName
-        })
-      } catch {
-        try {
-          matchedUpload = await fetchModelUploadForVersion({
-            projectId: params.projectId,
-            modelId: params.modelId,
-            versionId: latestVersion.versionId,
-            fileName: upload.fileName
-          })
-        } catch {
-          matchedUpload = null
+      const response = await $fetch<{ data: ServerModelSyncTask }>(
+        `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/model-sync/tasks`,
+        {
+          method: 'POST',
+          headers: getHeaders(),
+          body: {
+            mode: 'latest_upload'
+          }
         }
-      }
+      )
 
-      if (!matchedUpload) {
-        triggerNotification({
-          type: ToastNotificationType.Info,
-          title: '等待版本创建',
-          description: '已登记模型同步任务，待版本与上传记录关联后会自动继续执行'
-        })
-        return false
-      }
-
-      patchTask(task.id, {
-        modelId: params.modelId,
-        versionId: latestVersion.versionId,
-        uploadId: matchedUpload.id,
-        fileName: matchedUpload.fileName,
-        status: 'matched',
-        error: null
+      const task = await handleTaskUpdate(response.data, {
+        silentSuccess: true
       })
-
-      return await executeTask(task.id)
+      subscribeTask(task)
+      return task.status === 'succeeded'
     } catch (error) {
       const message = error instanceof Error ? error.message : '同步模型失败'
       triggerNotification({
@@ -959,14 +653,31 @@ export const useWorkbenchUploadSync = () => {
     }
   }
 
+  const isModelSyncing = (params: { projectId: string; modelId: string }) =>
+    tasks.value.some(
+      (task) =>
+        task.modelId &&
+        buildSyncingModelKey(task.projectId, task.modelId) ===
+          buildSyncingModelKey(params.projectId, params.modelId) &&
+        canResumeServerExecution(task)
+    )
+
+  const setModelSyncing = (_params: {
+    projectId: string
+    modelId: string
+    syncing: boolean
+  }) => {
+    // 状态以服务端任务为准，前端不再单独维护。
+  }
+
   return {
     tasks,
     tasksSignature,
     activeProjectIds,
-    registerPendingUpload,
-    removeTask,
+    uploadModelFile,
     retryTask,
-    executeTask,
+    executeTask: retryTask,
+    resumeProjectTasks,
     resumeInterruptedTasks,
     consumeVersionCreated,
     runFullModelSync,

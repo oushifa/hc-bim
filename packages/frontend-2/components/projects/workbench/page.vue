@@ -734,8 +734,7 @@ const drawingUploadProgress = ref(0)
 const drawingFileInputRef = ref<HTMLInputElement | null>(null)
 const drawingsApi = useWorkbenchDrawingsApi()
 
-const { tasks, registerPendingUpload, isModelSyncing, runFullModelSync } =
-  useWorkbenchUploadSync()
+const { tasks, isModelSyncing, runFullModelSync } = useWorkbenchUploadSync()
 
 const downloadsDialogOpen = ref(false)
 const selectedDownloadModel = ref<ModelListItem | null>(null)
@@ -857,7 +856,7 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
 
   if (
     latestTask &&
-    ['pending_version_created', 'matched', 'error'].includes(latestTask.status)
+    ['speckle_converting', 'failed'].includes(latestTask.status)
   ) {
     return '待同步'
   }
@@ -962,17 +961,6 @@ const onModelUploading = async (payload: FileAreaUploadingPayload) => {
   const wasUploading = isModelUploading.value
   isModelUploading.value = payload.isUploading
   if (wasUploading && !payload.isUploading) {
-    const fileName = payload.upload.file?.name?.trim()
-    const uploadId = payload.upload.result?.blobId?.trim?.() || null
-    const uploadModel = selectedVersionUploadModel.value
-    if (fileName && !payload.error && !payload.upload.result?.uploadError) {
-      registerPendingUpload({
-        projectId: props.projectId,
-        fileName,
-        modelId: uploadModel?.id || null,
-        uploadId
-      })
-    }
     selectedVersionUploadModel.value = null
     loadCacheBuster.value++
     await Promise.all([loadFolders(), refreshModels()])

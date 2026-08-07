@@ -1,5 +1,5 @@
 import type { MaybeRef } from '@vueuse/core'
-import { buildManualPromise, ensureError, throwUncoveredError } from '@speckle/shared'
+import { ensureError, throwUncoveredError } from '@speckle/shared'
 import type { MaybeNullOrUndefined, Nullable, Optional } from '@speckle/shared'
 import { useServerFileUploadLimit } from '~~/lib/common/composables/serverInfo'
 import type {
@@ -10,6 +10,7 @@ import { importFileLegacy, type ImportFile } from '~~/lib/core/api/fileImport'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { BlobUploadStatus, type BlobPostResultItem } from '~~/lib/core/api/blobStorage'
 import { useMixpanel } from '~~/lib/core/composables/mp'
+import { useWorkbenchUploadSync } from '~~/lib/projects/composables/workbenchUploadSync'
 import { graphql } from '~/lib/common/generated/gql'
 import {
   useIsNextGenFileImporterEnabled,
@@ -24,7 +25,6 @@ import type {
   UseFileImport_ModelFragment,
   UseFileImport_ProjectFragment
 } from '~/lib/common/generated/gql/graphql'
-import { useApolloClient } from '@vue/apollo-composable'
 import {
   FileTooLargeError,
   ForbiddenFileTypeError,
@@ -184,129 +184,27 @@ export const useGlobalFileImportManager = () => {
   }
 }
 
-const generateUploadUrlMutation = graphql(`
-  mutation GenerateUploadUrl($input: GenerateFileUploadUrlInput!) {
-    fileUploadMutations {
-      generateUploadUrl(input: $input) {
-        url
-        fileId
-      }
-    }
-  }
-`)
-
-const startFileImportMutation = graphql(`
-  mutation StartFileImport($input: StartFileImportInput!) {
-    fileUploadMutations {
-      startFileImport(input: $input) {
-        id
-      }
-    }
-  }
-`)
-
 export const useFileImportApi = (options?: { skipDtpModelSync?: boolean }) => {
   const {
     public: { FF_LEGACY_FILE_IMPORTS_ENABLED }
   } = useRuntimeConfig()
-  const apollo = useApolloClient().client
   const { registerActiveUpload, unregisterActiveUpload } = useGlobalFileImportManager()
-  const { syncModelFileAfterSpeckleUpload } = useDtpModelUpload()
-  const { skipDtpModelSync = false } = options || {}
+  void options
+  const { uploadModelFile } = useWorkbenchUploadSync()
 
   const importFileV2: ImportFile = async (params, callbacks) => {
     const { file, projectId, modelId } = params
     const { onProgress } = callbacks || {}
+    if (!modelId) {
+      throw new Error('文件导入失败，未提供模型')
+    }
 
-    // Generate upload URL
-    const generateUploadUrlResponse = await apollo.mutate({
-      mutation: generateUploadUrlMutation,
-      variables: {
-        input: {
-          projectId,
-          fileName: file.name
-        }
-      }
+    await uploadModelFile({
+      projectId,
+      modelId,
+      file,
+      onProgress
     })
-
-    const generateUploadUrl =
-      generateUploadUrlResponse.data?.fileUploadMutations.generateUploadUrl
-    if (!generateUploadUrl) {
-      const errMsg = getFirstGqlErrorMessage(
-        generateUploadUrlResponse.errors,
-        '文件上传失败，无法生成上传URL'
-      )
-      throw new Error(errMsg)
-    }
-
-    const { url: uploadUrl, fileId } = generateUploadUrl
-
-    // Upload to S3 compatible endpoint
-    const request = new XMLHttpRequest()
-    const uploadPromise = buildManualPromise<{ etag: string }>()
-    request.open('PUT', uploadUrl)
-    request.setRequestHeader('Content-Type', file.type)
-
-    request.upload.addEventListener('progress', (e) => {
-      const percentage = (e.loaded / e.total) * 100
-      onProgress?.(percentage)
-    })
-
-    const handleResponse = () => {
-      const statusCode = request.status
-      if (statusCode >= 200 && statusCode < 300) {
-        // Collect etag
-        const etag = request.getResponseHeader('ETag')
-        if (!etag) {
-          return uploadPromise.reject(new Error('文件上传失败，上传响应中没有ETag'))
-        }
-        return uploadPromise.resolve({ etag })
-      } else {
-        // Try to resolve error message from XML response w/ regex (dont want to parse XML)
-        const errorMessage = request.responseText.match(
-          /<Message>(.*?)<\/Message>/
-        )?.[1]
-        return uploadPromise.reject(
-          new Error(errorMessage || `文件${file.name}上传失败，未知错误发生`)
-        )
-      }
-    }
-
-    request.addEventListener('load', () => handleResponse())
-    request.addEventListener('error', () => handleResponse())
-    request.send(file)
-    const { etag } = await uploadPromise.promise
-
-    // Now lets start the file import
-    const startFileImportResponse = await apollo.mutate({
-      mutation: startFileImportMutation,
-      variables: {
-        input: {
-          projectId,
-          fileId,
-          etag,
-          modelId
-        }
-      }
-    })
-    const fileImportStarted =
-      startFileImportResponse.data?.fileUploadMutations.startFileImport.id
-    if (!fileImportStarted) {
-      const errMsg = getFirstGqlErrorMessage(
-        startFileImportResponse.errors,
-        '文件导入失败，无法启动文件导入'
-      )
-      throw new Error(errMsg)
-    }
-
-    if (import.meta.client && !skipDtpModelSync) {
-      void syncModelFileAfterSpeckleUpload({
-        file,
-        fileUploadId: fileImportStarted,
-        projectId,
-        modelId
-      })
-    }
 
     const res: BlobPostResultItem = {
       fileName: file.name,

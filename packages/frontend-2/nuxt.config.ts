@@ -104,6 +104,10 @@ export default defineNuxtConfig({
   },
 
   vite: {
+    esbuild: {
+      drop: ['console']
+    },
+
     define: {
       ...(hydrationMismatchReportingEnabled
         ? {

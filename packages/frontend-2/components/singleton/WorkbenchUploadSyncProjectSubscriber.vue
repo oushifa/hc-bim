@@ -9,7 +9,18 @@ const props = defineProps<{
   onVersionUpdate?: () => void
 }>()
 
-const { consumeVersionCreated } = useWorkbenchUploadSync()
+const { consumeVersionCreated, resumeProjectTasks } = useWorkbenchUploadSync()
+
+watch(
+  () => props.projectId,
+  (projectId) => {
+    if (!projectId) return
+    void resumeProjectTasks(projectId)
+  },
+  {
+    immediate: true
+  }
+)
 
 useProjectVersionUpdateTracking(
   computed(() => props.projectId),

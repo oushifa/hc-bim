@@ -652,7 +652,6 @@ import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import { useApiOrigin } from '~~/composables/env'
 import { useFileDownload } from '~~/lib/core/composables/fileUpload'
-import { useFileImportApi } from '~~/lib/core/composables/fileImport'
 import { ensureError } from '@speckle/shared'
 import { useModelLibraryApi } from '~~/lib/projects/composables/modelLibrary'
 import WorkbenchUploadSyncProjectSubscriber from '~~/components/singleton/WorkbenchUploadSyncProjectSubscriber.vue'
@@ -771,11 +770,10 @@ const { downloadWithAuth } = useFileDownload()
 const apiOrigin = useApiOrigin()
 const authToken = useAuthCookie()
 const { triggerNotification } = useGlobalToast()
-const { uploadFile: uploadModelLibraryFile } = useModelLibraryApi()
-const { importFile: importModelFile } = useFileImportApi()
+const { ensureModel } = useModelLibraryApi()
 const updateModel = useUpdateModel()
 const deleteModel = useDeleteModel()
-const { tasks, registerPendingUpload, isModelSyncing, runFullModelSync } =
+const { tasks, uploadModelFile, isModelSyncing, runFullModelSync } =
   useWorkbenchUploadSync()
 const modelLibraryFileInput = ref<HTMLInputElement | null>(null)
 const creatingModel = ref(false)
@@ -878,20 +876,6 @@ const openVersionFilePicker = (model: Model) => {
   versionFileInput.value?.click()
 }
 
-const registerSyncTaskForUpload = (params: {
-  projectId: string
-  modelId: string
-  fileName: string
-  uploadId?: string | null
-}) => {
-  registerPendingUpload({
-    projectId: params.projectId,
-    modelId: params.modelId,
-    fileName: params.fileName,
-    uploadId: params.uploadId || null
-  })
-}
-
 const submitCreateModel = async () => {
   const file = selectedCreateModelFile.value
   const modelName = sanitizeModelName(createModelName.value || '')
@@ -910,30 +894,24 @@ const submitCreateModel = async () => {
   createModelProgress.value = 0
 
   try {
-    const result = await uploadModelLibraryFile(
-      {
-        file,
-        modelName,
-        modelDescription: createModelDescription.value.trim() || undefined
-      },
-      {
-        onProgress: (percentage) => {
-          createModelProgress.value = percentage
-        }
+    const ensured = await ensureModel({
+      name: modelName,
+      description: createModelDescription.value.trim() || undefined
+    })
+
+    await uploadModelFile({
+      projectId: ensured.projectId,
+      modelId: ensured.model.id,
+      file,
+      onProgress: (percentage) => {
+        createModelProgress.value = percentage
       }
-    )
+    })
 
     triggerNotification({
       type: ToastNotificationType.Success,
       title: '模型已提交到模型库',
-      description: `模型 ${result.imported.modelName} 已开始导入`
-    })
-
-    registerSyncTaskForUpload({
-      projectId: result.imported.projectId,
-      modelId: result.imported.modelId,
-      fileName: file.name,
-      uploadId: result.imported.fileId || result.prepared.fileId || null
+      description: `模型 ${ensured.model.name} 已开始上传和处理`
     })
 
     resetCreateModelDialogState()
@@ -953,33 +931,19 @@ const uploadNewVersion = async (model: Model, file: File) => {
   uploadingModelId.value = model.id
 
   try {
-    await importModelFile(
-      {
-        file,
-        projectId: model.projectId,
-        apiOrigin,
-        authToken: authToken.value || '',
-        modelName: model.title,
-        modelId: model.id
-      },
-      {
-        onProgress: () => {
-          // 标题状态只展示“上传中”，不额外展示百分比
-        }
+    await uploadModelFile({
+      projectId: model.projectId,
+      modelId: model.id,
+      file,
+      onProgress: () => {
+        // 标题状态只展示“上传中”，不额外展示百分比
       }
-    )
+    })
 
     triggerNotification({
       type: ToastNotificationType.Success,
       title: '新版本已提交',
       description: `模型 ${model.title} 已开始处理并等待同步中海`
-    })
-
-    registerSyncTaskForUpload({
-      projectId: model.projectId,
-      modelId: model.id,
-      fileName: file.name,
-      uploadId: null
     })
 
     scheduleRefreshModels()
@@ -1051,7 +1015,7 @@ const getModelRuntimeStatus = (model: Model) => {
 
   if (
     latestTask &&
-    ['pending_version_created', 'matched', 'error'].includes(latestTask.status)
+    ['speckle_converting', 'failed'].includes(latestTask.status)
   ) {
     return '待同步'
   }

@@ -1,5 +1,18 @@
 <template>
   <div class="h-full flex flex-col bg-[#E7EBEB] overflow-hidden">
+    <WorkbenchUploadSyncProjectSubscriber
+      v-for="projectId in syncRefreshProjectIds"
+      :key="projectId"
+      :project-id="projectId"
+      :on-version-update="scheduleRefreshUserModels"
+    />
+    <input
+      ref="uploadFileInput"
+      type="file"
+      class="hidden"
+      aria-label="选择要上传的孪生模型文件"
+      @change="onUploadFileSelected"
+    />
     <!-- Top Filters -->
     <div
       class="bg-white/80 backdrop-blur-md p-4 rounded-[26px] shadow-sm mb-3 shrink-0 flex flex-col space-y-4 relative z-20"
@@ -236,7 +249,19 @@
         </template>
 
         <div class="flex-1 flex justify-end">
-          <!-- 用户模型下批量下架功能已隐藏 -->
+          <button
+            v-if="activeTab === 'user' && hasModelOp('canUpload')"
+            type="button"
+            class="px-4 py-2 rounded-[10px] text-sm font-medium text-white bg-[#00b4b6] hover:bg-[#009a9c] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            :disabled="uploadingTwinModel"
+            @click="openUploadFilePicker"
+          >
+            {{
+              uploadingTwinModel
+                ? uploadButtonText
+                : '上传模型'
+            }}
+          </button>
         </div>
       </div>
     </div>
@@ -1052,13 +1077,322 @@ import {
   EllipsisHorizontalIcon,
   XMarkIcon
 } from '@heroicons/vue/24/outline'
+import { ensureError } from '@speckle/shared'
+import WorkbenchUploadSyncProjectSubscriber from '~~/components/singleton/WorkbenchUploadSyncProjectSubscriber.vue'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
+import { useGlobalToast } from '~~/lib/common/composables/toast'
+import { useModelLibraryApi } from '~~/lib/projects/composables/modelLibrary'
+import { useWorkbenchUploadSync } from '~~/lib/projects/composables/workbenchUploadSync'
+import { sanitizeModelName } from '~~/lib/projects/helpers/models'
 
 const { ensureLoaded: ensureUserPermsLoaded, hasModelOp } = useUserPermissions()
 void ensureUserPermsLoaded()
+const { triggerNotification } = useGlobalToast()
+const { ensureModel } = useModelLibraryApi()
+const { uploadModelFile } = useWorkbenchUploadSync()
 
 // 使用插件提供的 $dtpFetch
 const { $dtpFetch } = useNuxtApp()
+const dtpFetch = $dtpFetch as <T = unknown>(
+  request: string,
+  options?: {
+    method?: string
+    headers?: HeadersInit
+    body?: BodyInit | Record<string, unknown> | null
+    prefix?: string
+  }
+) => Promise<T>
+
+const uploadFileInput = ref<HTMLInputElement | null>(null)
+const uploadingTwinModel = ref(false)
+const uploadProgress = ref<number | null>(null)
+const syncRefreshProjectIdSet = ref<Set<string>>(new Set())
+
+const LIGHT_MODEL_EXTENSIONS = new Set(['ifc', 'rvt'])
+const DTP_MIN_NON_LAST_CHUNK_SIZE = 8 * 1024 * 1024
+const DTP_MAX_NON_LAST_CHUNK_SIZE = 10 * 1024 * 1024
+const DTP_TARGET_NON_LAST_CHUNK_SIZE = 9 * 1024 * 1024
+
+const syncRefreshProjectIds = computed(() =>
+  Array.from(syncRefreshProjectIdSet.value).filter((id) => !!id)
+)
+
+const uploadButtonText = computed(() => {
+  if (!uploadingTwinModel.value) return '上传模型'
+  if (typeof uploadProgress.value === 'number') {
+    return `上传中 ${Math.round(uploadProgress.value)}%`
+  }
+  return '上传中'
+})
+
+const getFileExtension = (fileName: string) => {
+  const match = fileName.toLowerCase().match(/\.([^.]+)$/)
+  return match?.[1] || ''
+}
+
+const getFileBaseName = (fileName: string) =>
+  fileName.replace(/\.[^.]+$/, '').trim() || fileName.trim()
+
+const isLightModelFile = (fileName: string) =>
+  LIGHT_MODEL_EXTENSIONS.has(getFileExtension(fileName))
+
+const resetUploadPicker = () => {
+  uploadingTwinModel.value = false
+  uploadProgress.value = null
+  if (uploadFileInput.value) {
+    uploadFileInput.value.value = ''
+  }
+}
+
+const openUploadFilePicker = () => {
+  if (uploadingTwinModel.value) return
+  uploadFileInput.value?.click()
+}
+
+const addSyncRefreshProjectId = (projectId: string) => {
+  if (!projectId) return
+  const next = new Set(syncRefreshProjectIdSet.value)
+  next.add(projectId)
+  syncRefreshProjectIdSet.value = next
+}
+
+let refreshUserModelsTimer: ReturnType<typeof setTimeout> | null = null
+let refreshUserModelsBurstTimers: ReturnType<typeof setTimeout>[] = []
+
+const scheduleRefreshUserModels = () => {
+  if (refreshUserModelsTimer) {
+    clearTimeout(refreshUserModelsTimer)
+  }
+
+  refreshUserModelsTimer = setTimeout(() => {
+    if (activeTab.value === 'user') {
+      void fetchUserModels()
+    }
+  }, 200)
+}
+
+const scheduleRefreshUserModelsBurst = () => {
+  refreshUserModelsBurstTimers.forEach((timer) => clearTimeout(timer))
+  refreshUserModelsBurstTimers = [2000, 5000, 10000].map((delay) =>
+    setTimeout(() => {
+      if (activeTab.value === 'user') {
+        void fetchUserModels()
+      }
+    }, delay)
+  )
+}
+
+const resolveDirectUploadChunkPlan = (fileSize: number) => {
+  if (fileSize <= DTP_MAX_NON_LAST_CHUNK_SIZE) {
+    return [
+      {
+        part: 0,
+        start: 0,
+        end: fileSize,
+        size: fileSize,
+        lastChunk: true,
+        totalPart: 1
+      }
+    ]
+  }
+
+  const sizes: number[] = []
+  let remaining = fileSize
+
+  while (remaining > DTP_MAX_NON_LAST_CHUNK_SIZE) {
+    sizes.push(DTP_TARGET_NON_LAST_CHUNK_SIZE)
+    remaining -= DTP_TARGET_NON_LAST_CHUNK_SIZE
+  }
+
+  sizes.push(remaining)
+
+  if (
+    sizes.length > 1 &&
+    sizes
+      .slice(0, -1)
+      .some(
+        (size) =>
+          size <= DTP_MIN_NON_LAST_CHUNK_SIZE || size >= DTP_MAX_NON_LAST_CHUNK_SIZE
+      )
+  ) {
+    throw new Error('模型文件分片大小不符合 DTP 上传要求')
+  }
+
+  let offset = 0
+  return sizes.map((size, part) => {
+    const start = offset
+    const end = start + size
+    offset = end
+
+    return {
+      part,
+      start,
+      end,
+      size: end - start,
+      lastChunk: part === sizes.length - 1,
+      totalPart: sizes.length
+    }
+  })
+}
+
+const uploadFileChunkToDtp = async (params: {
+  uploadUrl: string
+  uploadToken: string
+  uploadPathPrefix: string
+  file: File
+}) => {
+  const { uploadUrl, uploadToken, uploadPathPrefix, file } = params
+  const chunkPlan = resolveDirectUploadChunkPlan(file.size)
+  const assetName = getFileBaseName(file.name)
+  const path = `${uploadPathPrefix}${file.name}`
+
+  let finalResult: {
+    assetId?: string
+    seedId?: string
+    assetName?: string
+  } | null = null
+
+  for (const chunkMeta of chunkPlan) {
+    const chunk = file.slice(chunkMeta.start, chunkMeta.end)
+    const formData = new FormData()
+    formData.append('path', path)
+    formData.append('size', String(chunk.size))
+    formData.append('totalSize', String(file.size))
+    formData.append('offset', String(chunkMeta.start))
+    formData.append('totalPart', String(chunkMeta.totalPart))
+    formData.append('part', String(chunkMeta.part))
+    formData.append('lastChunk', String(chunkMeta.lastChunk))
+    formData.append('file', chunk, file.name)
+    formData.append('assetName', assetName)
+    formData.append('folderId', '')
+
+    const response = (await dtpFetch(uploadUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${uploadToken}`
+      },
+      body: formData,
+      prefix: '/__dtp-static'
+    })) as {
+      result?: {
+        assetId?: string
+        seedId?: string
+        assetName?: string
+      }
+    }
+
+    uploadProgress.value = ((chunkMeta.end / file.size) * 100) || 100
+
+    if (chunkMeta.lastChunk) {
+      finalResult = response?.result || null
+    }
+  }
+
+  return finalResult
+}
+
+const uploadTwinModelDirectly = async (file: File) => {
+  const configResponse = (await dtpFetch('/v1/asset/model/upload/config', {
+    method: 'GET'
+  })) as {
+    results?: {
+      uploadUrl?: string
+      uploadUrlV2?: string
+      uploadPathPrefix?: string
+      uploadToken?: string
+    }
+    result?: {
+      uploadUrl?: string
+      uploadUrlV2?: string
+      uploadPathPrefix?: string
+      uploadToken?: string
+    }
+  }
+
+  const config = configResponse.results || configResponse.result
+  const uploadUrl = config?.uploadUrlV2 || config?.uploadUrl
+  const uploadPathPrefix = config?.uploadPathPrefix
+  const uploadToken = config?.uploadToken
+
+  if (!uploadUrl || !uploadPathPrefix || !uploadToken) {
+    throw new Error('获取孪生模型上传配置失败')
+  }
+
+  const result = await uploadFileChunkToDtp({
+    uploadUrl,
+    uploadToken,
+    uploadPathPrefix,
+    file
+  })
+
+  if (!result?.assetId || !result?.seedId) {
+    throw new Error('孪生模型上传完成，但未返回模型标识')
+  }
+
+  triggerNotification({
+    type: ToastNotificationType.Success,
+    title: '模型上传成功',
+    description: `${file.name} 已同步到孪生模型列表`
+  })
+}
+
+const uploadTwinModelThroughLightModelFlow = async (file: File) => {
+  const rawName = sanitizeModelName(getFileBaseName(file.name))
+  const modelName = rawName.length ? rawName : getFileBaseName(file.name)
+  const ensured = await ensureModel({
+    name: modelName
+  })
+
+  addSyncRefreshProjectId(ensured.projectId)
+
+  await uploadModelFile({
+    projectId: ensured.projectId,
+    modelId: ensured.model.id,
+    file,
+    onProgress: (percentage) => {
+      uploadProgress.value = percentage
+    }
+  })
+
+  triggerNotification({
+    type: ToastNotificationType.Success,
+    title: '模型已提交',
+    description: `${modelName} 已开始上传和同步`
+  })
+}
+
+const handleTwinFileUpload = async (file: File) => {
+  uploadingTwinModel.value = true
+  uploadProgress.value = 0
+
+  try {
+    if (isLightModelFile(file.name)) {
+      await uploadTwinModelThroughLightModelFlow(file)
+    } else {
+      await uploadTwinModelDirectly(file)
+    }
+
+    await fetchUserModels()
+    scheduleRefreshUserModels()
+    scheduleRefreshUserModelsBurst()
+  } catch (error) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '模型上传失败',
+      description: ensureError(error).message
+    })
+  } finally {
+    resetUploadPicker()
+  }
+}
+
+const onUploadFileSelected = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  void handleTwinFileUpload(file)
+}
 
 // 格式化文件大小
 const formatFileSize = (bytes: number): string => {
@@ -1749,6 +2083,10 @@ onUnmounted(() => {
   if (handleClickOutside) {
     document.removeEventListener('click', handleClickOutside)
   }
+  if (refreshUserModelsTimer) {
+    clearTimeout(refreshUserModelsTimer)
+  }
+  refreshUserModelsBurstTimers.forEach((timer) => clearTimeout(timer))
 })
 
 const activeTab = ref<'user' | 'official'>('user')
