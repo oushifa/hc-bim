@@ -5,7 +5,6 @@
     </ClientOnly>
     <SingletonFileUploadErrorDialog />
     <SingletonAppErrorStateManager />
-    <SingletonWorkbenchUploadSyncManager />
   </div>
   <div v-else />
 </template>

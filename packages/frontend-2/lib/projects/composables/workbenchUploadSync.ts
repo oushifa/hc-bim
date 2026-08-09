@@ -1,5 +1,4 @@
 import { useApolloClient } from '@vue/apollo-composable'
-import { useStorage } from '@vueuse/core'
 import type { OnProjectVersionsUpdateSubscription } from '~/lib/common/generated/gql/graphql'
 import {
   latestModelsPaginationQuery,
@@ -9,9 +8,9 @@ import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useScopedState } from '~~/lib/common/composables/scopedState'
 
-const WORKBENCH_UPLOAD_SYNC_TASK_STORAGE_KEY = 'workbench-upload-sync-tasks'
-const TASK_POLL_INTERVAL = 3000
-const AUTO_RETRY_LIMIT = 2
+const LOCAL_UPLOAD_RUNTIME_END = 20
+const RVT_CONVERSION_RUNTIME_START = 20
+const RVT_CONVERSION_RUNTIME_END = 60
 
 export type WorkbenchUploadSyncTaskStatus =
   | 'waiting_upload'
@@ -35,6 +34,9 @@ export type WorkbenchUploadSyncTask = {
   assetName: string | null
   transformTaskId: string | null
   status: WorkbenchUploadSyncTaskStatus
+  progressPercent: number | null
+  progressPhase: string | null
+  progressMessage: string | null
   error: string | null
   errorCode: string | null
   retriable: boolean
@@ -54,6 +56,9 @@ type ServerModelSyncTask = {
   fileType: string | null
   fileSize: number | null
   status: WorkbenchUploadSyncTaskStatus
+  progressPercent: number | null
+  progressPhase: string | null
+  progressMessage: string | null
   seedId: string | null
   assetId: string | null
   assetName: string | null
@@ -76,15 +81,18 @@ type CreateUploadTaskResponse = {
 
 const FINAL_STATUSES: WorkbenchUploadSyncTaskStatus[] = ['succeeded', 'failed']
 const CLIENT_UPLOAD_ONLY_STATUSES: WorkbenchUploadSyncTaskStatus[] = ['waiting_upload']
+const RVT_FILE_NAME_RE = /\.rvt$/i
+
+export type WorkbenchModelSyncRuntimeProgress = {
+  percent: number
+  phase: string | null
+  message: string | null
+}
 
 const useWorkbenchUploadSyncTaskMap = () => {
-  const serverFallback = ref<Record<string, WorkbenchUploadSyncTask>>({})
-  return import.meta.server
-    ? serverFallback
-    : useStorage<Record<string, WorkbenchUploadSyncTask>>(
-        WORKBENCH_UPLOAD_SYNC_TASK_STORAGE_KEY,
-        {}
-      )
+  return useScopedState('workbenchUploadSyncTaskMap', () =>
+    ref<Record<string, WorkbenchUploadSyncTask>>({})
+  )
 }
 
 const useWorkbenchUploadSyncEventSources = () =>
@@ -92,13 +100,52 @@ const useWorkbenchUploadSyncEventSources = () =>
     ref<Record<string, EventSource | null>>({})
   )
 
-const useWorkbenchUploadSyncTaskPollers = () =>
-  useScopedState('workbenchUploadSyncTaskPollers', () =>
-    ref<Record<string, number | null>>({})
+const useWorkbenchUploadSyncPageEventSources = () =>
+  useScopedState('workbenchUploadSyncPageEventSources', () =>
+    ref<Record<string, EventSource | null>>({})
   )
 
 const buildSyncingModelKey = (projectId: string, modelId: string) =>
   `${projectId}:${modelId}`
+
+const buildVisibleTaskSubscriptionKey = (projectId: string, modelIds: string[]) =>
+  `${projectId}:${[...modelIds].sort().join(',')}`
+
+const clampProgressPercent = (progress: number | null | undefined) => {
+  if (typeof progress !== 'number' || Number.isNaN(progress)) return null
+  return Math.max(0, Math.min(100, progress))
+}
+
+export const mapClientUploadProgressToRuntimePercent = (
+  progress: number | null | undefined
+) => {
+  const normalizedProgress = clampProgressPercent(progress)
+  if (normalizedProgress === null) return null
+
+  return Math.min(
+    LOCAL_UPLOAD_RUNTIME_END,
+    Math.round((normalizedProgress / 100) * LOCAL_UPLOAD_RUNTIME_END)
+  )
+}
+
+export const mapRvtConversionProgressToRuntimePercent = (
+  progress: number | null | undefined
+) => {
+  const normalizedProgress = clampProgressPercent(progress)
+  if (normalizedProgress === null) return null
+
+  return Math.min(
+    RVT_CONVERSION_RUNTIME_END,
+    Math.round(
+      RVT_CONVERSION_RUNTIME_START +
+        (normalizedProgress / 100) *
+          (RVT_CONVERSION_RUNTIME_END - RVT_CONVERSION_RUNTIME_START)
+    )
+  )
+}
+
+const isRvtSyncTask = (task: Pick<WorkbenchUploadSyncTask, 'status' | 'fileName'>) =>
+  task.status === 'speckle_converting' && RVT_FILE_NAME_RE.test(task.fileName || '')
 
 const mapServerTask = (task: ServerModelSyncTask): WorkbenchUploadSyncTask => ({
   id: task.id,
@@ -112,6 +159,9 @@ const mapServerTask = (task: ServerModelSyncTask): WorkbenchUploadSyncTask => ({
   assetName: task.assetName,
   transformTaskId: task.transformTaskId,
   status: task.status,
+  progressPercent: clampProgressPercent(task.progressPercent),
+  progressPhase: task.progressPhase,
+  progressMessage: task.progressMessage,
   error: task.error,
   errorCode: task.errorCode,
   retriable: task.retriable,
@@ -129,7 +179,7 @@ export const useWorkbenchUploadSync = () => {
 
   const taskMap = useWorkbenchUploadSyncTaskMap()
   const eventSources = useWorkbenchUploadSyncEventSources()
-  const taskPollers = useWorkbenchUploadSyncTaskPollers()
+  const pageEventSources = useWorkbenchUploadSyncPageEventSources()
 
   const getHeaders = () =>
     authToken.value
@@ -151,18 +201,44 @@ export const useWorkbenchUploadSync = () => {
       .join('|')
   )
 
-  const canResumeServerExecution = (task: Pick<WorkbenchUploadSyncTask, 'status'>) =>
-    !FINAL_STATUSES.includes(task.status) &&
-    !CLIENT_UPLOAD_ONLY_STATUSES.includes(task.status)
+  const canResumeServerExecution = (
+    task: Pick<WorkbenchUploadSyncTask, 'status' | 'retriable'>
+  ) =>
+    (task.status === 'failed' && task.retriable) ||
+    (!FINAL_STATUSES.includes(task.status) &&
+      !CLIENT_UPLOAD_ONLY_STATUSES.includes(task.status))
 
-  const canAutoRetryTask = (
-    task: Pick<WorkbenchUploadSyncTask, 'status' | 'retriable' | 'retryCount'>
-  ) => task.status === 'failed' && task.retriable && task.retryCount < AUTO_RETRY_LIMIT
+  const getLatestTask = (params: { projectId: string; modelId: string }) =>
+    tasks.value
+      .filter(
+        (task) =>
+          task.modelId &&
+          buildSyncingModelKey(task.projectId, task.modelId) ===
+            buildSyncingModelKey(params.projectId, params.modelId)
+      )
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] || null
+
+  const getModelRuntimeProgress = (params: {
+    projectId: string
+    modelId: string
+  }): WorkbenchModelSyncRuntimeProgress | null => {
+    const task = getLatestTask(params)
+    if (!task || !isRvtSyncTask(task)) return null
+
+    const percent = mapRvtConversionProgressToRuntimePercent(task.progressPercent)
+    if (percent === null) return null
+
+    return {
+      percent,
+      phase: task.progressPhase,
+      message: task.progressMessage
+    }
+  }
 
   const activeProjectIds = computed(() => {
     const projectIds = new Set<string>()
     for (const task of tasks.value) {
-      if (!canResumeServerExecution(task) && !canAutoRetryTask(task)) continue
+      if (!canResumeServerExecution(task)) continue
       projectIds.add(task.projectId)
     }
     return [...projectIds]
@@ -191,14 +267,12 @@ export const useWorkbenchUploadSync = () => {
     }
   }
 
-  const stopTaskPolling = (taskId: string) => {
-    const current = taskPollers.value[taskId]
-    if (current !== null && current !== undefined) {
-      window.clearInterval(current)
-    }
-    taskPollers.value = {
-      ...taskPollers.value,
-      [taskId]: null
+  const stopVisibleTaskSubscription = (subscriptionKey: string) => {
+    const source = pageEventSources.value[subscriptionKey]
+    source?.close()
+    pageEventSources.value = {
+      ...pageEventSources.value,
+      [subscriptionKey]: null
     }
   }
 
@@ -257,7 +331,6 @@ export const useWorkbenchUploadSync = () => {
 
     if (nextTask.status === 'succeeded') {
       stopTaskEventSource(nextTask.id)
-      stopTaskPolling(nextTask.id)
       await refreshModelList()
       removeTask(nextTask.id)
 
@@ -271,9 +344,10 @@ export const useWorkbenchUploadSync = () => {
     }
 
     if (nextTask.status === 'failed') {
-      stopTaskEventSource(nextTask.id)
-      stopTaskPolling(nextTask.id)
-      if (!options?.silentFailure && !canAutoRetryTask(nextTask)) {
+      if (!nextTask.retriable) {
+        stopTaskEventSource(nextTask.id)
+      }
+      if (!options?.silentFailure && !nextTask.retriable) {
         triggerNotification({
           type: ToastNotificationType.Danger,
           title: '模型同步失败',
@@ -285,45 +359,10 @@ export const useWorkbenchUploadSync = () => {
     return nextTask
   }
 
-  const startTaskPolling = (task: WorkbenchUploadSyncTask) => {
-    if (import.meta.server) return
-    if (!canResumeServerExecution(task)) return
-    if (taskPollers.value[task.id]) return
-
-    const timer = window.setInterval(async () => {
-      try {
-        if (!task.modelId) return
-        const response = await fetchTask({
-          projectId: task.projectId,
-          modelId: task.modelId,
-          taskId: task.id
-        })
-        await handleTaskUpdate(response.data, {
-          silentSuccess: true
-        })
-      } catch (error) {
-        logger.warn(
-          {
-            taskId: task.id,
-            error
-          },
-          '轮询模型同步任务失败'
-        )
-      }
-    }, TASK_POLL_INTERVAL)
-
-    taskPollers.value = {
-      ...taskPollers.value,
-      [task.id]: timer
-    }
-  }
-
   const subscribeTask = (task: WorkbenchUploadSyncTask) => {
     if (import.meta.server) return
     if (!task.modelId || !canResumeServerExecution(task)) return
     if (eventSources.value[task.id]) return
-
-    stopTaskPolling(task.id)
 
     const streamUrl = `/api/projects/${task.projectId}/models/${task.modelId}/model-sync/tasks/${task.id}/events`
     const source = new EventSource(streamUrl, {
@@ -355,7 +394,6 @@ export const useWorkbenchUploadSync = () => {
     })
     source.onerror = () => {
       stopTaskEventSource(task.id)
-      startTaskPolling(task)
     }
 
     eventSources.value = {
@@ -364,29 +402,116 @@ export const useWorkbenchUploadSync = () => {
     }
   }
 
-  const fetchTask = async (params: {
+  const fetchProjectTaskSnapshot = async (params: {
     projectId: string
-    modelId: string
-    taskId: string
+    modelIds: string[]
   }) => {
-    return await $fetch<{ data: ServerModelSyncTask }>(
-      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/model-sync/tasks/${params.taskId}`,
+    return await $fetch<{ data: ServerModelSyncTask[] }>(
+      `${apiOrigin}/api/v1/projects/${params.projectId}/model-sync/tasks/snapshot`,
       {
-        headers: getHeaders()
+        headers: getHeaders(),
+        query: {
+          modelIds: params.modelIds.join(',')
+        }
       }
     )
   }
 
-  const fetchProjectResumableTasks = async (params: { projectId: string }) => {
-    return await $fetch<{ data: ServerModelSyncTask[] }>(
-      `${apiOrigin}/api/v1/projects/${params.projectId}/model-sync/tasks`,
-      {
-        headers: getHeaders(),
-        query: {
-          status: 'resumable'
-        }
-      }
+  const replaceTasksForModels = (params: {
+    projectId: string
+    modelIds: string[]
+    serverTasks: ServerModelSyncTask[]
+  }) => {
+    const targetKeys = new Set(
+      params.modelIds.map((modelId) => buildSyncingModelKey(params.projectId, modelId))
     )
+
+    const nextMap = Object.fromEntries(
+      Object.entries(taskMap.value).filter(([, task]) => {
+        if (!task.modelId) return true
+        return !targetKeys.has(buildSyncingModelKey(task.projectId, task.modelId))
+      })
+    )
+
+    for (const serverTask of params.serverTasks) {
+      const mappedTask = mapServerTask(serverTask)
+      if (mappedTask.status === 'succeeded') continue
+      nextMap[mappedTask.id] = mappedTask
+    }
+
+    taskMap.value = nextMap
+  }
+
+  const subscribeVisibleTasks = (params: { projectId: string; modelIds: string[] }) => {
+    if (import.meta.server) return
+    const normalizedModelIds = [...new Set(params.modelIds)].filter(Boolean).sort()
+    if (!normalizedModelIds.length) return
+
+    const subscriptionKey = buildVisibleTaskSubscriptionKey(
+      params.projectId,
+      normalizedModelIds
+    )
+    if (pageEventSources.value[subscriptionKey]) return
+
+    const streamUrl = `/api/projects/${
+      params.projectId
+    }/model-sync/tasks/events?modelIds=${encodeURIComponent(
+      normalizedModelIds.join(',')
+    )}`
+    const source = new EventSource(streamUrl, {
+      withCredentials: true
+    })
+
+    source.addEventListener('snapshot', (event) => {
+      try {
+        const payload = JSON.parse((event as MessageEvent<string>).data) as {
+          projectId: string
+          tasks: ServerModelSyncTask[]
+        }
+        replaceTasksForModels({
+          projectId: payload.projectId,
+          modelIds: normalizedModelIds,
+          serverTasks: payload.tasks
+        })
+      } catch (error) {
+        logger.warn(
+          {
+            projectId: params.projectId,
+            error
+          },
+          '解析模型同步页面快照失败'
+        )
+      }
+    })
+
+    source.addEventListener('update', (event) => {
+      try {
+        const payload = JSON.parse(
+          (event as MessageEvent<string>).data
+        ) as ServerModelSyncTask
+        void handleTaskUpdate(payload, {
+          silentSuccess: true,
+          silentFailure: true
+        })
+      } catch (error) {
+        logger.warn(
+          {
+            projectId: params.projectId,
+            error
+          },
+          '解析模型同步页面 SSE 消息失败'
+        )
+      }
+    })
+
+    source.onerror = () => {
+      stopVisibleTaskSubscription(subscriptionKey)
+    }
+
+    pageEventSources.value = {
+      ...pageEventSources.value,
+      [subscriptionKey]: source
+    }
   }
 
   const createUploadTask = async (params: {
@@ -483,7 +608,7 @@ export const useWorkbenchUploadSync = () => {
     const task = taskMap.value[taskId]
     if (!task?.modelId) return false
 
-    if (canAutoRetryTask(task)) {
+    if (task.status === 'failed') {
       const response = await retryServerTask({
         projectId: task.projectId,
         modelId: task.modelId,
@@ -502,114 +627,47 @@ export const useWorkbenchUploadSync = () => {
     })
   }
 
-  const autoRetryTask = async (task: WorkbenchUploadSyncTask) => {
-    if (!task.modelId || !canAutoRetryTask(task)) return false
+  const syncVisibleTasks = async (
+    targets: Array<{ projectId: string; modelIds: string[] }>
+  ) => {
+    const normalizedTargets = targets
+      .map((target) => ({
+        projectId: target.projectId,
+        modelIds: [...new Set(target.modelIds)].filter(Boolean).sort()
+      }))
+      .filter((target) => target.projectId && target.modelIds.length)
 
-    const response = await retryServerTask({
-      projectId: task.projectId,
-      modelId: task.modelId,
-      taskId: task.id
-    })
-    const nextTask = await handleTaskUpdate(response.data, {
-      silentSuccess: true
-    })
-    subscribeTask(nextTask)
-    return true
-  }
-
-  const resumeProjectTasks = async (projectId: string) => {
-    try {
-      const response = await fetchProjectResumableTasks({ projectId })
-      const resumableTasks = response.data
-      const resumableTaskIds = new Set(resumableTasks.map((task) => task.id))
-
-      for (const serverTask of resumableTasks) {
-        const mappedTask = mapServerTask(serverTask)
-        if (canAutoRetryTask(mappedTask)) {
-          try {
-            await autoRetryTask(mappedTask)
-            continue
-          } catch (error) {
-            logger.warn(
-              {
-                projectId,
-                taskId: mappedTask.id,
-                error
-              },
-              '自动重试模型同步任务失败'
-            )
-          }
-        }
-
-        const nextTask = await handleTaskUpdate(serverTask, {
-          silentSuccess: true,
-          silentFailure: true
-        })
-        subscribeTask(nextTask)
-      }
-
-      const localProjectTasks = tasks.value.filter(
-        (task) => task.projectId === projectId && task.status !== 'succeeded'
+    const activeKeys = new Set(
+      normalizedTargets.map((target) =>
+        buildVisibleTaskSubscriptionKey(target.projectId, target.modelIds)
       )
+    )
 
-      for (const task of localProjectTasks) {
-        if (resumableTaskIds.has(task.id)) continue
-
-        if (CLIENT_UPLOAD_ONLY_STATUSES.includes(task.status)) {
-          stopTaskEventSource(task.id)
-          stopTaskPolling(task.id)
-          removeTask(task.id)
-          continue
-        }
-
-        if (!task.modelId) continue
-
-        try {
-          const taskResponse = await fetchTask({
-            projectId: task.projectId,
-            modelId: task.modelId,
-            taskId: task.id
-          })
-          const nextTask = await handleTaskUpdate(taskResponse.data, {
-            silentSuccess: true,
-            silentFailure: true
-          })
-
-          if (canAutoRetryTask(nextTask)) {
-            await autoRetryTask(nextTask)
-            continue
-          }
-
-          subscribeTask(nextTask)
-        } catch (error) {
-          logger.warn(
-            {
-              projectId,
-              taskId: task.id,
-              error
-            },
-            '补偿查询模型同步任务失败'
-          )
-        }
+    for (const subscriptionKey of Object.keys(pageEventSources.value)) {
+      if (!activeKeys.has(subscriptionKey)) {
+        stopVisibleTaskSubscription(subscriptionKey)
       }
-    } catch (error) {
-      logger.warn(
-        {
-          projectId,
-          error
-        },
-        '按项目恢复模型同步任务失败'
-      )
     }
-  }
 
-  const resumeInterruptedTasks = async (projectIds?: string[]) => {
-    const ids = projectIds?.length
-      ? [...new Set(projectIds)]
-      : [...new Set(tasks.value.map((task) => task.projectId))]
-
-    for (const projectId of ids) {
-      await resumeProjectTasks(projectId)
+    for (const target of normalizedTargets) {
+      try {
+        const response = await fetchProjectTaskSnapshot(target)
+        replaceTasksForModels({
+          projectId: target.projectId,
+          modelIds: target.modelIds,
+          serverTasks: response.data
+        })
+        subscribeVisibleTasks(target)
+      } catch (error) {
+        logger.warn(
+          {
+            projectId: target.projectId,
+            modelIds: target.modelIds,
+            error
+          },
+          '同步当前页模型任务快照失败'
+        )
+      }
     }
   }
 
@@ -674,11 +732,12 @@ export const useWorkbenchUploadSync = () => {
     tasks,
     tasksSignature,
     activeProjectIds,
+    getLatestTask,
+    getModelRuntimeProgress,
     uploadModelFile,
     retryTask,
     executeTask: retryTask,
-    resumeProjectTasks,
-    resumeInterruptedTasks,
+    syncVisibleTasks,
     consumeVersionCreated,
     runFullModelSync,
     setModelSyncing,

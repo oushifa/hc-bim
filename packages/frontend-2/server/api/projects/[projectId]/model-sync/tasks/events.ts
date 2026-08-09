@@ -2,6 +2,7 @@ import {
   createError,
   defineEventHandler,
   getHeader,
+  getQuery,
   getRequestURL,
   getRouterParam,
   parseCookies
@@ -19,13 +20,13 @@ const readResponseText = async (response: Response) => {
 
 export default defineEventHandler(async (event) => {
   const projectId = getRouterParam(event, 'projectId')
-  const modelId = getRouterParam(event, 'modelId')
-  const taskId = getRouterParam(event, 'taskId')
+  const query = getQuery(event)
+  const modelIds = typeof query.modelIds === 'string' ? query.modelIds : ''
 
-  if (!projectId || !modelId || !taskId) {
+  if (!projectId || !modelIds) {
     throw createError({
       statusCode: 400,
-      statusMessage: 'Missing projectId, modelId or taskId'
+      statusMessage: 'Missing projectId or modelIds'
     })
   }
 
@@ -49,7 +50,9 @@ export default defineEventHandler(async (event) => {
   const abortController = new AbortController()
 
   const upstream = await fetch(
-    `${apiOrigin}/api/v1/projects/${projectId}/models/${modelId}/model-sync/tasks/${taskId}/events`,
+    `${apiOrigin}/api/v1/projects/${projectId}/model-sync/tasks/events?modelIds=${encodeURIComponent(
+      modelIds
+    )}`,
     {
       method: 'GET',
       headers: {

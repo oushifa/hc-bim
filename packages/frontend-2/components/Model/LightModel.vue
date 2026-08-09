@@ -235,6 +235,8 @@
                         <div v-if="getModelRuntimeStatus(model)" class="mt-1">
                           <CommonModelRuntimeProgressBar
                             :status="getModelRuntimeStatus(model)"
+                            :progress="getModelRuntimeProgress(model)"
+                            :progress-phase="getModelRuntimeProgressPhase(model)"
                           />
                         </div>
                       </button>
@@ -659,7 +661,10 @@ import {
   useDeleteModel,
   useUpdateModel
 } from '~~/lib/projects/composables/modelManagement'
-import { useWorkbenchUploadSync } from '~~/lib/projects/composables/workbenchUploadSync'
+import {
+  mapClientUploadProgressToRuntimePercent,
+  useWorkbenchUploadSync
+} from '~~/lib/projects/composables/workbenchUploadSync'
 import { sanitizeModelName } from '~~/lib/projects/helpers/models'
 import { FileUploadConvertedStatus } from '~~/lib/core/api/fileImport'
 import dayjs from 'dayjs'
@@ -692,6 +697,9 @@ interface Model {
     uploadComplete: boolean
     convertedStatus: number | null
     convertedMessage?: string | null
+    progressPercent?: number | null
+    progressPhase?: string | null
+    progressMessage?: string | null
   } | null
 }
 
@@ -709,6 +717,7 @@ const selectedUploadModel = ref<Model | null>(null)
 const versionFileInput = ref<HTMLInputElement | null>(null)
 const pendingVersionUploadModel = ref<Model | null>(null)
 const uploadingModelId = ref<string | null>(null)
+const uploadingModelProgress = ref<number | null>(null)
 const renameDialogOpen = ref(false)
 const renameTargetModel = ref<Model | null>(null)
 const renameModelName = ref('')
@@ -773,8 +782,14 @@ const { triggerNotification } = useGlobalToast()
 const { ensureModel } = useModelLibraryApi()
 const updateModel = useUpdateModel()
 const deleteModel = useDeleteModel()
-const { tasks, uploadModelFile, isModelSyncing, runFullModelSync } =
-  useWorkbenchUploadSync()
+const {
+  tasks,
+  uploadModelFile,
+  isModelSyncing,
+  runFullModelSync,
+  syncVisibleTasks,
+  getModelRuntimeProgress: getTaskRuntimeProgress
+} = useWorkbenchUploadSync()
 const modelLibraryFileInput = ref<HTMLInputElement | null>(null)
 const creatingModel = ref(false)
 const createModelProgress = ref(0)
@@ -929,14 +944,15 @@ const submitCreateModel = async () => {
 
 const uploadNewVersion = async (model: Model, file: File) => {
   uploadingModelId.value = model.id
+  uploadingModelProgress.value = 0
 
   try {
     await uploadModelFile({
       projectId: model.projectId,
       modelId: model.id,
       file,
-      onProgress: () => {
-        // 标题状态只展示“上传中”，不额外展示百分比
+      onProgress: (percentage) => {
+        uploadingModelProgress.value = percentage
       }
     })
 
@@ -955,6 +971,7 @@ const uploadNewVersion = async (model: Model, file: File) => {
     })
   } finally {
     uploadingModelId.value = null
+    uploadingModelProgress.value = null
     pendingVersionUploadModel.value = null
     if (versionFileInput.value) {
       versionFileInput.value.value = ''
@@ -1013,15 +1030,47 @@ const getModelRuntimeStatus = (model: Model) => {
       .filter((task) => task.projectId === model.projectId && task.modelId === model.id)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] || null
 
-  if (
-    latestTask &&
-    ['speckle_converting', 'failed'].includes(latestTask.status)
-  ) {
+  if (latestTask && ['speckle_converting', 'failed'].includes(latestTask.status)) {
     return '待同步'
   }
 
   return null
 }
+
+const mapIfcConversionProgressToRuntimePercent = (
+  progress: number | null | undefined
+) => {
+  if (typeof progress !== 'number' || Number.isNaN(progress)) return null
+
+  const normalizedProgress = Math.max(0, Math.min(100, progress))
+  const runtimeStart = 20
+  const runtimeEnd = 59
+
+  return Math.min(
+    runtimeEnd,
+    Math.round(runtimeStart + (normalizedProgress / 100) * (runtimeEnd - runtimeStart))
+  )
+}
+
+const getLocalUploadRuntimeProgress = (model: Model) => {
+  if (uploadingModelId.value !== model.id) return null
+  return mapClientUploadProgressToRuntimePercent(uploadingModelProgress.value)
+}
+
+const getModelRuntimeProgress = (model: Model) =>
+  getLocalUploadRuntimeProgress(model) ??
+  mapIfcConversionProgressToRuntimePercent(model.latestUpload?.progressPercent) ??
+  getTaskRuntimeProgress({
+    projectId: model.projectId,
+    modelId: model.id
+  })?.percent ??
+  null
+
+const getModelRuntimeProgressPhase = (model: Model) =>
+  getTaskRuntimeProgress({
+    projectId: model.projectId,
+    modelId: model.id
+  })?.phase ?? null
 
 const shouldShowSyncAction = (model: Model) => {
   const status = getModelRuntimeStatus(model)
@@ -1128,6 +1177,31 @@ const fetchModels = async (options?: { silent?: boolean }) => {
     }
   }
 }
+
+const visibleModelSyncTargets = computed(() => {
+  const modelIdsByProjectId = new Map<string, string[]>()
+  for (const model of models.value) {
+    const current = modelIdsByProjectId.get(model.projectId) || []
+    current.push(model.id)
+    modelIdsByProjectId.set(model.projectId, current)
+  }
+
+  return [...modelIdsByProjectId.entries()].map(([projectId, modelIds]) => ({
+    projectId,
+    modelIds
+  }))
+})
+
+watch(
+  visibleModelSyncTargets,
+  (targets) => {
+    void syncVisibleTasks(targets)
+  },
+  {
+    immediate: true,
+    deep: true
+  }
+)
 
 // Simple debounce
 let timeout: ReturnType<typeof setTimeout> | undefined

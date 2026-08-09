@@ -4,14 +4,14 @@
       <div
         class="absolute h-full inset-0 transition-[width]"
         :class="barClasses"
-        :style="`width: ${Math.floor(progress)}%`"
+        :style="`width: ${Math.floor(displayProgress)}%`"
       >
         <div v-if="soothing" class="absolute inset-0 model-runtime-soothing"></div>
       </div>
       <div
         class="absolute h-full inset-0 text-center text-[10px] leading-4 select-none"
       >
-        <span :class="textClasses">{{ Math.floor(progress) }}%</span>
+        <span :class="textClasses">{{ Math.floor(displayProgress) }}%</span>
       </div>
     </div>
   </div>
@@ -30,9 +30,11 @@ type RuntimeStatus =
 
 const props = defineProps<{
   status: RuntimeStatus
+  progress?: number | null
+  progressPhase?: string | null
 }>()
 
-const progress = ref(0)
+const displayProgress = ref(0)
 let timer: ReturnType<typeof setInterval> | null = null
 
 const stop = () => {
@@ -40,12 +42,35 @@ const stop = () => {
   timer = null
 }
 
+const realProgress = computed(() => {
+  if (typeof props.progress !== 'number' || Number.isNaN(props.progress)) return null
+  return Math.max(0, Math.min(100, props.progress))
+})
+
+const runtimePhaseStage = computed(() => {
+  switch (props.progressPhase) {
+    case 'acknowledged':
+      return { min: 20, max: 20, mode: 'hold' as const }
+    case 'opening':
+      return { min: 20, max: 25, mode: 'auto' as const }
+    case 'converting':
+    case 'converting_model':
+      return { min: 25, max: 58, mode: 'auto' as const }
+    case 'uploading_version':
+      return { min: 58, max: 60, mode: 'auto' as const }
+    case 'completed':
+      return { min: 60, max: 60, mode: 'hold' as const }
+    default:
+      return null
+  }
+})
+
 const stage = computed(() => {
   switch (props.status) {
     case '上传中':
-      return { min: 0, max: 25, mode: 'auto' as const }
+      return { min: 0, max: 20, mode: 'auto' as const }
     case '模型处理中':
-      return { min: 25, max: 60, mode: 'auto' as const }
+      return { min: 20, max: 20, mode: 'hold' as const }
     case '待同步':
       return { min: 60, max: 60, mode: 'error' as const }
     case '同步中':
@@ -102,37 +127,69 @@ const textClasses = computed(() => {
 
 const startAuto = (min: number, max: number) => {
   stop()
-  if (progress.value < min) progress.value = min
+  if (displayProgress.value < min) displayProgress.value = min
   timer = setInterval(() => {
-    const cur = progress.value
+    const cur = displayProgress.value
     const next = cur + (max - cur) * 0.08
-    progress.value = Math.min(max, Number(next.toFixed(2)))
-    if (progress.value >= max) stop()
+    displayProgress.value = Math.min(max, Number(next.toFixed(2)))
+    if (displayProgress.value >= max) stop()
   }, 250)
 }
 
 watch(
-  stage,
-  (s) => {
+  [stage, realProgress, runtimePhaseStage],
+  ([s, actualProgress, phaseStage]) => {
     if (!s) {
       stop()
-      progress.value = 0
+      displayProgress.value = 0
       return
     }
 
-    if (s.mode === 'done') {
+    const activeStage = phaseStage || s
+
+    if (actualProgress !== null) {
+      if (!phaseStage) {
+        stop()
+        displayProgress.value = actualProgress
+        return
+      }
+
+      const nextMin = Math.max(activeStage.min, actualProgress)
+      if (activeStage.mode === 'done' || nextMin >= activeStage.max) {
+        stop()
+        displayProgress.value = activeStage.mode === 'done' ? 100 : nextMin
+        return
+      }
+
       stop()
-      progress.value = 100
+      if (displayProgress.value < nextMin) {
+        displayProgress.value = nextMin
+      }
+      startAuto(nextMin, activeStage.max)
       return
     }
 
-    if (s.mode === 'error') {
+    if (activeStage.mode === 'done') {
       stop()
-      if (progress.value < s.min) progress.value = s.min
+      displayProgress.value = 100
       return
     }
 
-    startAuto(s.min, s.max)
+    if (activeStage.mode === 'error') {
+      stop()
+      if (displayProgress.value < activeStage.min)
+        displayProgress.value = activeStage.min
+      return
+    }
+
+    if (activeStage.mode === 'hold') {
+      stop()
+      if (displayProgress.value < activeStage.min)
+        displayProgress.value = activeStage.min
+      return
+    }
+
+    startAuto(activeStage.min, activeStage.max)
   },
   { immediate: true }
 )

@@ -277,6 +277,17 @@ export default defineNuxtPlugin(async (nuxtApp) => {
 
   // Unhandled error handler
   if (import.meta.client && window) {
+    if (import.meta.prod) {
+      const previousOnError = window.onerror
+
+      // Silence the browser's default uncaught error logging in production while
+      // still allowing our own transport pipeline below to record the failure.
+      window.onerror = (...args) => {
+        previousOnError?.(...args)
+        return true
+      }
+    }
+
     const unhandledHandler = (event: ErrorEvent | PromiseRejectionEvent) => {
       const handlers = transports.filter(
         (t): t is SetRequired<typeof t, 'onUnhandledError'> => !!t.onUnhandledError
@@ -289,6 +300,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
       handlers.forEach((handler) =>
         handler.onUnhandledError({ event, isUnhandledRejection, error, message })
       )
+
+      if (import.meta.prod && isUnhandledRejection) {
+        event.preventDefault()
+      }
     }
 
     window.addEventListener('error', unhandledHandler)

@@ -1,26 +1,27 @@
 <script setup lang="ts">
-import type { OnProjectVersionsUpdateSubscription } from '~/lib/common/generated/gql/graphql'
-import { ProjectVersionsUpdatedMessageType } from '~/lib/common/generated/gql/graphql'
+import type {
+  OnProjectPendingModelsUpdatedSubscription,
+  OnProjectPendingVersionsUpdatedSubscription,
+  OnProjectVersionsUpdateSubscription
+} from '~/lib/common/generated/gql/graphql'
+import {
+  ProjectPendingModelsUpdatedMessageType,
+  ProjectPendingVersionsUpdatedMessageType,
+  ProjectVersionsUpdatedMessageType
+} from '~/lib/common/generated/gql/graphql'
 import { useWorkbenchUploadSync } from '~/lib/projects/composables/workbenchUploadSync'
-import { useProjectVersionUpdateTracking } from '~/lib/projects/composables/versionManagement'
+import { useProjectPendingModelUpdateTracking } from '~/lib/projects/composables/modelManagement'
+import {
+  useProjectPendingVersionUpdateTracking,
+  useProjectVersionUpdateTracking
+} from '~/lib/projects/composables/versionManagement'
 
 const props = defineProps<{
   projectId: string
   onVersionUpdate?: () => void
 }>()
 
-const { consumeVersionCreated, resumeProjectTasks } = useWorkbenchUploadSync()
-
-watch(
-  () => props.projectId,
-  (projectId) => {
-    if (!projectId) return
-    void resumeProjectTasks(projectId)
-  },
-  {
-    immediate: true
-  }
-)
+const { consumeVersionCreated } = useWorkbenchUploadSync()
 
 useProjectVersionUpdateTracking(
   computed(() => props.projectId),
@@ -47,6 +48,38 @@ useProjectVersionUpdateTracking(
   },
   {
     silenceToast: true
+  }
+)
+
+useProjectPendingModelUpdateTracking(
+  computed(() => props.projectId),
+  (
+    event: NonNullable<
+      OnProjectPendingModelsUpdatedSubscription['projectPendingModelsUpdated']
+    >
+  ) => {
+    if (
+      event.type === ProjectPendingModelsUpdatedMessageType.Created ||
+      event.type === ProjectPendingModelsUpdatedMessageType.Updated
+    ) {
+      props.onVersionUpdate?.()
+    }
+  }
+)
+
+useProjectPendingVersionUpdateTracking(
+  computed(() => props.projectId),
+  (
+    event: NonNullable<
+      OnProjectPendingVersionsUpdatedSubscription['projectPendingVersionsUpdated']
+    >
+  ) => {
+    if (
+      event.type === ProjectPendingVersionsUpdatedMessageType.Created ||
+      event.type === ProjectPendingVersionsUpdatedMessageType.Updated
+    ) {
+      props.onVersionUpdate?.()
+    }
   }
 )
 </script>

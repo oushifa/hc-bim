@@ -253,6 +253,8 @@
                     >
                       <CommonModelRuntimeProgressBar
                         :status="getModelRuntimeStatus(model)"
+                        :progress="getModelRuntimeProgress(model)"
+                        :progress-phase="getModelRuntimeProgressPhase(model)"
                       />
                     </div>
                   </div>
@@ -341,6 +343,8 @@
                           >
                             <CommonModelRuntimeProgressBar
                               :status="getModelRuntimeStatus(model)"
+                              :progress="getModelRuntimeProgress(model)"
+                              :progress-phase="getModelRuntimeProgressPhase(model)"
                             />
                           </div>
                         </div>
@@ -653,7 +657,10 @@ import WorkbenchUploadSyncProjectSubscriber from '~/components/singleton/Workben
 import { useWorkbenchDrawingsApi } from '~/components/projects/workbench/drawingsApi'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
-import { useWorkbenchUploadSync } from '~~/lib/projects/composables/workbenchUploadSync'
+import {
+  mapClientUploadProgressToRuntimePercent,
+  useWorkbenchUploadSync
+} from '~~/lib/projects/composables/workbenchUploadSync'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { ensureError, Roles } from '@speckle/shared'
 import type { ModelLibraryListItem } from '~/lib/projects/composables/modelLibrary'
@@ -707,6 +714,12 @@ type ModelListItem = {
   raw: ProjectPageLatestItemsModelItemFragment
 }
 
+type ActiveModelUpload = FileAreaUploadingPayload['upload'] & {
+  model?: {
+    id?: string | null
+  } | null
+}
+
 const ROOT_ID = 'all'
 const projectName = computed(() => uploadProject.value?.name || '项目工作台')
 
@@ -722,6 +735,7 @@ const newDirName = ref('')
 const infiniteLoaderId = ref('')
 const loadCacheBuster = ref(0)
 const isModelUploading = ref(false)
+const activeModelUpload = ref<ActiveModelUpload | null>(null)
 const uploadAreaRef = ref<null | { triggerPicker: () => void }>(null)
 const versionUploadAreaRef = ref<null | { triggerPicker: () => void }>(null)
 const selectedVersionUploadModel = ref<ModelListItem | null>(null)
@@ -734,7 +748,13 @@ const drawingUploadProgress = ref(0)
 const drawingFileInputRef = ref<HTMLInputElement | null>(null)
 const drawingsApi = useWorkbenchDrawingsApi()
 
-const { tasks, isModelSyncing, runFullModelSync } = useWorkbenchUploadSync()
+const {
+  tasks,
+  isModelSyncing,
+  runFullModelSync,
+  syncVisibleTasks,
+  getModelRuntimeProgress: getTaskRuntimeProgress
+} = useWorkbenchUploadSync()
 
 const downloadsDialogOpen = ref(false)
 const selectedDownloadModel = ref<ModelListItem | null>(null)
@@ -807,7 +827,7 @@ const onUploadDownloaded = async () => {
 }
 
 const getModelRuntimeStatus = (model: ModelListItem) => {
-  if (isModelUploading.value && selectedVersionUploadModel.value?.id === model.id) {
+  if (activeModelUpload.value?.model?.id === model.id) {
     return '上传中'
   }
 
@@ -854,15 +874,49 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
       .filter((task) => task.projectId === props.projectId && task.modelId === model.id)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] || null
 
-  if (
-    latestTask &&
-    ['speckle_converting', 'failed'].includes(latestTask.status)
-  ) {
+  if (latestTask && ['speckle_converting', 'failed'].includes(latestTask.status)) {
     return '待同步'
   }
 
   return null
 }
+
+const mapIfcConversionProgressToRuntimePercent = (
+  progress: number | null | undefined
+) => {
+  if (typeof progress !== 'number' || Number.isNaN(progress)) return null
+
+  const normalizedProgress = Math.max(0, Math.min(100, progress))
+  const runtimeStart = 20
+  const runtimeEnd = 59
+
+  return Math.min(
+    runtimeEnd,
+    Math.round(runtimeStart + (normalizedProgress / 100) * (runtimeEnd - runtimeStart))
+  )
+}
+
+const getLocalUploadRuntimeProgress = (model: ModelListItem) => {
+  if (activeModelUpload.value?.model?.id !== model.id) return null
+  return mapClientUploadProgressToRuntimePercent(activeModelUpload.value.progress)
+}
+
+const getModelRuntimeProgress = (model: ModelListItem) =>
+  getLocalUploadRuntimeProgress(model) ??
+  mapIfcConversionProgressToRuntimePercent(
+    model.raw.pendingImportedVersions?.[0]?.progressPercent
+  ) ??
+  getTaskRuntimeProgress({
+    projectId: props.projectId,
+    modelId: model.id
+  })?.percent ??
+  null
+
+const getModelRuntimeProgressPhase = (model: ModelListItem) =>
+  getTaskRuntimeProgress({
+    projectId: props.projectId,
+    modelId: model.id
+  })?.phase ?? null
 
 const shouldShowSyncAction = (model: ModelListItem) => {
   const status = getModelRuntimeStatus(model)
@@ -960,6 +1014,9 @@ const triggerVersionUploadPicker = async (model: ModelListItem) => {
 const onModelUploading = async (payload: FileAreaUploadingPayload) => {
   const wasUploading = isModelUploading.value
   isModelUploading.value = payload.isUploading
+  activeModelUpload.value = payload.isUploading
+    ? (payload.upload as ActiveModelUpload)
+    : null
   if (wasUploading && !payload.isUploading) {
     selectedVersionUploadModel.value = null
     loadCacheBuster.value++
@@ -1514,6 +1571,28 @@ const displayedModels = computed<ModelListItem[]>(() =>
     previewUrl: model.previewUrl,
     raw: model
   }))
+)
+
+const visibleModelSyncTargets = computed(() =>
+  displayedModels.value.length
+    ? [
+        {
+          projectId: props.projectId,
+          modelIds: displayedModels.value.map((model) => model.id)
+        }
+      ]
+    : []
+)
+
+watch(
+  visibleModelSyncTargets,
+  (targets) => {
+    void syncVisibleTasks(targets)
+  },
+  {
+    immediate: true,
+    deep: true
+  }
 )
 
 const refreshModels = async () => {
