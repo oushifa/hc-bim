@@ -49,8 +49,6 @@ import type {
   AutomateFunctionsPageHeader_QueryFragment
 } from '~/lib/common/generated/gql/graphql'
 import { workspaceFunctionsRoute, workspaceRoute } from '~/lib/common/helpers/route'
-import { useMixpanel } from '~/lib/core/composables/mp'
-
 graphql(`
   fragment AutomateFunctionsPageHeader_Query on Query {
     activeUser {
@@ -82,8 +80,6 @@ const { on, bind } = useDebouncedTextInput({ model: search })
 const { triggerNotification } = useGlobalToast()
 const route = useRoute()
 const router = useRouter()
-const mixpanel = useMixpanel()
-
 const createDialogOpen = ref(false)
 
 const availableTemplates = computed(
@@ -106,7 +102,6 @@ if (import.meta.client) {
           type: ToastNotificationType.Success,
           title: 'GitHub authorization successful'
         })
-        mixpanel.track('Automate Finish Authorize GitHub App')
         createDialogOpen.value = true
       } else if (ghAuthVal === 'access_denied') {
         triggerNotification({
@@ -133,7 +128,6 @@ if (import.meta.client) {
     () => route.query['automateBetaRedirect'] as Nullable<string>,
     (isRedirect) => {
       if (!isRedirect?.length) return
-      mixpanel.track('Automate Beta Visit Redirected')
       const { automateBetaRedirect, ...query } = route.query
       void router.replace({ query })
     },

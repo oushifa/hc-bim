@@ -216,7 +216,10 @@
                         class="w-10 h-10 rounded-[8px] bg-gray-100 flex items-center justify-center shrink-0 overflow-hidden border border-gray-200"
                       >
                         <div v-if="model.previewUrl" class="w-full h-full">
-                          <PreviewImage :preview-url="model.previewUrl" />
+                          <PreviewImage
+                            :preview-url="model.previewUrl"
+                            :eager-load="false"
+                          />
                         </div>
                         <CubeIcon v-else class="h-4 w-4 text-gray-400" />
                       </div>
@@ -249,8 +252,18 @@
                     {{ formatDate(model.updateTime) }}
                   </td>
                   <td class="px-4 py-3">
-                    <span class="text-xs text-gray-500">
-                      {{ getModelRuntimeStatus(model) || '-' }}
+                    <span class="inline-flex items-center gap-1">
+                      <span class="text-xs text-gray-500">
+                        {{ getModelRuntimeStatus(model) || '-' }}
+                      </span>
+                      <button
+                        v-if="shouldShowRetryAction(model)"
+                        type="button"
+                        class="inline-flex cursor-pointer items-center rounded-full border border-[#bfecee] bg-[#e6f7f8] px-2 py-0.5 text-[11px] font-medium leading-none text-[#00b4b6] transition-colors hover:bg-[#00b4b6] hover:text-white"
+                        @click.stop="retryModelSync(model)"
+                      >
+                        重试
+                      </button>
                     </span>
                   </td>
                   <td class="px-4 py-3 text-center text-gray-500">
@@ -300,26 +313,6 @@
                           >
                             <ArrowUpTrayIcon class="w-3.5 h-3.5" />
                             <span>更新版本</span>
-                          </button>
-                          <button
-                            v-if="shouldShowSyncAction(model)"
-                            class="menu-item"
-                            :disabled="
-                              isModelSyncing({
-                                projectId: model.projectId,
-                                modelId: model.id
-                              })
-                            "
-                            @click.stop="syncModelToDtp(model)"
-                          >
-                            <ArrowPathIcon class="w-3.5 h-3.5" />
-                            <span>
-                              {{
-                                getModelRuntimeStatus(model) === '待同步'
-                                  ? '重新同步'
-                                  : '同步中海'
-                              }}
-                            </span>
                           </button>
                           <button
                             v-if="hasModelOp('canEdit')"
@@ -634,7 +627,6 @@ import {
   EllipsisHorizontalIcon,
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
-  ArrowPathIcon,
   ShareIcon,
   PencilSquareIcon,
   TrashIcon,
@@ -783,11 +775,12 @@ const { ensureModel } = useModelLibraryApi()
 const updateModel = useUpdateModel()
 const deleteModel = useDeleteModel()
 const {
-  tasks,
   uploadModelFile,
+  getLatestTask,
   isModelSyncing,
-  runFullModelSync,
+  retryTask,
   syncVisibleTasks,
+  cleanupVisibleTaskSubscriptions,
   getModelRuntimeProgress: getTaskRuntimeProgress
 } = useWorkbenchUploadSync()
 const modelLibraryFileInput = ref<HTMLInputElement | null>(null)
@@ -818,8 +811,32 @@ const getModelNameFromFile = (fileName: string) => {
   return fileName.replace(/\.[^.]+$/, '').trim() || fileName.trim()
 }
 
+const shouldSubscribeProjectUpdates = (model: Model) => {
+  if (
+    isModelSyncing({
+      projectId: model.projectId,
+      modelId: model.id
+    })
+  ) {
+    return true
+  }
+
+  if (model.latestUpload?.id && !model.latestUpload.uploadComplete) {
+    return true
+  }
+
+  return [
+    FileUploadConvertedStatus.Queued,
+    FileUploadConvertedStatus.Converting,
+    FileUploadConvertedStatus.Completed
+  ].includes(model.latestUpload?.convertedStatus as FileUploadConvertedStatus)
+}
+
 const subscribedProjectIds = computed(() => {
-  const ids = models.value.map((m) => m.projectId).filter((v): v is string => !!v)
+  const ids = models.value
+    .filter((model) => shouldSubscribeProjectUpdates(model))
+    .map((model) => model.projectId)
+    .filter((v): v is string => !!v)
   return Array.from(new Set(ids))
 })
 
@@ -1025,10 +1042,7 @@ const getModelRuntimeStatus = (model: Model) => {
     return '待同步'
   }
 
-  const latestTask =
-    tasks.value
-      .filter((task) => task.projectId === model.projectId && task.modelId === model.id)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] || null
+  const latestTask = getLatestModelTask(model)
 
   if (latestTask && ['speckle_converting', 'failed'].includes(latestTask.status)) {
     return '待同步'
@@ -1072,10 +1086,14 @@ const getModelRuntimeProgressPhase = (model: Model) =>
     modelId: model.id
   })?.phase ?? null
 
-const shouldShowSyncAction = (model: Model) => {
-  const status = getModelRuntimeStatus(model)
-  return status === '待同步' || status === '同步中'
-}
+const getLatestModelTask = (model: Model) =>
+  getLatestTask({
+    projectId: model.projectId,
+    modelId: model.id
+  })
+
+const shouldShowRetryAction = (model: Model) =>
+  getLatestModelTask(model)?.status === 'failed'
 
 const createModelDialogButtons = computed((): LayoutDialogButton[] => [
   {
@@ -1181,6 +1199,7 @@ const fetchModels = async (options?: { silent?: boolean }) => {
 const visibleModelSyncTargets = computed(() => {
   const modelIdsByProjectId = new Map<string, string[]>()
   for (const model of models.value) {
+    if (!shouldSubscribeProjectUpdates(model)) continue
     const current = modelIdsByProjectId.get(model.projectId) || []
     current.push(model.id)
     modelIdsByProjectId.set(model.projectId, current)
@@ -1192,14 +1211,21 @@ const visibleModelSyncTargets = computed(() => {
   }))
 })
 
+const visibleModelSyncTargetsSignature = computed(() =>
+  visibleModelSyncTargets.value
+    .map(
+      (target) => `${target.projectId}:${[...target.modelIds].sort().join(',')}`
+    )
+    .join('|')
+)
+
 watch(
-  visibleModelSyncTargets,
-  (targets) => {
-    void syncVisibleTasks(targets)
+  visibleModelSyncTargetsSignature,
+  () => {
+    void syncVisibleTasks(visibleModelSyncTargets.value)
   },
   {
-    immediate: true,
-    deep: true
+    immediate: true
   }
 )
 
@@ -1363,15 +1389,19 @@ const submitDeleteModel = async () => {
   }
 }
 
-const syncModelToDtp = async (model: Model) => {
+const retryModelSync = async (model: Model) => {
   closeActionMenu()
-  const synced = await runFullModelSync({
-    projectId: model.projectId,
-    modelId: model.id
-  })
+  const latestTask = getLatestModelTask(model)
+  if (!latestTask || latestTask.status !== 'failed') return
 
-  if (!synced && getModelRuntimeStatus(model) === '待同步') {
-    await fetchModels()
+  try {
+    await retryTask(latestTask.id)
+  } catch (e) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '重试失败',
+      description: ensureError(e).message
+    })
   }
 }
 
@@ -1616,6 +1646,7 @@ onUnmounted(() => {
   document.removeEventListener('mousedown', handleClickOutside)
   window.removeEventListener('scroll', handleScrollClose, true)
   window.removeEventListener('resize', handleScrollClose)
+  cleanupVisibleTaskSubscriptions()
   if (refreshTimeout) clearTimeout(refreshTimeout)
 })
 </script>

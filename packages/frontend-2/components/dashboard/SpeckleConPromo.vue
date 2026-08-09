@@ -36,14 +36,11 @@
 
 <script setup lang="ts">
 import { ArrowUpRightIcon, XMarkIcon } from '@heroicons/vue/24/solid'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useActiveUserMeta } from '~~/lib/user/composables/meta'
 
-const mixpanel = useMixpanel()
 const { updateSpeckleCon25BannerDismissed } = useActiveUserMeta()
 
 const onCTAClick = () => {
-  mixpanel.track('SpeckleCon 2025 CTA Clicked')
 }
 
 const dismissBanner = async () => {
@@ -51,6 +48,5 @@ const dismissBanner = async () => {
 }
 
 onMounted(() => {
-  mixpanel.track('SpeckleCon 2025 Banner Shown')
 })
 </script>

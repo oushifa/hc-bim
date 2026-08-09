@@ -1,7 +1,6 @@
 import { MeasurementType } from '@speckle/shared/viewer/state'
 import { SelectionExtension } from '@speckle/viewer'
 import type { SpeckleObject } from '~/lib/viewer/helpers/sceneExplorer'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useInjectedViewerState } from '~~/lib/viewer/composables/setup'
 import { useCameraUtilities, useSelectionUtilities } from '~~/lib/viewer/composables/ui'
 import { useSelectionEvents } from '~~/lib/viewer/composables/viewer'
@@ -28,17 +27,10 @@ function useSelectOrZoomOnSelection() {
   const state = useInjectedViewerState()
   const { clearSelection, addToSelection } = useSelectionUtilities()
   const { zoom } = useCameraUtilities()
-  const mp = useMixpanel()
   const logger = useLogger()
 
   const trackAndClearSelection = () => {
     clearSelection()
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'selection',
-      action: 'clear',
-      source: 'viewer'
-    })
   }
   useSelectionEvents(
     {
@@ -84,12 +76,6 @@ function useSelectOrZoomOnSelection() {
           if (!pair) return
           addToSelection(pair)
         }
-        mp.track('Viewer Action', {
-          type: 'action',
-          name: 'selection',
-          action: 'select',
-          multiple: args.multiple
-        })
       },
       doubleClickCallback: (args, { firstVisibleSelectionHit }) => {
         const isMeasureMode = state.ui.measurement.enabled.value
@@ -118,11 +104,6 @@ function useSelectOrZoomOnSelection() {
             "Got a double click event but there's no selected object in the state - this should be impossible :)"
           )
         }
-        mp.track('Viewer Action', {
-          type: 'action',
-          name: 'zoom',
-          source: 'object-double-click'
-        })
       }
     },
     { state }

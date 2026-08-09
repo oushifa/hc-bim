@@ -14,13 +14,8 @@
 
 <script setup lang="ts">
 import { LayoutDialog, CommonVimeoEmbed } from '@speckle/ui-components'
-import { useMixpanel } from '~~/lib/core/composables/mp'
-
 const isOpen = defineModel<boolean>('open', { required: true })
 
-const mixpanel = useMixpanel()
-
 const onPlay = () => {
-  mixpanel.track('Getting Started Video Played')
 }
 </script>

@@ -98,7 +98,6 @@ import {
   useAutomationInputEncryptor,
   type AutomationInputEncryptor
 } from '~/lib/automate/composables/automations'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import type { JsonFormsChangeEvent } from '@jsonforms/vue'
 
 type AutomationRevisionFunction =
@@ -155,8 +154,6 @@ const createNewAutomationRevision = useCreateAutomationRevision()
 const inputEncryption = useAutomationInputEncryptor({ ensureWhen: open })
 const { triggerNotification } = useGlobalToast()
 const logger = useLogger()
-const mixpanel = useMixpanel()
-
 const jsonForm = ref<{ triggerChange: () => Promise<Optional<JsonFormsChangeEvent>> }>()
 const selectedModel = ref<CommonModelSelectorModelFragment>()
 const selectedRelease = ref<SearchAutomateFunctionReleaseItemFragment | undefined>(
@@ -259,15 +256,6 @@ const onSave = async () => {
       }
     })
     if (res?.id) {
-      mixpanel.track('Automation Revision Created', {
-        automationId: props.automationId,
-        projectId: props.projectId,
-        functionId: fId,
-        functionReleaseId: rId,
-        modelId: model.id,
-        /* eslint-disable-next-line camelcase */
-        workspace_id: props.workspaceId
-      })
     }
   } finally {
     automationEncrypt?.dispose()

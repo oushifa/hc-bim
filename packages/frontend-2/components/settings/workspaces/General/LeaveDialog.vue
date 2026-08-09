@@ -31,7 +31,6 @@ import {
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { isUndefined } from 'lodash-es'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { homeRoute } from '~/lib/common/helpers/route'
 import type { MaybeNullOrUndefined } from '@speckle/shared'
 import { useSetActiveWorkspace } from '~/lib/user/composables/activeWorkspace'
@@ -53,7 +52,6 @@ const { mutate: leaveWorkspace } = useMutation(settingsLeaveWorkspaceMutation)
 const { triggerNotification } = useGlobalToast()
 const { activeUser } = useActiveUser()
 const apollo = useApolloClient().client
-const mixpanel = useMixpanel()
 const { setActiveWorkspace } = useSetActiveWorkspace()
 
 const onLeave = async () => {
@@ -99,10 +97,6 @@ const onLeave = async () => {
       description: `You have left the ${props.workspace.name} workspace`
     })
 
-    mixpanel.track('Workspace User Left', {
-      // eslint-disable-next-line camelcase
-      workspace_id: props.workspace.id
-    })
   } else {
     const errorMessage = getFirstErrorMessage(result?.errors)
     triggerNotification({

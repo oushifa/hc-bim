@@ -137,7 +137,7 @@ const setParentDimensions = () => {
   parentHeight.value = height
 }
 
-if (import.meta.client) useResizeObserver(document.body, () => setParentDimensions())
+if (import.meta.client) useResizeObserver(parent, () => setParentDimensions())
 
 const positionMagic = ref(0)
 const latestMouseEvent = ref<PanoramaStyleMouseOrTouchEvent>()

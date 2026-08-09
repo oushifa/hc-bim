@@ -763,7 +763,6 @@ import { onClickOutside, useEventListener } from '@vueuse/core'
 import { useRoute } from 'vue-router'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useActiveWorkspaceSlug } from '~/lib/user/composables/activeWorkspace'
 import { graphql } from '~/lib/common/generated/gql'
 import { useQuery } from '@vue/apollo-composable'
@@ -814,7 +813,6 @@ const isDashboardsEnabled = useIsDashboardsModuleEnabled()
 const route = useRoute()
 const activeWorkspaceSlug = useActiveWorkspaceSlug()
 const { $intercom } = useNuxtApp()
-const mixpanel = useMixpanel()
 const { result: permissionsResult } = useQuery(
   sidebarPermissionsQuery,
   () => ({
@@ -1245,9 +1243,6 @@ const openChat = () => {
 const openExplainerVideoDialog = () => {
   showExplainerVideoDialog.value = true
   isOpenMobile.value = false
-  mixpanel.track('Getting Started Video Opened', {
-    location: 'sidebar'
-  })
 }
 
 const isActive = (...routes: string[]): boolean => {

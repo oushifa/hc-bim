@@ -64,8 +64,6 @@ import type {
   WorkspaceProjectsQueryQueryVariables,
   WorkspaceDashboardProjectList_WorkspaceFragment
 } from '~~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~~/lib/core/composables/mp'
-
 graphql(`
   fragment WorkspaceDashboardProjectList_ProjectCollection on ProjectCollection {
     totalCount
@@ -98,7 +96,6 @@ const {
   debouncedBy: 800
 })
 
-const mixpanel = useMixpanel()
 const {
   query: projectsQuery,
   identifier,
@@ -135,9 +132,6 @@ const showEmptyState = computed(() =>
 
 const openExplainerVideoDialog = () => {
   isExplainerVideoOpen.value = true
-  mixpanel.track('Getting Started Video Opened', {
-    location: 'project_list'
-  })
 }
 
 const clearSearch = () => {

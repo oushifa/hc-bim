@@ -8,8 +8,6 @@ import type { LayoutDialogButton } from '@speckle/ui-components'
 import { graphql } from '~/lib/common/generated/gql'
 import type { UseLoadLatestVersion_ProjectFragment } from '~/lib/common/generated/gql/graphql'
 import { modelRoute } from '~/lib/common/helpers/route'
-import { useMixpanel } from '~/lib/core/composables/mp'
-
 graphql(`
   fragment UseLoadLatestVersion_Project on Project {
     id
@@ -23,7 +21,6 @@ export const useLoadLatestVersion = (params: {
   project: Ref<MaybeNullOrUndefined<UseLoadLatestVersion_ProjectFragment>>
   resourceIdString: Ref<string>
 }) => {
-  const mixpanel = useMixpanel()
   const workspaceSlug = computed(() => unref(params.project)?.workspace?.slug)
   const projectId = computed(() => unref(params.project)?.id)
 
@@ -42,16 +39,6 @@ export const useLoadLatestVersion = (params: {
 
   const load = async () => {
     if (!projectId.value) return
-
-    mixpanel.track('Load Latest Version Button Clicked', {
-      location: 'viewer',
-      ...(workspaceSlug.value
-        ? {
-            // eslint-disable-next-line camelcase
-            workspace_id: workspaceSlug.value
-          }
-        : {})
-    })
 
     const latestResourceIdString = stripVersionIds(unref(params.resourceIdString))
 

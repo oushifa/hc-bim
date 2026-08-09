@@ -43,7 +43,6 @@ import { Roles } from '@speckle/shared'
 import { useMutation } from '@vue/apollo-composable'
 import { graphql } from '~/lib/common/generated/gql'
 import type { SettingsWorkspacesSecurityDomainProtection_WorkspaceFragment } from '~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { workspaceUpdateDomainProtectionMutation } from '~/lib/workspaces/graphql/mutations'
 import { settingsWorkspaceRoutes } from '~/lib/common/helpers/route'
 
@@ -66,7 +65,6 @@ const props = defineProps<{
   workspace: SettingsWorkspacesSecurityDomainProtection_WorkspaceFragment
 }>()
 
-const mixpanel = useMixpanel()
 const { mutate: updateDomainProtection } = useMutation(
   workspaceUpdateDomainProtectionMutation
 )
@@ -91,11 +89,6 @@ const isDomainProtectionEnabled = computed({
         type: ToastNotificationType.Success,
         title: '域保护已更新',
         description: `域保护已${newVal ? '启用' : '禁用'}`
-      })
-      mixpanel.track('Workspace Domain Protection Toggled', {
-        value: newVal,
-        // eslint-disable-next-line camelcase
-        workspace_id: props.workspace?.id
       })
     } else {
       triggerNotification({

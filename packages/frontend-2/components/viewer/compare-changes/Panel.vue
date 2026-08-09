@@ -76,7 +76,6 @@ import { VisualDiffMode } from '@speckle/viewer'
 import { useInjectedViewerState } from '~~/lib/viewer/composables/setup'
 import { uniqBy, debounce } from 'lodash-es'
 import type { SpeckleObject } from '~~/lib/viewer/helpers/sceneExplorer'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { TIME_MS } from '@speckle/shared'
 import { FormSwitch } from '@speckle/ui-components'
 
@@ -114,45 +113,19 @@ watch(
 )
 
 const debouncedTrackChangeDiffTime = debounce(() => {
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'diffs',
-    action: 'set-diff-time',
-    value: localDiffTime.value
-  })
 }, TIME_MS.second)
 
 watch(diffState.result, () => {
   localDiffTime.value = 0.5
   if (diffState.result.value) {
-    mp.track('Viewer Action', {
-      type: 'stats',
-      name: 'diffs',
-      size: {
-        changed: diffState.result.value.modified.length,
-        removed: diffState.result.value.removed.length,
-        added: diffState.result.value.added.length,
-        unchanged: diffState.result.value.unchanged.length
-      }
-    })
   }
 })
 
 function swapDiffMode() {
   if (diffState.mode.value === VisualDiffMode.COLORED) {
     diffState.mode.value = VisualDiffMode.PLAIN
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'diffs',
-      action: 'set-mode-plain'
-    })
     return
   }
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'diffs',
-    action: 'set-mode-colored'
-  })
   diffState.mode.value = VisualDiffMode.COLORED
 }
 
@@ -193,15 +166,8 @@ const modifiedIds = computed(() => {
   ]
 })
 
-const mp = useMixpanel()
-
 const handleBack = async () => {
   if (props.clearOnBack) {
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'diffs',
-      action: 'disable'
-    })
     await diff.update(null)
   } else {
     emit('close')

@@ -56,8 +56,6 @@ import {
   useWorkspaceSsoStatus,
   useWorkspacePublicSsoCheck
 } from '~/lib/workspaces/composables/sso'
-import { useMixpanel } from '~/lib/core/composables/mp'
-
 definePageMeta({
   layout: 'login-or-register',
   middleware: ['requires-workspaces-enabled', 'require-sso-enabled']
@@ -68,8 +66,6 @@ const logger = useLogger()
 const { challenge } = useLoginOrRegisterUtils()
 const { signInOrSignUpWithSso } = useAuthManager()
 const isSsoEnabled = useIsWorkspacesSsoEnabled()
-const mixpanel = useMixpanel()
-
 const workspaceSlug = computed(() => route.params.slug as string)
 const { isSsoAuthenticated } = useWorkspaceSsoStatus({
   workspaceSlug
@@ -113,12 +109,6 @@ const isAuthenticating = computed(() => {
 })
 
 const handleContinue = () => {
-  mixpanel.track('Workspace SSO Login Attempted', {
-    // eslint-disable-next-line camelcase
-    workspace_slug: route.params.slug.toString(),
-    // eslint-disable-next-line camelcase
-    provider_name: workspace.value?.ssoProviderName
-  })
   signInOrSignUpWithSso({
     challenge: challenge.value,
     workspaceSlug: route.params.slug.toString()

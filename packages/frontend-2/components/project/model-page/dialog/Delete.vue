@@ -39,7 +39,6 @@
 <script setup lang="ts">
 import { graphql } from '~~/lib/common/generated/gql'
 import type { ProjectModelPageDialogDeleteVersionFragment } from '~~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useDeleteVersions } from '~~/lib/projects/composables/versionManagement'
 
 graphql(`
@@ -71,7 +70,6 @@ const isOpen = computed({
   set: (newVal) => emit('update:open', newVal)
 })
 
-const mp = useMixpanel()
 const onDelete = async () => {
   loading.value = true
   const success = await deleteVersions(
@@ -83,11 +81,6 @@ const onDelete = async () => {
       modelId: props.modelId
     }
   )
-  mp.track('Commit Action', {
-    type: 'action',
-    name: 'delete',
-    bulk: props.versions.length !== 1
-  })
 
   loading.value = false
 

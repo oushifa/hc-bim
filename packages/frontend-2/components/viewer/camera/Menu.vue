@@ -48,7 +48,6 @@
 
 <script setup lang="ts">
 import type { CanonicalView, SpeckleView } from '@speckle/viewer'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import {
   useInjectedViewerState,
   useInjectedViewer
@@ -79,7 +78,6 @@ const {
 } = useInjectedViewerState()
 const { instance } = useInjectedViewer()
 const { getShortcutDisplayText, registerShortcuts, shortcuts } = useViewerShortcuts()
-const mixpanel = useMixpanel()
 const {
   setView: setViewRaw,
   toggleProjection,
@@ -106,11 +104,6 @@ const handleViewChange = (v: CanonicalView | SpeckleView, isShortcut = false) =>
 
 const trackAndtoggleProjection = () => {
   toggleProjection()
-  mixpanel.track('Viewer Action', {
-    type: 'action',
-    name: 'camera',
-    camera: isOrthoProjection ? 'ortho' : 'perspective'
-  })
 }
 
 const setViewerCameraHandlerControlsMaxPolarAngle = (angle: number) => {

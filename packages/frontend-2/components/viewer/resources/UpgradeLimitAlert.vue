@@ -24,7 +24,6 @@
 import type { AlertAction } from '@speckle/ui-components'
 import { useWorkspaceLimits } from '~/lib/workspaces/composables/limits'
 import { settingsWorkspaceRoutes } from '~~/lib/common/helpers/route'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import type {
   ViewerLimitAlertType,
   ViewerLimitAlertVariant
@@ -50,8 +49,6 @@ const props = withDefaults(
   }
 )
 
-const mixpanel = useMixpanel()
-
 const { commentLimitFormatted, versionLimitFormatted } = useWorkspaceLimits({
   slug: computed(() => props.workspace.slug || '')
 })
@@ -72,14 +69,6 @@ const actions = computed((): AlertAction[] => [
 
 const handleUpgradeClick = () => {
   // Track the appropriate event based on the limit type
-  mixpanel.track(
-    props.limitType === 'comment' ? '升级评论按钮点击' : '升级版本按钮点击',
-    {
-      location: 'viewer',
-      // eslint-disable-next-line camelcase
-      workspace_id: props.workspace.slug
-    }
-  )
   return navigateTo(settingsWorkspaceRoutes.billing.route(props.workspace.slug))
 }
 </script>

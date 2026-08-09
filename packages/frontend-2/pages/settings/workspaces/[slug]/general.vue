@@ -198,7 +198,6 @@ import {
   convertThrowIntoFetchResult
 } from '~~/lib/common/helpers/graphql'
 import { isRequired, isStringOfLength } from '~~/lib/common/helpers/validation'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { Roles, WorkspacePlans } from '@speckle/shared'
 import { workspaceRoute, settingsWorkspaceRoutes } from '~/lib/common/helpers/route'
 import { useRoute } from 'vue-router'
@@ -246,7 +245,6 @@ const routeSlug = computed(() => (route.params.slug as string) || '')
 const IconEdit = resolveComponent('IconEdit')
 
 const isBillingIntegrationEnabled = useIsBillingIntegrationEnabled()
-const mixpanel = useMixpanel()
 const router = useRouter()
 const route = useRoute()
 const { handleSubmit } = useForm<FormValues>()
@@ -317,14 +315,6 @@ const save = handleSubmit(async () => {
       title: '工作空间已更新'
     })
 
-    mixpanel.track('Workspace General Settings Updated', {
-      fields: (Object.keys(input) as Array<keyof WorkspaceUpdateInput>).filter(
-        (key) => key !== 'id'
-      ),
-      // eslint-disable-next-line camelcase
-      workspace_id: workspaceResult.value.workspaceBySlug.id,
-      source: 'settings'
-    })
   } else {
     const errorMessage = getFirstErrorMessage(result?.errors)
     triggerNotification({
@@ -391,11 +381,6 @@ const updateShowBranding = async () => {
   })
 
   if (result && result.data) {
-    mixpanel.track('Workspace Embed Options Updated', {
-      hideBranding: !showBranding.value,
-      // eslint-disable-next-line camelcase
-      workspace_id: workspaceResult.value.workspaceBySlug.id
-    })
 
     triggerNotification({
       type: ToastNotificationType.Success,

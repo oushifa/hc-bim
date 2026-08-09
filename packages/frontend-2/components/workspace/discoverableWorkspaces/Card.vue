@@ -77,7 +77,6 @@
 <script setup lang="ts">
 import type { DiscoverableWorkspace_LimitedWorkspaceFragment } from '~~/lib/common/generated/gql/graphql'
 import { useDiscoverableWorkspaces } from '~/lib/workspaces/composables/discoverableWorkspaces'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { CheckIcon } from '@heroicons/vue/20/solid'
 import { WorkspaceJoinRequestStatus } from '~/lib/common/generated/gql/graphql'
 
@@ -96,8 +95,6 @@ const emit = defineEmits<{
 
 const { requestToJoinWorkspace, dismissDiscoverableWorkspace } =
   useDiscoverableWorkspaces()
-const mixpanel = useMixpanel()
-
 const adminTeam = computed(() => props.workspace.adminTeam?.map((t) => t.user) ?? [])
 const adminIds = computed(() => new Set(adminTeam.value.map((admin) => admin.id)))
 const allMembers = computed(() => props.workspace.team?.items?.map((u) => u.user) ?? [])
@@ -136,11 +133,5 @@ const onRequest = () => {
 const onDismiss = async () => {
   await dismissDiscoverableWorkspace(props.workspace.id)
   emit('dismissed', props.workspace.id)
-  mixpanel.track('Workspace Discovery Banner Dismissed', {
-    workspaceId: props.workspace.id,
-    location: 'discovery_card',
-    // eslint-disable-next-line camelcase
-    workspace_id: props.workspace.id
-  })
 }
 </script>

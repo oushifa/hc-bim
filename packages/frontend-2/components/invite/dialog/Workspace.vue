@@ -62,7 +62,6 @@ import {
   type MaybeNullOrUndefined,
   type WorkspaceRoles
 } from '@speckle/shared'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { mapMainRoleToGqlWorkspaceRole } from '~/lib/workspaces/helpers/roles'
 import { useInviteUserToWorkspace } from '~/lib/workspaces/composables/management'
 import { getRoleLabel } from '~~/lib/settings/helpers/utils'
@@ -96,7 +95,6 @@ const props = defineProps<{
 }>()
 const isOpen = defineModel<boolean>('open', { required: true })
 
-const mixpanel = useMixpanel()
 const inviteToWorkspace = useInviteUserToWorkspace()
 const inviteToProject = useInviteUserToProject()
 
@@ -202,17 +200,6 @@ const onSelectUsersSubmit = async () => {
   }
 
   isOpen.value = false
-  mixpanel.track('Invite Action', {
-    type: 'workspace invite',
-    name: 'send',
-    multiple: invites.value.length !== 1,
-    count: invites.value.length,
-    to: 'email',
-    hasProject: !!project.value,
-    workspaceRole: selectedRole.value,
-    // eslint-disable-next-line camelcase
-    workspace_id: props.workspace.id
-  })
 }
 
 const initInvites = () => {

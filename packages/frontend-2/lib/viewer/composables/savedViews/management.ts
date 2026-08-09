@@ -14,7 +14,6 @@ import type {
 } from '~/lib/common/generated/gql/graphql'
 import { useStateSerialization } from '~/lib/viewer/composables/serialization'
 import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { onNewGroupViewCacheUpdates } from '~/lib/viewer/helpers/savedViews/cache'
 
 const createSavedViewMutation = graphql(`
@@ -77,8 +76,6 @@ export const useCreateSavedView = () => {
   } = useInjectedViewerState()
   const { triggerNotification } = useGlobalToast()
   const { collect } = useCollectNewSavedViewViewerData()
-  const mp = useMixpanel()
-
   return async (
     input: Omit<
       CreateSavedViewInput,
@@ -127,12 +124,6 @@ export const useCreateSavedView = () => {
         })
       }
 
-      mp.track('Saved View Created', {
-        viewId: res.id,
-        groupId: res.groupId,
-        // eslint-disable-next-line camelcase
-        workspace_id: project.value?.workspaceId
-      })
     }
 
     return res
@@ -237,7 +228,6 @@ export const useUpdateSavedView = () => {
   const { mutate } = useMutation(updateSavedViewMutation)
   const { triggerNotification } = useGlobalToast()
   const { isLoggedIn } = useActiveUser()
-  const mp = useMixpanel()
   const {
     resources: {
       response: { project }
@@ -286,12 +276,6 @@ export const useUpdateSavedView = () => {
 
     if (res?.id) {
       if ('isHomeView' in input) {
-        mp.track('Saved View Set as Home View', {
-          viewId: res.id,
-          isHomeView: input.isHomeView,
-          // eslint-disable-next-line camelcase
-          workspace_id: project.value?.workspaceId
-        })
       }
     }
 
@@ -317,7 +301,6 @@ export const useCreateSavedViewGroup = () => {
   const { mutate } = useMutation(createSavedViewGroupMutation)
   const { triggerNotification } = useGlobalToast()
   const { isLoggedIn } = useActiveUser()
-  const mp = useMixpanel()
   const {
     resources: {
       response: { project }
@@ -344,11 +327,6 @@ export const useCreateSavedViewGroup = () => {
     }
 
     if (res?.id) {
-      mp.track('Saved View Group Created', {
-        groupId: res.id,
-        // eslint-disable-next-line camelcase
-        workspace_id: project.value?.workspaceId
-      })
     }
 
     return res

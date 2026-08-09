@@ -34,7 +34,6 @@
 import { ref, computed } from 'vue'
 import { graphql } from '~~/lib/common/generated/gql'
 import type { ProjectModelPageDialogMoveToVersionFragment } from '~~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useMoveVersions } from '~~/lib/projects/composables/versionManagement'
 import type { LayoutPageTabItem } from '@speckle/ui-components'
 
@@ -58,7 +57,6 @@ const props = defineProps<{
 }>()
 
 const moveVersions = useMoveVersions()
-const mp = useMixpanel()
 const loading = ref(false)
 
 // Define tab items
@@ -89,12 +87,6 @@ const onMove = async (targetModelName: string, newModelCreated?: boolean) => {
     }
   )
   loading.value = false
-  mp.track('Commit Action', {
-    type: 'action',
-    name: 'move',
-    model: newModelCreated ? 'new model' : 'existing model',
-    bulk: props.versions.length !== 1
-  })
   if (success) isOpen.value = false
 }
 </script>

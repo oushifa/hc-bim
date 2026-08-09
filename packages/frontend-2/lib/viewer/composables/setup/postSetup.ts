@@ -58,7 +58,6 @@ import {
 } from '~~/lib/viewer/composables/ui'
 import { setupDebugMode } from '~~/lib/viewer/composables/setup/dev'
 import { useEmbed } from '~/lib/viewer/composables/setup/embed'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { graphql } from '~/lib/common/generated/gql'
 import { useTreeManagement } from '~~/lib/viewer/composables/tree'
 import { useViewerSavedViewIntegration } from '~/lib/viewer/composables/savedViews/state'
@@ -265,7 +264,6 @@ function useViewerReceiveTracking() {
       response: { modelsAndVersionIds }
     }
   } = useInjectedViewerState()
-  const mixpanel = useMixpanel()
   const { userId } = useActiveUser()
   const receivedVersions = new Set<string>()
   watch(modelsAndVersionIds, (newVal) => {
@@ -274,11 +272,6 @@ function useViewerReceiveTracking() {
         continue
       }
       receivedVersions.add(versionId)
-      mixpanel.track('Receive', {
-        hostApp: 'viewer',
-        sourceHostApp: model.loadedVersion.items[0].sourceApplication,
-        isMultiplayer: model.loadedVersion.items[0].authorUser?.id !== userId.value
-      })
     }
   })
 }

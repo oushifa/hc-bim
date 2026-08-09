@@ -24,7 +24,6 @@ import {
   modifyObjectField
 } from '~/lib/common/helpers/graphql'
 import { settingsDeleteWorkspaceDomainMutation } from '~/lib/settings/graphql/mutations'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import type { MaybeNullOrUndefined } from '@speckle/shared'
 
 graphql(`
@@ -52,8 +51,6 @@ const isOpen = defineModel<boolean>('open', { required: true })
 
 const apollo = useApolloClient().client
 const { triggerNotification } = useGlobalToast()
-const mixpanel = useMixpanel()
-
 const handleRemove = async () => {
   if (!props.workspaceId) return
 
@@ -92,10 +89,6 @@ const handleRemove = async () => {
       description: `Removed domain successfully`
     })
 
-    mixpanel.track('Workspace Domain Removed', {
-      // eslint-disable-next-line camelcase
-      workspace_id: props.workspaceId
-    })
   } else {
     triggerNotification({
       type: ToastNotificationType.Danger,

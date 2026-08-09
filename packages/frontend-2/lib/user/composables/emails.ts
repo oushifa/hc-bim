@@ -13,7 +13,6 @@ import {
 } from '~/lib/common/helpers/graphql'
 import type { UserEmail } from '~/lib/common/generated/gql/graphql'
 import { useGlobalToast } from '~/lib/common/composables/toast'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import {
   verifyEmailRoute,
   homeRoute,
@@ -23,7 +22,6 @@ import { verifyEmailMutation } from '~/lib/user/graphql/mutations'
 
 export function useUserEmails() {
   const { triggerNotification } = useGlobalToast()
-  const mixpanel = useMixpanel()
   const { result } = useQuery(userEmailsQuery)
   const route = useRoute()
   const apollo = useApolloClient().client
@@ -50,7 +48,6 @@ export function useUserEmails() {
     }).catch(convertThrowIntoFetchResult)
 
     if (result?.data) {
-      mixpanel.track('Email Added')
       navigateTo(verifyEmailRoute)
       return true
     }
@@ -104,7 +101,6 @@ export function useUserEmails() {
           description: email.email
         })
       }
-      mixpanel.track('Email Deleted')
 
       // If we're on the verify email page and there are no more unverified emails, redirect home
       if (route.path === verifyEmailRoute && unverifiedEmails.value.length === 0) {
@@ -124,10 +120,6 @@ export function useUserEmails() {
   }
 
   const verifyUserEmail = async (email: UserEmail, code: string) => {
-    mixpanel.track('Email Verification Started', {
-      email: email.email,
-      isPrimary: email.primary
-    })
 
     const result = await verifyMutation({
       input: { email: email.email, code }
@@ -137,11 +129,6 @@ export function useUserEmails() {
 
     if (result?.data?.activeUserMutations?.emailMutations?.verify) {
       if (!activeUserId.value) return
-
-      mixpanel.track('Email Verified', {
-        email: email.email,
-        isPrimary: email.primary
-      })
 
       // Update UserEmail verified status in cache
       modifyObjectField(
@@ -178,11 +165,6 @@ export function useUserEmails() {
       })
       return true
     }
-
-    mixpanel.track('Email Verification Failed', {
-      email: email.email,
-      isPrimary: email.primary
-    })
 
     triggerNotification({
       type: ToastNotificationType.Danger,

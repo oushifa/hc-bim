@@ -2,7 +2,6 @@ import { useApolloClient, useMutation, useQuery } from '@vue/apollo-composable'
 import { graphql } from '~/lib/common/generated/gql/gql'
 import type { WorkspaceSsoCheckQuery } from '~/lib/common/generated/gql/graphql'
 import { getFirstErrorMessage } from '~/lib/common/helpers/graphql'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { deleteWorkspaceSsoProviderMutation } from '~/lib/workspaces/graphql/mutations'
 import { workspaceSsoCheckQuery } from '~/lib/workspaces/graphql/queries'
 import type { WorkspaceSsoProviderPublic } from '~/lib/workspaces/helpers/types'
@@ -140,7 +139,6 @@ export function useWorkspaceSsoValidation(workspaceSlug: Ref<string>) {
  */
 export function useWorkspaceSsoDelete() {
   const { triggerNotification } = useGlobalToast()
-  const mixpanel = useMixpanel()
   const apollo = useApolloClient().client
 
   const { mutate: deleteSsoProviderMutation, loading } = useMutation(
@@ -162,11 +160,6 @@ export function useWorkspaceSsoDelete() {
         type: ToastNotificationType.Success,
         title: 'SSO provider removed',
         description: 'SSO provider was successfully removed'
-      })
-
-      mixpanel.track('Workspace SSO Provider Removed', {
-        // eslint-disable-next-line camelcase
-        workspace_id: workspaceId
       })
 
       return true

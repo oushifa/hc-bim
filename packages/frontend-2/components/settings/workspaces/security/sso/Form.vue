@@ -62,8 +62,6 @@ import { isRequired, isStringOfLength, isUrl } from '~~/lib/common/helpers/valid
 import { useLoginOrRegisterUtils } from '~/lib/auth/composables/auth'
 import { usePostAuthRedirect } from '~/lib/auth/composables/postAuthRedirect'
 import type { SsoFormValues } from '~/lib/workspaces/helpers/types'
-import { useMixpanel } from '~/lib/core/composables/mp'
-
 const props = defineProps<{
   workspaceSlug: string
   providerInfo?: {
@@ -80,8 +78,6 @@ defineEmits<{
 const apiOrigin = useApiOrigin()
 const postAuthRedirect = usePostAuthRedirect()
 const { challenge } = useLoginOrRegisterUtils()
-const mixpanel = useMixpanel()
-
 const formData = ref<SsoFormValues>({
   providerName: props.providerInfo?.providerName || '',
   clientId: props.providerInfo?.clientId || '',
@@ -107,13 +103,6 @@ const onSubmit = handleSubmit(() => {
   postAuthRedirect.set(
     `/settings/workspaces/${props.workspaceSlug}/security?ssoValidationSuccess=true`
   )
-
-  mixpanel.track('Workspace SSO Configuration Started', {
-    // eslint-disable-next-line camelcase
-    workspace_slug: props.workspaceSlug,
-    // eslint-disable-next-line camelcase
-    provider_name: formData.value.providerName
-  })
 
   navigateTo(url.toString(), {
     external: true

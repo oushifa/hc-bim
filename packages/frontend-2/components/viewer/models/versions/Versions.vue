@@ -55,7 +55,6 @@ import {
   useInjectedViewerState
 } from '~~/lib/viewer/composables/setup'
 import { SpeckleViewer } from '@speckle/shared'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { ViewerEvent } from '@speckle/viewer'
 import { useViewerEventListener } from '~~/lib/viewer/composables/viewer'
 import { ChevronLeft } from 'lucide-vue-next'
@@ -74,8 +73,6 @@ const {
   ui: { diff: diffState }
 } = useInjectedViewerState()
 const { endDiff } = useDiffUtilities()
-
-const mp = useMixpanel()
 
 const hasDiffActive = computed(() => {
   return !!(diffState.oldVersion.value && diffState.newVersion.value)
@@ -102,7 +99,6 @@ const removeModel = async (modelId: string) => {
         builder.addObject(loadedResource.objectId)
     }
   }
-  mp.track('Viewer Action', { type: 'action', name: 'federation', action: 'remove' })
   await items.update(builder.toResources())
 }
 

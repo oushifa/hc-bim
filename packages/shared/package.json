@@ -48,7 +48,6 @@
     "@tiptap/core": "^2.0.0-beta.176",
     "bull": "*",
     "knex": "*",
-    "mixpanel": "^0.17.0",
     "pino": "^8.7.0",
     "pino-http": "^8.0.0",
     "pino-pretty": ">=8.0.0",
@@ -70,7 +69,6 @@
     "eslint": "^9.4.0",
     "eslint-config-prettier": "^9.1.0",
     "knex": "^2.5.1",
-    "mixpanel": "^0.17.0",
     "pino": "^8.7.0",
     "pino-http": "^8.0.0",
     "tshy": "^1.14.0",
@@ -92,7 +90,6 @@
       "./environment/node": "./src/environment/node.ts",
       "./environment/multiRegionConfig": "./src/environment/db.ts",
       "./observability": "./src/observability/index.ts",
-      "./observability/mixpanel": "./src/observability/mixpanel.ts",
       "./blobs": "./src/blobs/index.ts",
       "./previews": "./src/previews/index.ts",
       "./authz": "./src/authz/index.ts",
@@ -192,16 +189,6 @@
       "require": {
         "types": "./dist/commonjs/observability/index.d.ts",
         "default": "./dist/commonjs/observability/index.js"
-      }
-    },
-    "./observability/mixpanel": {
-      "import": {
-        "types": "./dist/esm/observability/mixpanel.d.ts",
-        "default": "./dist/esm/observability/mixpanel.js"
-      },
-      "require": {
-        "types": "./dist/commonjs/observability/mixpanel.d.ts",
-        "default": "./dist/commonjs/observability/mixpanel.js"
       }
     },
     "./blobs": {

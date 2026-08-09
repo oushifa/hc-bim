@@ -14,7 +14,6 @@
 <script setup lang="ts">
 import { LayoutDialog, type LayoutDialogButton } from '@speckle/ui-components'
 import { useLeaveProject } from '~~/lib/projects/composables/projectManagement'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import type { ProjectPageSettingsGeneralBlockLeave_ProjectFragment } from '~~/lib/common/generated/gql/graphql'
 
 const isOpen = defineModel<boolean>('open', { required: true })
@@ -24,8 +23,6 @@ const props = defineProps<{
 }>()
 
 const leaveProject = useLeaveProject()
-const mp = useMixpanel()
-
 const dialogButtons = computed<LayoutDialogButton[]>(() => [
   {
     text: 'Cancel',
@@ -47,11 +44,5 @@ const dialogButtons = computed<LayoutDialogButton[]>(() => [
 
 const onLeave = async () => {
   await leaveProject(props.project.id, { goHome: true })
-  mp.track('Stream Action', {
-    type: 'action',
-    name: 'leave',
-    // eslint-disable-next-line camelcase
-    workspace_id: props.project.workspace?.id
-  })
 }
 </script>

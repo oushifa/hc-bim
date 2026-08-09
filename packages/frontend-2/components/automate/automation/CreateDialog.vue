@@ -94,7 +94,6 @@ import {
   useAutomationInputEncryptor,
   type AutomationInputEncryptor
 } from '~/lib/automate/composables/automations'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { hasJsonFormErrors } from '~/lib/automate/composables/jsonSchema'
 import type { JsonFormsChangeEvent } from '@jsonforms/vue'
 
@@ -124,8 +123,6 @@ const props = defineProps<{
   preselectedProject?: Optional<FormSelectProjects_ProjectFragment>
 }>()
 const open = defineModel<boolean>('open', { required: true })
-
-const mixpanel = useMixpanel()
 
 const { handleSubmit: handleDetailsSubmit } = useForm<DetailsFormValues>()
 
@@ -214,9 +211,6 @@ const buttons = computed((): LayoutDialogButton[] => {
             disabled: !selectedFunction.value
           },
           onClick: () => {
-            mixpanel.track('Automate Select Function', {
-              functionId: selectedFunction?.value?.id
-            })
             step.value++
           }
         }
@@ -235,9 +229,6 @@ const buttons = computed((): LayoutDialogButton[] => {
           id: 'fnParamsNext',
           text: 'Next',
           onClick: () => {
-            mixpanel.track('Automate Set Function Parameters', {
-              functionId: selectedFunction?.value?.id
-            })
           },
           props: {
             disabled: hasParameterErrors.value
@@ -259,9 +250,6 @@ const buttons = computed((): LayoutDialogButton[] => {
           id: 'detailsCreate',
           text: 'Create',
           onClick: () => {
-            mixpanel.track('Automate Set Automation Details', {
-              functionId: selectedFunction?.value?.id
-            })
           },
           submit: true,
           disabled: creationLoading.value
@@ -447,16 +435,6 @@ const onDetailsSubmit = handleDetailsSubmit(async () => {
       logger.error('Failed to create revision', { revisionRes })
       return
     }
-
-    mixpanel.track('Automate Automation Created', {
-      automationId: aId,
-      name,
-      projectId: project.id,
-      functionName: fn.name,
-      functionId: fn.id,
-      functionReleaseId: fnRelease.id,
-      modelId: model.id
-    })
 
     // Enable
     await updateAutomation(

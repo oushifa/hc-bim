@@ -34,7 +34,6 @@ import {
   ROOT_QUERY
 } from '~/lib/common/helpers/graphql'
 import { useNavigateToHome, workspaceRoute } from '~/lib/common/helpers/route'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import {
   createWorkspaceMutation,
   inviteToWorkspaceMutation,
@@ -129,7 +128,6 @@ export const useProcessWorkspaceInvite = () => {
   const { mutate } = useMutation(processWorkspaceInviteMutation)
   const { activeUser } = useActiveUser()
   const { triggerNotification } = useGlobalToast()
-  const mp = useMixpanel()
   const isWorkspacesEnabled = useIsWorkspacesEnabled()
 
   return async (
@@ -224,17 +222,6 @@ export const useProcessWorkspaceInvite = () => {
         title: input.accept ? '工作空间邀请已接受' : '工作空间邀请已拒绝'
       })
 
-      mp.track('Workspace Joined', {
-        // eslint-disable-next-line camelcase
-        workspace_id: workspaceId
-      })
-
-      mp.track('Invite Action', {
-        type: 'workspace invite',
-        accepted: input.accept,
-        // eslint-disable-next-line camelcase
-        workspace_id: workspaceId
-      })
     } else {
       const err = getFirstErrorMessage(errors)
       const preventErrorToasts = isFunction(options?.preventErrorToasts)
@@ -450,8 +437,6 @@ export function useCreateWorkspace() {
 export const useWorkspaceUpdateRole = () => {
   const { mutate } = useMutation(workspaceUpdateRoleMutation)
   const { triggerNotification } = useGlobalToast()
-  const mixpanel = useMixpanel()
-
   return async (input: WorkspaceRoleUpdateInput) => {
     const result = await mutate(
       { input },
@@ -519,16 +504,7 @@ export const useWorkspaceUpdateRole = () => {
       })
 
       if (input.role) {
-        mixpanel.track('Workspace User Role Updated', {
-          newRole: input.role,
-          // eslint-disable-next-line camelcase
-          workspace_id: input.workspaceId
-        })
       } else {
-        mixpanel.track('Workspace User Removed', {
-          // eslint-disable-next-line camelcase
-          workspace_id: input.workspaceId
-        })
       }
     } else {
       const errorMessage = getFirstErrorMessage(result?.errors)
@@ -544,8 +520,6 @@ export const useWorkspaceUpdateRole = () => {
 export const useWorkspaceUpdateSeatType = () => {
   const { mutate } = useMutation(workspacesUpdateSeatTypeMutation)
   const { triggerNotification } = useGlobalToast()
-  const mixpanel = useMixpanel()
-
   return async (
     input: {
       userId: string
@@ -588,11 +562,6 @@ export const useWorkspaceUpdateSeatType = () => {
         })
       }
 
-      mixpanel.track('Workspace User Seat Type Updated', {
-        newSeatType: input.seatType,
-        // eslint-disable-next-line camelcase
-        workspace_id: input.workspaceId
-      })
     } else {
       const errorMessage = getFirstErrorMessage(result?.errors)
       triggerNotification({

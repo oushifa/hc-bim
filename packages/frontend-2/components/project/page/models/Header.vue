@@ -150,7 +150,6 @@ import type {
   GridListToggleValue,
   LayoutMenuItem
 } from '~~/lib/layout/helpers/components'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useCanCreateModel } from '~/lib/projects/composables/permissions'
 import { HorizontalDirection } from '@speckle/ui-components'
 import { useAccIntegration } from '~/lib/integrations/composables/useAccIntegration'
@@ -217,19 +216,11 @@ const localSearch = ref('')
 const sourceAppsLabelId = useId()
 const sourceAppsBtnId = useId()
 const router = useRouter()
-const mp = useMixpanel()
-
 const menuId = useId()
 
 const onViewAllClick = () => {
   router.push(allModelsRoute.value)
 
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'federation',
-    action: 'view-all',
-    source: 'project page'
-  })
 }
 
 const showNewDialog = ref(false)

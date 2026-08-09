@@ -26,7 +26,6 @@
 
 <script setup lang="ts">
 import { useWorkspacesWizard } from '~/lib/workspaces/composables/wizard'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { type PaidWorkspacePlans, WorkspacePlans } from '@speckle/shared'
 import { useWorkspaceAddonPrices } from '~/lib/billing/composables/prices'
 import { Currency, BillingInterval } from '~/lib/common/generated/gql/graphql'
@@ -35,7 +34,6 @@ import { formatPrice } from '~/lib/billing/helpers/plan'
 type AddonIncludedSelect = 'yes' | 'no'
 
 const { goToNextStep, goToPreviousStep, state } = useWorkspacesWizard()
-const mixpanel = useMixpanel()
 const { addonPrices } = useWorkspaceAddonPrices()
 
 const includeUnlimitedAddon = ref<AddonIncludedSelect | undefined>(undefined)
@@ -82,15 +80,9 @@ const onCtaClick = () => {
       ? WorkspacePlans.Team
       : WorkspacePlans.Pro
 
-  mixpanel.track('Workspace Unlimited Addon Step Completed', {
-    plan: state.value.plan,
-    includesAddonPurchase: includeUnlimitedAddon.value
-  })
-
   goToNextStep()
 }
 
 onMounted(() => {
-  mixpanel.track('Workspace Unlimited Addon Step Viewed')
 })
 </script>

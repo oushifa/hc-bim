@@ -30,12 +30,10 @@
 <script setup lang="ts">
 import { CommonLoadingIcon } from '@speckle/ui-components'
 import { useWorkspacePublicSsoCheck } from '~/lib/workspaces/composables/sso'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useAuthManager, useLoginOrRegisterUtils } from '~/lib/auth/composables/auth'
 
 const route = useRoute()
 const logger = useLogger()
-const mixpanel = useMixpanel()
 const { signInOrSignUpWithSso } = useAuthManager()
 const { challenge } = useLoginOrRegisterUtils()
 
@@ -47,12 +45,6 @@ if (error.value) {
 }
 
 const handleSsoLogin = () => {
-  mixpanel.track('Workspace SSO Session Error Redirected', {
-    // eslint-disable-next-line camelcase
-    workspace_slug: workspaceSlug.value,
-    // eslint-disable-next-line camelcase
-    provider_name: workspace.value?.ssoProviderName
-  })
 
   signInOrSignUpWithSso({
     workspaceSlug: workspaceSlug.value,

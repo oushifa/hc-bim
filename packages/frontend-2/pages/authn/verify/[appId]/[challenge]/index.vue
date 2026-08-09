@@ -161,7 +161,6 @@ import { useAuthCookie, useAuthManager } from '~~/lib/auth/composables/auth'
 import { authorizableAppMetadataQuery } from '~~/lib/auth/graphql/queries'
 import { Disclosure, DisclosureButton } from '@headlessui/vue'
 import { ensureError, type Nullable } from '@speckle/shared'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { homeRoute } from '~~/lib/common/helpers/route'
 import {
   ArrowsRightLeftIcon,
@@ -191,7 +190,6 @@ const route = useRoute()
 const { activeUser } = useActiveUser()
 const authToken = useAuthCookie()
 const { logout } = useAuthManager()
-const mp = useMixpanel()
 const { serverInfo } = useServerInfo()
 const loading = ref(false)
 const { triggerNotification } = useGlobalToast()
@@ -243,7 +241,6 @@ const deny = () => {
 
   loading.value = true
   action.value = ChosenAction.Deny
-  mp.track('App Authorization', { allow: false, type: 'action' })
   goToFinalUrl(denyUrl.value)
 }
 
@@ -251,7 +248,6 @@ const allow = async () => {
   if (import.meta.server || !allowUrl.value || loading.value) return
 
   loading.value = true
-  mp.track('App Authorization', { allow: true, type: 'action' })
 
   try {
     const allowRes = await $fetch<{ redirectUrl: string }>(allowUrl.value)

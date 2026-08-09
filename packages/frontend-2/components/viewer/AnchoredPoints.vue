@@ -136,7 +136,6 @@ import { useEmbed } from '~/lib/viewer/composables/setup/embed'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import type { LimitedUser } from '~~/lib/common/generated/gql/graphql'
 import type { SetFullyRequired } from '~~/lib/common/helpers/type'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useViewerUserActivityTracking } from '~~/lib/viewer/composables/activity'
 import {
   useViewerCommentBubblesProjection,
@@ -285,26 +284,13 @@ const showFollowerMessage = computed(
     followers.value.length !== 0
 )
 
-const mp = useMixpanel()
 function setUserSpotlight(sessionId: string) {
   if (spotlightUserSessionId.value === sessionId) {
     spotlightUserSessionId.value = null
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'spotlight-mode',
-      action: 'stop',
-      source: 'navbar'
-    })
     return
   }
 
   spotlightUserSessionId.value = sessionId
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'spotlight-mode',
-    action: 'start',
-    source: 'navbar'
-  })
 }
 
 const forceCloseThreads = async () => {

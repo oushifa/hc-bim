@@ -78,7 +78,6 @@ import {
 } from '~~/lib/viewer/composables/commentManagement'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { Roles } from '@speckle/shared'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useThreadUtilities } from '~~/lib/viewer/composables/ui'
 
 const props = defineProps<{
@@ -103,15 +102,8 @@ const isLimited = computed(() => {
   return !props.thread.rawText || props.thread.rawText.trim() === ''
 })
 
-const mp = useMixpanel()
 const open = (id: string) => {
   openThreadRaw(id)
-  mp.track('Comment Action', {
-    type: 'action',
-    name: 'toggle',
-    status: !isOpenInViewer.value,
-    source: 'sidebar'
-  })
 }
 
 const { calculateThreadResourceStatus } = useCommentContext()
@@ -147,11 +139,6 @@ const toggleCommentResolvedStatus = async () => {
     commentId: props.thread.id,
     projectId: projectId.value,
     archived: !props.thread.archived
-  })
-  mp.track('Comment Action', {
-    type: 'action',
-    name: 'archive',
-    status: !props.thread.archived
   })
   triggerNotification({
     title: `问题 ${props.thread.archived ? '已重新打开。' : '已解决。'}`,

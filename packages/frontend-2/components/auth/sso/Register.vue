@@ -33,7 +33,6 @@
 <script setup lang="ts">
 import { useAuthManager, useLoginOrRegisterUtils } from '~/lib/auth/composables/auth'
 import { useWorkspacePublicSsoCheck } from '~/lib/workspaces/composables/sso'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { authRegisterPanelQuery } from '~/lib/auth/graphql/queries'
 import { useQuery } from '@vue/apollo-composable'
 
@@ -43,7 +42,6 @@ const newsletterConsent = ref<boolean>(false)
 
 const { challenge } = useLoginOrRegisterUtils()
 const { signInOrSignUpWithSso } = useAuthManager()
-const mixpanel = useMixpanel()
 const logger = useLogger()
 const { result } = useQuery(authRegisterPanelQuery)
 
@@ -56,10 +54,6 @@ const handleContinue = () => {
 
   loading.value = true
   try {
-    mixpanel.track('Workspace SSO Register Attempted', {
-      // eslint-disable-next-line camelcase
-      workspace_slug: workspaceSlug.value
-    })
 
     signInOrSignUpWithSso({
       challenge: challenge.value,
@@ -68,16 +62,8 @@ const handleContinue = () => {
     })
   } catch (error) {
     logger.error('SSO registration failed:', error)
-    mixpanel.track('Workspace SSO Registration Failed', {
-      // eslint-disable-next-line camelcase
-      workspace_slug: workspaceSlug.value
-    })
   } finally {
     loading.value = false
-    mixpanel.track('Workspace SSO Registration Successful', {
-      // eslint-disable-next-line camelcase
-      workspace_slug: workspaceSlug.value
-    })
   }
 }
 </script>

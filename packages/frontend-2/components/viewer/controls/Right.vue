@@ -42,7 +42,6 @@
 
 <script setup lang="ts">
 import { useCameraUtilities, useViewerShortcuts } from '~~/lib/viewer/composables/ui'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { onClickOutside, useBreakpoints } from '@vueuse/core'
 import { TailwindBreakpoints } from '~~/lib/common/helpers/tailwind'
 import type { Nullable } from '@speckle/shared'
@@ -63,7 +62,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 const { zoomExtentsOrSelection } = useCameraUtilities()
 const { registerShortcuts, getShortcutDisplayText, shortcuts } = useViewerShortcuts()
-const mixpanel = useMixpanel()
 const { getTooltipProps } = useSmartTooltipDelay()
 const { isEnabled: isEmbedEnabled } = useEmbed()
 
@@ -94,7 +92,6 @@ const toggleActivePanel = (panel: ActivePanel) => {
 
 const trackAndzoomExtentsOrSelection = () => {
   zoomExtentsOrSelection()
-  mixpanel.track('Viewer Action', { type: 'action', name: 'zoom', source: 'button' })
 }
 
 registerShortcuts({

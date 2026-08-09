@@ -85,7 +85,6 @@
 import { useInjectedPresentationState } from '~/lib/presentations/composables/setup'
 import { useEventListener, useBreakpoints } from '@vueuse/core'
 import { TailwindBreakpoints } from '~~/lib/common/helpers/tailwind'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { graphql } from '~~/lib/common/generated/gql'
 import type { InjectableViewerState } from '~/lib/viewer/composables/setup/core'
 
@@ -105,7 +104,6 @@ const {
 } = useInjectedPresentationState()
 const viewerState = shallowRef<InjectableViewerState>()
 
-const mixpanel = useMixpanel()
 const breakpoints = useBreakpoints(TailwindBreakpoints)
 const isLgOrLarger = breakpoints.greaterOrEqual('lg')
 const isXlOrLarger = breakpoints.greaterOrEqual('xl')
@@ -143,12 +141,6 @@ useEventListener('keydown', handleKeydown)
 useHead({ title })
 
 onMounted(() => {
-  mixpanel.track('Presentation Viewed', {
-    // eslint-disable-next-line camelcase
-    presentation_id: presentation.value?.id,
-    // eslint-disable-next-line camelcase
-    workspace_id: workspace.value?.id
-  })
 
   $intercom.track('Presentation Viewed', {
     canEditPresentation: canEditPresentation.value

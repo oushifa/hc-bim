@@ -29,8 +29,6 @@
 import { useSelectionUtilities } from '~~/lib/viewer/composables/ui'
 import { useInjectedViewer } from '~~/lib/viewer/composables/setup'
 import { keyboardClick, CommonLoadingBar } from '@speckle/ui-components'
-import { useMixpanel } from '~~/lib/core/composables/mp'
-
 const {
   clearSelection,
   setSelectionFromObjectIds,
@@ -95,18 +93,11 @@ const displayName = computed(() => {
       return '未变更'
   }
 })
-const mp = useMixpanel()
 const isProcessing = ref(false)
 
 const yieldToMain = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
 const setSelection = async () => {
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'diffs',
-    action: 'select-group',
-    group: props.name
-  })
 
   if (isProcessing.value) return
 

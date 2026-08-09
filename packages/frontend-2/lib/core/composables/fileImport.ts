@@ -9,7 +9,6 @@ import type {
 import { importFileLegacy, type ImportFile } from '~~/lib/core/api/fileImport'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { BlobUploadStatus, type BlobPostResultItem } from '~~/lib/core/api/blobStorage'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useWorkbenchUploadSync } from '~~/lib/projects/composables/workbenchUploadSync'
 import { graphql } from '~/lib/common/generated/gql'
 import {
@@ -340,9 +339,6 @@ export function useFileImport(params: {
     if (!upload.value.file) return false
     return true
   })
-
-  const mp = useMixpanel()
-
   const handleError = () => {
     if (!errorCallback || !upload.value) return
 
@@ -436,12 +432,6 @@ export function useFileImport(params: {
         }
       )
       upload.value.result = res
-
-      mp.track('Upload Action', {
-        type: 'action',
-        name: 'create',
-        source: 'model card'
-      })
 
       fileUploadedCallback?.(upload.value)
     } catch (e) {

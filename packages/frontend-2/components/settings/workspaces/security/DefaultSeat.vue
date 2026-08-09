@@ -69,7 +69,6 @@ import type {
 } from '~/lib/common/generated/gql/graphql'
 import { Roles, SeatTypes } from '@speckle/shared'
 import { workspaceUpdateDefaultSeatTypeMutation } from '~/lib/workspaces/graphql/mutations'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useWorkspacePlan } from '~/lib/workspaces/composables/plan'
 import { WorkspaceSeatTypeDescription } from '~/lib/settings/helpers/constants'
 import {
@@ -91,7 +90,6 @@ const props = defineProps<{
   workspace: SettingsWorkspacesSecurityDefaultSeat_WorkspaceFragment
 }>()
 
-const mixpanel = useMixpanel()
 const { mutate: updateDefaultSeatType } = useMutation(
   workspaceUpdateDefaultSeatTypeMutation
 )
@@ -146,11 +144,6 @@ const applySeatTypeChange = async (seatTypeValue: WorkspaceSeatType) => {
       } 席位`
     })
 
-    mixpanel.track('Workspace Default Seat Type Updated', {
-      value: seatTypeValue,
-      // eslint-disable-next-line camelcase
-      workspace_id: props.workspace.id
-    })
   } else {
     triggerNotification({
       type: ToastNotificationType.Danger,

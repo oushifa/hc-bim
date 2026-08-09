@@ -17,7 +17,6 @@ import type { LayoutDialogButton } from '@speckle/ui-components'
 import { settingsWorkspaceRoutes } from '~/lib/common/helpers/route'
 import { useEmbed } from '~/lib/viewer/composables/setup/embed'
 import { useWorkspaceLimits } from '~/lib/workspaces/composables/limits'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { graphql } from '~/lib/common/generated/gql'
 import type { ViewerLimitsWorkspaceDialog_ProjectFragment } from '~/lib/common/generated/gql/graphql'
 import type { ViewerLimitsDialogType } from '~/lib/projects/helpers/limits'
@@ -46,7 +45,6 @@ const dialogOpen = defineModel<boolean>('open', {
   required: true
 })
 
-const mixpanel = useMixpanel()
 const { isEnabled: isEmbedEnabled } = useEmbed()
 const { versionLimitFormatted } = useWorkspaceLimits({
   slug: computed(() => props.project.workspace?.slug),
@@ -92,12 +90,6 @@ const explorePlansButton: LayoutDialogButton = {
     const slug = props.project.workspace?.slug
     if (!slug) return
 
-    mixpanel.track('Limit Reached Dialog Upgrade Button Clicked', {
-      type: props.limitType === 'version' ? 'version' : 'model',
-      location: 'viewer',
-      // eslint-disable-next-line camelcase
-      workspace_id: slug
-    })
     return navigateTo(settingsWorkspaceRoutes.billing.route(slug))
   }
 }

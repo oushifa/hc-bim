@@ -83,7 +83,6 @@ import { Roles, SeatTypes } from '@speckle/shared'
 import { useMutation } from '@vue/apollo-composable'
 import { graphql } from '~/lib/common/generated/gql'
 import type { SettingsWorkspacesSecurityDiscoverability_WorkspaceFragment } from '~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import {
   workspaceUpdateDiscoverabilityMutation,
   workspaceUpdateAutoJoinMutation
@@ -114,7 +113,6 @@ const props = defineProps<{
   workspace: SettingsWorkspacesSecurityDiscoverability_WorkspaceFragment
 }>()
 
-const mixpanel = useMixpanel()
 const { mutate: updateDiscoverability } = useMutation(
   workspaceUpdateDiscoverabilityMutation
 )
@@ -154,11 +152,6 @@ const isDomainDiscoverabilityEnabled = computed({
           newVal ? '自动加入' : '工作空间管理员必须接受加入请求'
         }。`
       })
-      mixpanel.track('Workspace Discoverability Toggled', {
-        value: newVal,
-        // eslint-disable-next-line camelcase
-        workspace_id: props.workspace?.id
-      })
 
       // If turning off discoverability, also turn off auto-join
       if (!newVal && props.workspace.discoverabilityAutoJoinEnabled) {
@@ -170,11 +163,6 @@ const isDomainDiscoverabilityEnabled = computed({
         }).catch(convertThrowIntoFetchResult)
 
         if (autoJoinResult?.data) {
-          mixpanel.track('Workspace Join Policy Updated', {
-            value: 'admin-approval',
-            // eslint-disable-next-line camelcase
-            workspace_id: props.workspace.id
-          })
         }
       }
     }
@@ -252,11 +240,6 @@ const handleJoinPolicyUpdate = async (newValue: JoinPolicy, confirmed = false) =
       ...notificationConfig
     })
 
-    mixpanel.track('Workspace Join Policy Updated', {
-      value: newValue === JoinPolicy.AutoJoin ? 'auto-join' : 'admin-approval',
-      // eslint-disable-next-line camelcase
-      workspace_id: props.workspace.id
-    })
   }
 }
 

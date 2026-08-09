@@ -41,7 +41,6 @@ import { useForm } from 'vee-validate'
 import { graphql } from '~~/lib/common/generated/gql'
 import type { ProjectModelPageDialogDeleteVersionFragment } from '~~/lib/common/generated/gql/graphql'
 import { isRequired } from '~~/lib/common/helpers/validation'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useUpdateVersion } from '~~/lib/projects/composables/versionManagement'
 
 graphql(`

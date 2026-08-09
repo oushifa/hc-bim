@@ -59,7 +59,6 @@ import {
 } from '~~/lib/common/helpers/graphql'
 import { isStringOfLength } from '~~/lib/common/helpers/validation'
 import type { WorkspaceSidebarAbout_WorkspaceFragment } from '~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import type { MaybeNullOrUndefined } from '@speckle/shared'
 
 graphql(`
@@ -77,8 +76,6 @@ const props = defineProps<{
 
 const { triggerNotification } = useGlobalToast()
 const { mutate: updateMutation } = useMutation(settingsUpdateWorkspaceMutation)
-const mixpanel = useMixpanel()
-
 const isEditing = ref(false)
 const editedDescription = ref('')
 
@@ -124,12 +121,6 @@ const saveDescription = async () => {
     triggerNotification({
       type: ToastNotificationType.Success,
       title: '描述已更新'
-    })
-    mixpanel.track('Workspace General Settings Updated', {
-      fields: ['description'],
-      // eslint-disable-next-line camelcase
-      workspace_id: props.workspace?.id,
-      source: 'sidebar'
     })
     isEditing.value = false
   } else {

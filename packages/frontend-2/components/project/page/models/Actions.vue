@@ -58,7 +58,6 @@ import type { LayoutMenuItem } from '~~/lib/layout/helpers/components'
 import { useCopyModelLink } from '~~/lib/projects/composables/modelManagement'
 import { EllipsisHorizontalIcon } from '@heroicons/vue/24/solid'
 import { graphql } from '~~/lib/common/generated/gql'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { HorizontalDirection } from '~~/lib/common/composables/window'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { modelVersionsRoute } from '~/lib/common/helpers/route'
@@ -145,7 +144,6 @@ const { copy } = useClipboard()
 const menuId = useId()
 const { isLoggedIn } = useActiveUser()
 const router = useRouter()
-const mp = useMixpanel()
 const { statusIsCanceled } = useWorkspacePlan(props.project.workspace?.slug || '')
 
 const showActionsMenu = ref(false)
@@ -298,7 +296,6 @@ const onActionChosen = (params: { item: LayoutMenuItem; event: MouseEvent }) => 
       )
       break
     case ActionTypes.Share:
-      mp.track('Branch Action', { type: 'action', name: 'share' })
       void copyModelLink({ model: props.model })
       break
     case ActionTypes.ViewVersions:

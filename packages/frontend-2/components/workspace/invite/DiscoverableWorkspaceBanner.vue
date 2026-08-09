@@ -10,7 +10,6 @@
 
 <script setup lang="ts">
 import { useDiscoverableWorkspaces } from '~/lib/workspaces/composables/discoverableWorkspaces'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import type { LimitedWorkspace } from '~/lib/common/generated/gql/graphql'
 
 const props = defineProps<{
@@ -19,8 +18,6 @@ const props = defineProps<{
 
 const { requestToJoinWorkspace, dismissDiscoverableWorkspace } =
   useDiscoverableWorkspaces()
-const mixpanel = useMixpanel()
-
 const invite = computed(() => ({
   workspace: {
     id: props.workspace.id,
@@ -34,12 +31,6 @@ const handleRequest = async (accept: boolean) => {
     await requestToJoinWorkspace(props.workspace, 'discovery banner')
   } else {
     await dismissDiscoverableWorkspace(props.workspace.id)
-    mixpanel.track('Workspace Discovery Banner Dismissed', {
-      workspaceId: props.workspace.id,
-      location: 'discovery_banner',
-      // eslint-disable-next-line camelcase
-      workspace_id: props.workspace.id
-    })
   }
 }
 </script>

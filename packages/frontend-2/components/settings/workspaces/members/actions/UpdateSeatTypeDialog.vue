@@ -41,7 +41,6 @@ import { useWorkspacePlan } from '~/lib/workspaces/composables/plan'
 import SeatTransitionCards from './SeatTransitionCards.vue'
 import type { SettingsWorkspacesMembersTableHeader_WorkspaceFragment } from '~/lib/common/generated/gql/graphql'
 import { Roles } from '@speckle/shared'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { graphql } from '~~/lib/common/generated/gql'
 import { useQuery } from '@vue/apollo-composable'
 
@@ -81,7 +80,6 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { required: true })
 
-const mixpanel = useMixpanel()
 const updateUserSeatType = useWorkspaceUpdateSeatType()
 const {
   editorSeatPriceFormatted,
@@ -148,12 +146,6 @@ const handleConfirm = async () => {
     )
 
     if (!hasAvailableEditorSeats.value && isPaidPlan.value) {
-      mixpanel.track('Workspace Seat Purchased', {
-        location: 'upgrade_seat_type_dialog',
-        seatType: 'editor',
-        // eslint-disable-next-line camelcase
-        workspace_id: props.workspace.id
-      })
     }
 
     await refetchSeats()

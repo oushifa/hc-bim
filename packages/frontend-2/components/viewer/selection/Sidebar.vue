@@ -169,7 +169,6 @@ import { containsAll } from '~~/lib/common/helpers/utils'
 import { useSelectionUtilities } from '~~/lib/viewer/composables/ui'
 import { useFilterUtilities } from '~/lib/viewer/composables/filtering/filtering'
 import { uniqWith } from 'lodash-es'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useIsSmallerOrEqualThanBreakpoint } from '~~/composables/browser'
 import { modelRoute } from '~/lib/common/helpers/route'
 import { TailwindBreakpoints } from '~~/lib/common/helpers/tailwind'
@@ -219,7 +218,6 @@ const { isSmallerOrEqualSm } = useIsSmallerOrEqualThanBreakpoint()
 const breakpoints = useBreakpoints(TailwindBreakpoints)
 const isGreaterThanSm = breakpoints.greater('sm')
 const menuId = useId()
-const mp = useMixpanel()
 const { showControls } = useEmbed()
 
 const itemCount = ref(20)
@@ -870,30 +868,15 @@ const onActionChosen = (params: { item: LayoutMenuItem; event: MouseEvent }) => 
 const hideOrShowSelection = () => {
   if (!isHidden.value) {
     hideObjects(allTargetIds.value)
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'selection',
-      action: 'hide'
-    })
     return
   }
 
   showObjects(allTargetIds.value)
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'selection',
-    action: 'show'
-  })
 }
 
 const isolateOrUnisolateSelection = () => {
   if (isIsolated.value) {
     unIsolateObjects(allTargetIds.value)
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'selection',
-      action: 'unisolate'
-    })
   } else {
     isolateObjects(allTargetIds.value)
   }
@@ -1012,12 +995,6 @@ onKeyStroke('Escape', () => {
   // Note: we're not using the trackAndClearSelection method beacuse
   // we want to track whether people press buttons or keys
   clearSelection()
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'selection',
-    action: 'clear',
-    source: 'keypress-escape'
-  })
 })
 
 watch(

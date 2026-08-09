@@ -31,7 +31,7 @@ import { useProcessOnboarding } from '~~/lib/auth/composables/onboarding'
 import { homeRoute } from '~/lib/common/helpers/route'
 
 const isOnboardingForced = useIsOnboardingForced()
-const { setUserOnboardingComplete, setMixpanelSegments } = useProcessOnboarding()
+const { setUserOnboardingComplete } = useProcessOnboarding()
 const { handleSubmit, meta, isSubmitting, values } = useForm({
   initialValues: {
     role: undefined as OnboardingRole | undefined,
@@ -41,9 +41,6 @@ const { handleSubmit, meta, isSubmitting, values } = useForm({
 })
 
 const onSubmit = handleSubmit(async () => {
-  if (values.role) {
-    setMixpanelSegments({ role: values.role })
-  }
   await setUserOnboardingComplete({
     role: values.role,
     plans: values.plan,

@@ -242,9 +242,19 @@
                       <span>{{ model.name }}</span>
                       <span
                         v-if="getModelRuntimeStatus(model)"
-                        class="ml-2 text-xs font-normal text-gray-400"
+                        class="ml-2 inline-flex items-center gap-1 align-middle"
                       >
-                        {{ getModelRuntimeStatus(model) }}
+                        <span class="text-xs font-normal text-gray-400">
+                          {{ getModelRuntimeStatus(model) }}
+                        </span>
+                        <button
+                          v-if="shouldShowRetryAction(model)"
+                          type="button"
+                          class="inline-flex cursor-pointer items-center rounded-full border border-[#bfecee] bg-[#e6f7f8] px-2 py-0.5 text-[11px] font-medium leading-none text-[#00b4b6] transition-colors hover:bg-[#00b4b6] hover:text-white"
+                          @click.stop="retryModelSync(model)"
+                        >
+                          重试
+                        </button>
                       </span>
                     </h3>
                     <div
@@ -332,9 +342,19 @@
                             {{ model.name }}
                             <span
                               v-if="getModelRuntimeStatus(model)"
-                              class="ml-2 text-xs font-normal text-gray-400"
+                              class="ml-2 inline-flex items-center gap-1 align-middle"
                             >
-                              {{ getModelRuntimeStatus(model) }}
+                              <span class="text-xs font-normal text-gray-400">
+                                {{ getModelRuntimeStatus(model) }}
+                              </span>
+                              <button
+                                v-if="shouldShowRetryAction(model)"
+                                type="button"
+                                class="inline-flex cursor-pointer items-center rounded-full border border-[#bfecee] bg-[#e6f7f8] px-2 py-0.5 text-[11px] font-medium leading-none text-[#00b4b6] transition-colors hover:bg-[#00b4b6] hover:text-white"
+                                @click.stop="retryModelSync(model)"
+                              >
+                                重试
+                              </button>
                             </span>
                           </span>
                           <div
@@ -375,35 +395,6 @@
                           @click.stop="triggerVersionUploadPicker(model)"
                         >
                           <ArrowUpTrayIcon class="h-4 w-4" />
-                        </button>
-                        <button
-                          v-if="shouldShowSyncAction(model)"
-                          :title="
-                            isModelSyncing({
-                              projectId: props.projectId,
-                              modelId: model.id
-                            })
-                              ? '同步中'
-                              : '同步模型'
-                          "
-                          class="p-1.5 text-[#00b4b6] hover:bg-[#e6f7f8] rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                          :disabled="
-                            isModelSyncing({
-                              projectId: props.projectId,
-                              modelId: model.id
-                            })
-                          "
-                          @click.stop="syncModelFile(model)"
-                        >
-                          <ArrowPathIcon
-                            class="h-4 w-4"
-                            :class="{
-                              'animate-spin': isModelSyncing({
-                                projectId: props.projectId,
-                                modelId: model.id
-                              })
-                            }"
-                          />
                         </button>
                         <button
                           v-if="hasModelOp('canDownload')"
@@ -618,7 +609,6 @@ import {
   EyeIcon,
   InboxIcon,
   ArrowUpTrayIcon,
-  ArrowPathIcon,
   PlusIcon,
   MagnifyingGlassIcon,
   EllipsisHorizontalIcon,
@@ -749,10 +739,11 @@ const drawingFileInputRef = ref<HTMLInputElement | null>(null)
 const drawingsApi = useWorkbenchDrawingsApi()
 
 const {
-  tasks,
+  getLatestTask,
   isModelSyncing,
-  runFullModelSync,
+  retryTask,
   syncVisibleTasks,
+  cleanupVisibleTaskSubscriptions,
   getModelRuntimeProgress: getTaskRuntimeProgress
 } = useWorkbenchUploadSync()
 
@@ -869,10 +860,7 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
     return '待同步'
   }
 
-  const latestTask =
-    tasks.value
-      .filter((task) => task.projectId === props.projectId && task.modelId === model.id)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] || null
+  const latestTask = getLatestModelTask(model)
 
   if (latestTask && ['speckle_converting', 'failed'].includes(latestTask.status)) {
     return '待同步'
@@ -918,10 +906,14 @@ const getModelRuntimeProgressPhase = (model: ModelListItem) =>
     modelId: model.id
   })?.phase ?? null
 
-const shouldShowSyncAction = (model: ModelListItem) => {
-  const status = getModelRuntimeStatus(model)
-  return status === '待同步' || status === '同步中'
-}
+const getLatestModelTask = (model: ModelListItem) =>
+  getLatestTask({
+    projectId: props.projectId,
+    modelId: model.id
+  })
+
+const shouldShowRetryAction = (model: ModelListItem) =>
+  getLatestModelTask(model)?.status === 'failed'
 
 const shouldShowProgressBar = (status: string | null) => {
   if (!status) return false
@@ -1231,11 +1223,19 @@ const loadSourceModelObjectTree = async (params: {
   return objects
 }
 
-const syncModelFile = async (model: ModelListItem) => {
-  await runFullModelSync({
-    projectId: props.projectId,
-    modelId: model.id
-  })
+const retryModelSync = async (model: ModelListItem) => {
+  const latestTask = getLatestModelTask(model)
+  if (!latestTask || latestTask.status !== 'failed') return
+
+  try {
+    await retryTask(latestTask.id)
+  } catch (e) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '重试失败',
+      description: ensureError(e).message
+    })
+  }
 }
 
 const downloadModelSource = async (model: ModelListItem) => {
@@ -1584,16 +1584,25 @@ const visibleModelSyncTargets = computed(() =>
     : []
 )
 
+const visibleModelSyncTargetsSignature = computed(() =>
+  visibleModelSyncTargets.value
+    .map((target) => `${target.projectId}:${[...target.modelIds].sort().join(',')}`)
+    .join('|')
+)
+
 watch(
-  visibleModelSyncTargets,
-  (targets) => {
-    void syncVisibleTasks(targets)
+  visibleModelSyncTargetsSignature,
+  () => {
+    void syncVisibleTasks(visibleModelSyncTargets.value)
   },
   {
-    immediate: true,
-    deep: true
+    immediate: true
   }
 )
+
+onUnmounted(() => {
+  cleanupVisibleTaskSubscriptions()
+})
 
 const refreshModels = async () => {
   await Promise.allSettled([refetchBaseModels(), refetchExtraModels()])

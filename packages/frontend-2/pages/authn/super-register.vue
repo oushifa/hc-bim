@@ -60,14 +60,12 @@
 </template>
 <script setup lang="ts">
 import { useForm } from 'vee-validate'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useAuthManager, useLoginOrRegisterUtils } from '~~/lib/auth/composables/auth'
 import { ensureError } from '@speckle/shared'
 import { isRequired } from '~~/lib/common/helpers/validation'
 import { passwordRules } from '~~/lib/auth/helpers/validation'
 import { useMounted } from '@vueuse/core'
 
-const mixpanel = useMixpanel()
 const { signUpWithEmail } = useAuthManager()
 const { challenge } = useLoginOrRegisterUtils()
 const { handleSubmit } = useForm<{ email: string; password: string; name: string }>()
@@ -98,9 +96,6 @@ const onSubmit = handleSubmit(async () => {
     })
   } catch (e) {
     errorMessage.value = '注册失败'
-    mixpanel.track('Super Register Failed', {
-      reason: ensureError(e).message
-    })
   } finally {
     loading.value = false
   }

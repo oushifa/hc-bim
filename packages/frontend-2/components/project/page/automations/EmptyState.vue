@@ -21,8 +21,6 @@ import {
 } from '~/lib/common/helpers/route'
 import type { CreateAutomationSelectableFunction } from '~/lib/automate/helpers/automations'
 import type { LayoutDialogButton } from '@speckle/ui-components'
-import { useMixpanel } from '~/lib/core/composables/mp'
-
 const emit = defineEmits<{
   'new-automation': [fn?: CreateAutomationSelectableFunction]
   'new-function': []
@@ -49,10 +47,7 @@ const props = withDefaults(
 )
 
 const router = useRouter()
-const mixpanel = useMixpanel()
-
 onMounted(() => {
-  mixpanel.track('Automate Onboarding Start')
 })
 
 const functionsGalleryRoute = computed(() =>
@@ -88,7 +83,6 @@ const emptyStateItems = computed(() => {
           id: 'create-function',
           text: 'Create function',
           onClick: () => {
-            mixpanel.track('Automate Onboarding Start Create Function')
             emit('new-function')
           },
           disabled: isDisabledAction('create-function')
@@ -110,7 +104,6 @@ const emptyStateItems = computed(() => {
         {
           text: 'Create automation',
           onClick: () => {
-            mixpanel.track('Automate Onboarding Start Create Automation')
             emit('new-automation')
           },
           disabled: isDisabledAction('create-automation'),

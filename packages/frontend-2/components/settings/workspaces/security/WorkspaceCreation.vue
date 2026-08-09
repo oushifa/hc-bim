@@ -38,7 +38,6 @@
 import { useMutation } from '@vue/apollo-composable'
 import { graphql } from '~/lib/common/generated/gql'
 import type { SettingsWorkspacesSecurityWorkspaceCreation_WorkspaceFragment } from '~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { workspaceUpdateExclusiveMutation } from '~/lib/workspaces/graphql/mutations'
 
 graphql(`
@@ -61,7 +60,6 @@ const props = defineProps<{
   workspace: SettingsWorkspacesSecurityWorkspaceCreation_WorkspaceFragment
 }>()
 
-const mixpanel = useMixpanel()
 const { mutate: updateExclusive } = useMutation(workspaceUpdateExclusiveMutation)
 const { triggerNotification } = useGlobalToast()
 
@@ -88,11 +86,6 @@ const isExclusive = computed({
         description: `成员工作空间创建已被 ${
           newVal ? '限制' : '允许'
         }。管理员和访客仍可以创建工作空间。`
-      })
-      mixpanel.track('Workspace Creation Restriction Toggled', {
-        value: newVal,
-        // eslint-disable-next-line camelcase
-        workspace_id: props.workspace?.id
       })
     } else {
       triggerNotification({

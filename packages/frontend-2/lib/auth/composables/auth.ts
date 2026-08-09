@@ -73,7 +73,7 @@ export const useJustLoggedOutTracking = () => {
 
 /**
  * Do something when the app auth state changes (user logged in or not). Useful for imperatively
- * identifying/unidentifying users on mixpanel & other observability tools.
+ * identifying/unidentifying users in observability tools.
  *
  * Use the return to manually remove the callback
  */

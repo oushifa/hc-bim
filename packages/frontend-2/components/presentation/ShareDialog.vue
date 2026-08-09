@@ -53,7 +53,6 @@ import {
   convertThrowIntoFetchResult,
   getFirstErrorMessage
 } from '~~/lib/common/helpers/graphql'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { projectRoute } from '~/lib/common/helpers/route'
 import { Roles } from '@speckle/shared'
 
@@ -142,8 +141,6 @@ const { mutate: disableToken } = useMutation(
 )
 const { mutate: enableToken } = useMutation(presentationDialogShareEnableTokenMutation)
 const { triggerNotification } = useGlobalToast()
-const mixpanel = useMixpanel()
-
 const isProjectOwner = computed(
   () => result.value?.project?.role === Roles.Stream.Owner
 )
@@ -216,11 +213,6 @@ const onEnablePublicUrl = async (value: boolean) => {
   }
 
   // Track the sharing toggle event
-  mixpanel.track('Presentation Sharing Toggled', {
-    public: value,
-    projectId: props.projectId,
-    savedViewGroupId: props.presentationId
-  })
 
   await refetch()
 }

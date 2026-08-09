@@ -67,7 +67,6 @@ import { useInjectedViewerState } from '~~/lib/viewer/composables/setup'
 import { onKeyStroke, useBreakpoints } from '@vueuse/core'
 import { useEmbed } from '~/lib/viewer/composables/setup/embed'
 import { TailwindBreakpoints } from '~~/lib/common/helpers/tailwind'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { Ruler, Scissors, Sun, Layers2, Glasses } from 'lucide-vue-next'
 import { useOnViewerLoadComplete } from '~/lib/viewer/composables/viewer'
 
@@ -108,8 +107,6 @@ const hasNonDefaultViewMode = computed(() => currentViewMode.value !== ViewMode.
 const { isEnabled: isEmbedEnabled } = useEmbed()
 const breakpoints = useBreakpoints(TailwindBreakpoints)
 const isMobile = breakpoints.smaller('sm')
-const mixpanel = useMixpanel()
-
 const activePanel = ref<ActivePanel>(ActivePanel.none)
 const viewerLoaded = ref(false)
 
@@ -297,27 +294,12 @@ useOnViewerLoadComplete(
 
 watch(activePanel, (newVal) => {
   // Using 'controls' here to stick to the old naming convention
-  mixpanel.track('Viewer Action', {
-    type: 'action',
-    name: 'controls-toggle',
-    action: newVal
-  })
 })
 
 watch(isSectionBoxEnabled, (val) => {
-  mixpanel.track('Viewer Action', {
-    type: 'action',
-    name: 'section-box',
-    status: val
-  })
 })
 
 watch(isSectionBoxVisible, (val) => {
-  mixpanel.track('Viewer Action', {
-    type: 'action',
-    name: 'section-box-visibility',
-    status: val
-  })
 })
 
 defineExpose({

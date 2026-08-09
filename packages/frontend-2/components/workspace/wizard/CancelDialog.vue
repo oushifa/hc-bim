@@ -15,7 +15,6 @@
 
 <script setup lang="ts">
 import type { LayoutDialogButton } from '@speckle/ui-components'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { homeRoute } from '~/lib/common/helpers/route'
 import {
   convertThrowIntoFetchResult,
@@ -37,7 +36,6 @@ const { resetWizardState } = useWorkspacesWizard()
 const { mutate: deleteWorkspace } = useMutation(deleteWorkspaceMutation)
 const { activeUser } = useActiveUser()
 const apollo = useApolloClient().client
-const mixpanel = useMixpanel()
 const router = useRouter()
 
 const dialogButtons = computed((): LayoutDialogButton[] => [
@@ -96,7 +94,5 @@ const onConfirm = async () => {
   router.push(homeRoute)
   isOpen.value = false
   resetWizardState()
-  mixpanel.track('Workspace Creation Canceled')
-  mixpanel.stop_session_recording()
 }
 </script>

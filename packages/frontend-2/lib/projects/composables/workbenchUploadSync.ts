@@ -7,6 +7,7 @@ import {
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useScopedState } from '~~/lib/common/composables/scopedState'
+import { nanoid } from 'nanoid'
 
 const LOCAL_UPLOAD_RUNTIME_END = 20
 const RVT_CONVERSION_RUNTIME_START = 20
@@ -89,6 +90,16 @@ export type WorkbenchModelSyncRuntimeProgress = {
   message: string | null
 }
 
+type VisibleTaskTarget = {
+  projectId: string
+  modelIds: string[]
+}
+
+type VisibleTaskSubscriptionState = {
+  source: EventSource
+  ownerIds: string[]
+}
+
 const useWorkbenchUploadSyncTaskMap = () => {
   return useScopedState('workbenchUploadSyncTaskMap', () =>
     ref<Record<string, WorkbenchUploadSyncTask>>({})
@@ -102,7 +113,7 @@ const useWorkbenchUploadSyncEventSources = () =>
 
 const useWorkbenchUploadSyncPageEventSources = () =>
   useScopedState('workbenchUploadSyncPageEventSources', () =>
-    ref<Record<string, EventSource | null>>({})
+    ref<Record<string, VisibleTaskSubscriptionState | null>>({})
   )
 
 const buildSyncingModelKey = (projectId: string, modelId: string) =>
@@ -110,6 +121,12 @@ const buildSyncingModelKey = (projectId: string, modelId: string) =>
 
 const buildVisibleTaskSubscriptionKey = (projectId: string, modelIds: string[]) =>
   `${projectId}:${[...modelIds].sort().join(',')}`
+
+const buildVisibleTaskBatchSubscriptionKey = (targets: VisibleTaskTarget[]) =>
+  targets
+    .map((target) => buildVisibleTaskSubscriptionKey(target.projectId, target.modelIds))
+    .sort()
+    .join('|')
 
 const clampProgressPercent = (progress: number | null | undefined) => {
   if (typeof progress !== 'number' || Number.isNaN(progress)) return null
@@ -176,6 +193,8 @@ export const useWorkbenchUploadSync = () => {
   const logger = useLogger()
   const authToken = useAuthCookie()
   const { triggerNotification } = useGlobalToast()
+  const visibleTaskSubscriptionOwnerId = nanoid()
+  let visibleTaskSyncRunId = 0
 
   const taskMap = useWorkbenchUploadSyncTaskMap()
   const eventSources = useWorkbenchUploadSyncEventSources()
@@ -268,12 +287,38 @@ export const useWorkbenchUploadSync = () => {
   }
 
   const stopVisibleTaskSubscription = (subscriptionKey: string) => {
-    const source = pageEventSources.value[subscriptionKey]
-    source?.close()
-    pageEventSources.value = {
-      ...pageEventSources.value,
-      [subscriptionKey]: null
+    const entry = pageEventSources.value[subscriptionKey]
+    entry?.source.close()
+    const next = { ...pageEventSources.value }
+    delete next[subscriptionKey]
+    pageEventSources.value = next
+  }
+
+  const cleanupVisibleTaskSubscriptions = () => {
+    const nextEntries: Record<string, VisibleTaskSubscriptionState | null> = {
+      ...pageEventSources.value
     }
+
+    for (const [subscriptionKey, entry] of Object.entries(pageEventSources.value)) {
+      if (!entry) continue
+
+      const nextOwnerIds = entry.ownerIds.filter(
+        (ownerId) => ownerId !== visibleTaskSubscriptionOwnerId
+      )
+
+      if (nextOwnerIds.length) {
+        nextEntries[subscriptionKey] = {
+          ...entry,
+          ownerIds: nextOwnerIds
+        }
+        continue
+      }
+
+      entry.source.close()
+      delete nextEntries[subscriptionKey]
+    }
+
+    pageEventSources.value = nextEntries
   }
 
   const refreshModelList = async () => {
@@ -364,7 +409,7 @@ export const useWorkbenchUploadSync = () => {
     if (!task.modelId || !canResumeServerExecution(task)) return
     if (eventSources.value[task.id]) return
 
-    const streamUrl = `${apiOrigin}/api/v1/projects/${task.projectId}/models/${task.modelId}/model-sync/tasks/${task.id}/events`
+    const streamUrl = `/api/projects/${task.projectId}/models/${task.modelId}/model-sync/tasks/${task.id}/events`
     const source = new EventSource(streamUrl, {
       withCredentials: true
     })
@@ -442,21 +487,37 @@ export const useWorkbenchUploadSync = () => {
     taskMap.value = nextMap
   }
 
-  const subscribeVisibleTasks = (params: { projectId: string; modelIds: string[] }) => {
+  const shouldIgnoreVisibleTaskEvent = (subscriptionKey: string, source: EventSource) =>
+    pageEventSources.value[subscriptionKey]?.source !== source
+
+  const subscribeVisibleTasks = (targets: VisibleTaskTarget[]) => {
     if (import.meta.server) return
-    const normalizedModelIds = [...new Set(params.modelIds)].filter(Boolean).sort()
-    if (!normalizedModelIds.length) return
+    const normalizedTargets = targets
+      .map((target) => ({
+        projectId: target.projectId,
+        modelIds: [...new Set(target.modelIds)].filter(Boolean).sort()
+      }))
+      .filter((target) => target.projectId && target.modelIds.length)
 
-    const subscriptionKey = buildVisibleTaskSubscriptionKey(
-      params.projectId,
-      normalizedModelIds
-    )
-    if (pageEventSources.value[subscriptionKey]) return
+    if (!normalizedTargets.length) return
 
-    const streamUrl = `${apiOrigin}/api/v1/projects/${
-      params.projectId
-    }/model-sync/tasks/events?modelIds=${encodeURIComponent(
-      normalizedModelIds.join(',')
+    const subscriptionKey = buildVisibleTaskBatchSubscriptionKey(normalizedTargets)
+    const existingEntry = pageEventSources.value[subscriptionKey]
+    if (existingEntry) {
+      if (!existingEntry.ownerIds.includes(visibleTaskSubscriptionOwnerId)) {
+        pageEventSources.value = {
+          ...pageEventSources.value,
+          [subscriptionKey]: {
+            ...existingEntry,
+            ownerIds: existingEntry.ownerIds.concat(visibleTaskSubscriptionOwnerId)
+          }
+        }
+      }
+      return
+    }
+
+    const streamUrl = `/api/model-sync/tasks/events?targets=${encodeURIComponent(
+      JSON.stringify(normalizedTargets)
     )}`
     const source = new EventSource(streamUrl, {
       withCredentials: true
@@ -464,19 +525,22 @@ export const useWorkbenchUploadSync = () => {
 
     source.addEventListener('snapshot', (event) => {
       try {
+        if (shouldIgnoreVisibleTaskEvent(subscriptionKey, source)) return
         const payload = JSON.parse((event as MessageEvent<string>).data) as {
           projectId: string
           tasks: ServerModelSyncTask[]
         }
         replaceTasksForModels({
           projectId: payload.projectId,
-          modelIds: normalizedModelIds,
+          modelIds:
+            normalizedTargets.find((target) => target.projectId === payload.projectId)
+              ?.modelIds || [],
           serverTasks: payload.tasks
         })
       } catch (error) {
         logger.warn(
           {
-            projectId: params.projectId,
+            targets: normalizedTargets,
             error
           },
           '解析模型同步页面快照失败'
@@ -486,6 +550,7 @@ export const useWorkbenchUploadSync = () => {
 
     source.addEventListener('update', (event) => {
       try {
+        if (shouldIgnoreVisibleTaskEvent(subscriptionKey, source)) return
         const payload = JSON.parse(
           (event as MessageEvent<string>).data
         ) as ServerModelSyncTask
@@ -496,7 +561,7 @@ export const useWorkbenchUploadSync = () => {
       } catch (error) {
         logger.warn(
           {
-            projectId: params.projectId,
+            targets: normalizedTargets,
             error
           },
           '解析模型同步页面 SSE 消息失败'
@@ -505,12 +570,16 @@ export const useWorkbenchUploadSync = () => {
     })
 
     source.onerror = () => {
+      if (shouldIgnoreVisibleTaskEvent(subscriptionKey, source)) return
       stopVisibleTaskSubscription(subscriptionKey)
     }
 
     pageEventSources.value = {
       ...pageEventSources.value,
-      [subscriptionKey]: source
+      [subscriptionKey]: {
+        source,
+        ownerIds: [visibleTaskSubscriptionOwnerId]
+      }
     }
   }
 
@@ -627,9 +696,9 @@ export const useWorkbenchUploadSync = () => {
     })
   }
 
-  const syncVisibleTasks = async (
-    targets: Array<{ projectId: string; modelIds: string[] }>
-  ) => {
+  const syncVisibleTasks = async (targets: VisibleTaskTarget[]) => {
+    visibleTaskSyncRunId += 1
+    const currentRunId = visibleTaskSyncRunId
     const normalizedTargets = targets
       .map((target) => ({
         projectId: target.projectId,
@@ -637,39 +706,70 @@ export const useWorkbenchUploadSync = () => {
       }))
       .filter((target) => target.projectId && target.modelIds.length)
 
-    const activeKeys = new Set(
-      normalizedTargets.map((target) =>
-        buildVisibleTaskSubscriptionKey(target.projectId, target.modelIds)
-      )
+    const targetsWithTasks: VisibleTaskTarget[] = []
+
+    await Promise.all(
+      normalizedTargets.map(async (target) => {
+        try {
+          const response = await fetchProjectTaskSnapshot(target)
+          if (currentRunId !== visibleTaskSyncRunId) return
+
+          replaceTasksForModels({
+            projectId: target.projectId,
+            modelIds: target.modelIds,
+            serverTasks: response.data
+          })
+
+          if (response.data.length) {
+            targetsWithTasks.push(target)
+          }
+        } catch (error) {
+          logger.warn(
+            {
+              projectId: target.projectId,
+              modelIds: target.modelIds,
+              error
+            },
+            '同步当前页模型任务快照失败'
+          )
+        }
+      })
     )
 
-    for (const subscriptionKey of Object.keys(pageEventSources.value)) {
-      if (!activeKeys.has(subscriptionKey)) {
+    if (currentRunId !== visibleTaskSyncRunId) return
+
+    const nextSubscriptionKey = targetsWithTasks.length
+      ? buildVisibleTaskBatchSubscriptionKey(targetsWithTasks)
+      : null
+
+    for (const [subscriptionKey, entry] of Object.entries(pageEventSources.value)) {
+      if (!entry?.ownerIds.includes(visibleTaskSubscriptionOwnerId)) continue
+      if (subscriptionKey !== nextSubscriptionKey) {
+        const nextOwnerIds = entry.ownerIds.filter(
+          (ownerId) => ownerId !== visibleTaskSubscriptionOwnerId
+        )
+        if (nextOwnerIds.length) {
+          pageEventSources.value = {
+            ...pageEventSources.value,
+            [subscriptionKey]: {
+              ...entry,
+              ownerIds: nextOwnerIds
+            }
+          }
+          continue
+        }
         stopVisibleTaskSubscription(subscriptionKey)
       }
     }
 
-    for (const target of normalizedTargets) {
-      try {
-        const response = await fetchProjectTaskSnapshot(target)
-        replaceTasksForModels({
-          projectId: target.projectId,
-          modelIds: target.modelIds,
-          serverTasks: response.data
-        })
-        subscribeVisibleTasks(target)
-      } catch (error) {
-        logger.warn(
-          {
-            projectId: target.projectId,
-            modelIds: target.modelIds,
-            error
-          },
-          '同步当前页模型任务快照失败'
-        )
-      }
+    if (targetsWithTasks.length) {
+      subscribeVisibleTasks(targetsWithTasks)
     }
   }
+
+  onScopeDispose(() => {
+    cleanupVisibleTaskSubscriptions()
+  })
 
   const consumeVersionCreated = async (_params: {
     projectId: string
@@ -738,6 +838,7 @@ export const useWorkbenchUploadSync = () => {
     retryTask,
     executeTask: retryTask,
     syncVisibleTasks,
+    cleanupVisibleTaskSubscriptions,
     consumeVersionCreated,
     runFullModelSync,
     setModelSyncing,

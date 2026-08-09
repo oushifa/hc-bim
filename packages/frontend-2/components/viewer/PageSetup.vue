@@ -131,7 +131,6 @@ import dayjs from 'dayjs'
 import { graphql } from '~~/lib/common/generated/gql'
 import { useEmbed } from '~/lib/viewer/composables/setup/embed'
 import { projectsRoute, workspaceRoute } from '~~/lib/common/helpers/route'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { parseUrlParameters, resourceBuilder } from '@speckle/shared/viewer/route'
 import { ViewerLimitsDialogType } from '~/lib/projects/helpers/limits'
 import { TailwindBreakpoints } from '~~/lib/common/helpers/tailwind'
@@ -192,8 +191,6 @@ const {
   disableModelLink,
   hideSpeckleBranding
 } = useEmbed()
-const mp = useMixpanel()
-
 const {
   resources: {
     response: { project, modelsAndVersionIds, savedView }
@@ -293,7 +290,6 @@ onMounted(() => {
   const shouldTrackEvent = !referrer?.includes('47.100.77.97:64482') && !import.meta.dev
 
   if (isEmbedEnabled.value && shouldTrackEvent) {
-    mp.track('Embedded Model Load')
   }
 })
 

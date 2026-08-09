@@ -44,7 +44,6 @@ import type {
   ProjectPageAutomationHeader_ProjectFragment
 } from '~/lib/common/generated/gql/graphql'
 import { projectRoute } from '~/lib/common/helpers/route'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useUpdateAutomation } from '~/lib/projects/composables/automationManagement'
 
 graphql(`
@@ -84,8 +83,6 @@ const props = defineProps<{
 const switchId = useId()
 const loading = useMutationLoading()
 const updateAutomation = useUpdateAutomation()
-const mixpanel = useMixpanel()
-
 const automationsLink = computed(() => projectRoute(props.project.id, 'automations'))
 const name = computed({
   get: () => props.automation.name,
@@ -145,14 +142,6 @@ const enabled = computed({
       }
     })
     if (res?.id) {
-      mixpanel.track('Automation Enabled/Disabled', {
-        automationId: res.id,
-        automationName: res.name,
-        projectId: props.project.id,
-        enabled: res.enabled,
-        /* eslint-disable-next-line camelcase */
-        workspace_id: props.project.workspaceId
-      })
     }
   }
 })

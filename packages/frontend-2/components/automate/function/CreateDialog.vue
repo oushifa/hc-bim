@@ -61,7 +61,6 @@ import type {
   AutomateFunctionCreateDialogDoneStep_AutomateFunctionFragment,
   AutomateFunctionCreateDialog_WorkspaceFragment
 } from '~~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { graphql } from '~/lib/common/generated/gql'
 
 enum FunctionCreateSteps {
@@ -89,7 +88,6 @@ const props = defineProps<{
 }>()
 const open = defineModel<boolean>('open', { required: true })
 
-const mixpanel = useMixpanel()
 const logger = useLogger()
 const mutationLoading = useMutationLoading()
 const createFunction = useCreateAutomateFunction()
@@ -118,13 +116,6 @@ const onDetailsSubmit = handleDetailsSubmit(async (values) => {
     return
   }
 
-  mixpanel.track('Automate Function Created', {
-    functionId: res.id,
-    templateId: selectedTemplate.value.id,
-    name: values.name,
-    /* eslint-disable-next-line camelcase */
-    workspace_id: props.workspace?.id
-  })
   createdFunction.value = res
   step.value++
 
@@ -143,7 +134,6 @@ const onDetailsSubmit = handleDetailsSubmit(async (values) => {
 const onSubmit = computed(() => {
   switch (enumStep.value) {
     case FunctionCreateSteps.Details:
-      mixpanel.track('Automate Configure Function Details')
       return onDetailsSubmit
     default:
       return noop
@@ -217,7 +207,6 @@ const buttons = computed((): LayoutDialogButton[] => {
           id: 'authorizeAuthorize',
           text: 'Authorize',
           onClick: () => {
-            mixpanel.track('Automate Start Authorize GitHub App')
           },
           props: {
             fullWidth: true,
@@ -235,7 +224,6 @@ const buttons = computed((): LayoutDialogButton[] => {
             disabled: !selectedTemplate.value
           },
           onClick: () => {
-            mixpanel.track('Automate Select Function Template')
             step.value++
           }
         }

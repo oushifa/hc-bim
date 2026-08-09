@@ -61,13 +61,11 @@
 <script setup lang="ts">
 import { ViewMode, type SunLightConfiguration } from '@speckle/viewer'
 import { useInjectedViewerState } from '~~/lib/viewer/composables/setup'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { debounce } from 'lodash-es'
 import { FormSwitch } from '@speckle/ui-components'
 import { useViewModeUtilities } from '~/lib/viewer/composables/ui'
 import { TIME_MS } from '@speckle/shared'
 
-const mp = useMixpanel()
 const {
   viewMode: { mode: currentViewMode }
 } = useViewModeUtilities()
@@ -78,10 +76,6 @@ const isLightingSupported = computed(() => {
 })
 
 const debounceTrackLightConfigChange = debounce(() => {
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'light-config-change'
-  })
 }, TIME_MS.second)
 
 const createLightConfigComputed = <K extends keyof SunLightConfiguration>(key: K) =>

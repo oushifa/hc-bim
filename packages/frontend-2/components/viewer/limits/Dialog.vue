@@ -20,7 +20,6 @@
 import { useMultipleDialogBranching } from '~/lib/common/composables/dialog'
 import { graphql } from '~/lib/common/generated/gql'
 import type { ViewerLimitsDialog_ProjectFragment } from '~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import type { ViewerLimitsDialogType } from '~/lib/projects/helpers/limits'
 
 graphql(`
@@ -41,8 +40,6 @@ const props = defineProps<{
 const open = defineModel<boolean>('open', {
   required: true
 })
-const mixpanel = useMixpanel()
-
 const isPersonal = computed(() => props.project && !props.project.workspaceId)
 
 const { openPersonalLimits, openWorkspaceLimits } = useMultipleDialogBranching({
@@ -56,22 +53,11 @@ const { openPersonalLimits, openWorkspaceLimits } = useMultipleDialogBranching({
 
 watch(openWorkspaceLimits, (value, oldValue) => {
   if (value && !oldValue) {
-    mixpanel.track('Limit Reached Dialog Viewed', {
-      type: props.limitType === 'version' ? 'version' : 'model',
-      location: 'viewer',
-      // eslint-disable-next-line camelcase
-      workspace_id: props.project.workspace?.slug,
-      limitType: props.limitType
-    })
   }
 })
 
 watch(openWorkspaceLimits, (value, oldValue) => {
   if (value && !oldValue) {
-    mixpanel.track('Personal Limit Reached Dialog Viewed', {
-      location: 'viewer',
-      limitType: props.limitType
-    })
   }
 })
 </script>

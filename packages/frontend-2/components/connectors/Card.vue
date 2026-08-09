@@ -44,11 +44,6 @@
             :disabled="enableButton"
             external
             :to="canDownload ? latestAvailableVersion?.Url : undefined"
-            @click="
-              mixpanel.track('Connector Card Install Clicked', {
-                connector: props.connector.slug
-              })
-            "
           >
             {{ connector.isComingSoon ? '即将发布' : '安装 Windows 版本' }}
           </FormButton>
@@ -60,11 +55,6 @@
           target="_blank"
           external
           :to="connector.url"
-          @click="
-            mixpanel.track('Connector Card Documentation Clicked', {
-              connector: props.connector.slug
-            })
-          "
         >
           Docs
         </FormButton>
@@ -75,7 +65,6 @@
 
 <script setup lang="ts">
 import type { ConnectorItem, Version, Versions } from '~~/lib/dashboard/helpers/types'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { loginRoute, registerRoute } from '~~/lib/common/helpers/route'
 
 const props = defineProps<{
@@ -83,7 +72,6 @@ const props = defineProps<{
   canDownload: boolean
 }>()
 
-const mixpanel = useMixpanel()
 const { data: versionData, status } = useFetch(
   `https://releases.speckle.dev/manager2/feeds/${props.connector.slug}-v3.json`,
   {

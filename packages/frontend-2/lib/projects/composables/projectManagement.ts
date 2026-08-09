@@ -50,7 +50,6 @@ import {
   createWorkspaceProjectMutation
 } from '~~/lib/projects/graphql/mutations'
 import { onProjectUpdatedSubscription } from '~~/lib/projects/graphql/subscriptions'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useRouter } from 'vue-router'
 
 export function useProjectUpdateTracking(
@@ -558,7 +557,6 @@ export function useLeaveProject() {
 
 export function useMoveProjectToWorkspace() {
   const { triggerNotification } = useGlobalToast()
-  const mixpanel = useMixpanel()
   const { mutate } = useMutation(useMoveProjectToWorkspaceMutation)
   const { activeUser } = useActiveUser()
 
@@ -615,12 +613,6 @@ export function useMoveProjectToWorkspace() {
         title: `已将项目移动到 ${workspaceName}`
       })
 
-      mixpanel.track('Project Moved To Workspace', {
-        projectId,
-        // eslint-disable-next-line camelcase
-        workspace_id: workspaceId,
-        source: eventSource
-      })
     } else {
       const errMsg = getFirstErrorMessage(res?.errors)
       triggerNotification({

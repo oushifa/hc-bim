@@ -271,10 +271,6 @@ export function usePreviewImageBlob(
       credentials: 'include'
     })
 
-    if (!response.ok) {
-      throw new Error(`Preview request failed with status ${response.status}`)
-    }
-
     const metadata: PreviewFetchMetadata = {
       status: response.headers.get('X-Preview-Status'),
       errorCode: response.headers.get('X-Preview-Error-Code'),
@@ -282,6 +278,11 @@ export function usePreviewImageBlob(
     }
 
     updatePreviewMetadata(target, metadata)
+
+    if (!response.ok) {
+      return null
+    }
+
     maybeLogPreviewMetadata(target, requestUrl, metadata)
 
     if (options?.throwOnAngleNotFound && metadata.errorCode === 'ANGLE_NOT_FOUND') {
@@ -337,10 +338,10 @@ export function usePreviewImageBlob(
         return
       }
 
-      const { blobUrl } = await fetchPreviewImage(requestUrl, 'main', {
+      const previewImage = await fetchPreviewImage(requestUrl, 'main', {
         measureImage: lazyLoad
       })
-      setResolvedUrl('main', blobUrl)
+      setResolvedUrl('main', previewImage?.blobUrl || PreviewPlaceholder)
     } catch (e) {
       logger.error('Preview image load error', e)
       updatePreviewMetadata('main')
@@ -379,18 +380,19 @@ export function usePreviewImageBlob(
         searchParams.set('v', cacheBust.value.toString())
       })
 
-      const { blobUrl, naturalWidth = 0 } = await fetchPreviewImage(
-        requestUrl,
-        'panorama',
-        {
-          measureImage: true,
-          throwOnAngleNotFound: true
-        }
-      )
+      const previewImage = await fetchPreviewImage(requestUrl, 'panorama', {
+        measureImage: true,
+        throwOnAngleNotFound: true
+      })
+
+      if (!previewImage) {
+        setResolvedUrl('panorama', null)
+        return
+      }
 
       // If width is 700px or less, it's the placeholder not the actual panorama
-      isPanoramaPlaceholder.value = naturalWidth <= 700
-      setResolvedUrl('panorama', blobUrl)
+      isPanoramaPlaceholder.value = (previewImage.naturalWidth || 0) <= 700
+      setResolvedUrl('panorama', previewImage.blobUrl)
     } catch (e) {
       if (!(e instanceof AngleNotFoundError)) {
         logger.error('Panorama preview image load error:', e)

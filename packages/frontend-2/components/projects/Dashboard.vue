@@ -102,7 +102,6 @@ import {
   PlusIcon
 } from '@heroicons/vue/24/outline'
 import { useUserProjectsUpdatedTracking } from '~~/lib/user/composables/projectUpdates'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useCanCreatePersonalProject } from '~~/lib/projects/composables/permissions'
 import {
   useUpdateProject,
@@ -236,19 +235,12 @@ const onProjectCreated = async () => {
   infiniteLoaderResetToken.value++
 }
 
-const mixpanel = useMixpanel()
-
 const onMoveProject = (projectId: string | undefined, location: string) => {
   const project = projectId
     ? projects.value?.items.find((p) => p.id === projectId)
     : undefined
   emittedProject.value = project || undefined
 
-  mixpanel.track('Move Project CTA Clicked', {
-    location,
-    // eslint-disable-next-line camelcase
-    workspace_id: project?.workspace?.id || undefined
-  })
   showMoveProjectDialog.value = true
 }
 

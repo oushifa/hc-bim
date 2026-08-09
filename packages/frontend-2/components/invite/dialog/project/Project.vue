@@ -64,7 +64,6 @@ import type {
   WorkspaceProjectInviteCreateInput
 } from '~/lib/common/generated/gql/graphql'
 import { useInviteUserToProject } from '~~/lib/projects/composables/projectManagement'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { Roles, SeatTypes } from '@speckle/shared'
 import { useWorkspacePlan } from '~/lib/workspaces/composables/plan'
 
@@ -93,7 +92,6 @@ const props = defineProps<{
 }>()
 const isOpen = defineModel<boolean>('open', { required: true })
 
-const mixpanel = useMixpanel()
 const createInvite = useInviteUserToProject()
 const { handleSubmit } = useForm<InviteProjectForm>({
   initialValues: {
@@ -217,16 +215,6 @@ const sendInvites = handleSubmit(async () => {
   const result = await createInvite(props.project.id, inputs)
 
   if (result?.id) {
-    mixpanel.track('Invite Action', {
-      type: 'project invite',
-      name: 'send',
-      multiple: inputs.length !== 1,
-      count: inputs.length,
-      hasProject: true,
-      isNewWorkspaceMember: isAdmin.value,
-      // eslint-disable-next-line camelcase
-      workspace_id: props.project.workspace?.id
-    })
 
     isOpen.value = false
   }

@@ -18,8 +18,6 @@ import { workspaceRoute } from '~/lib/common/helpers/route'
 import { mapMainRoleToGqlWorkspaceRole } from '~/lib/workspaces/helpers/roles'
 import { mapServerRoleToGqlServerRole } from '~/lib/common/helpers/roles'
 import { Roles, TIME_MS, WorkspacePlans } from '@speckle/shared'
-import { useMixpanel } from '~/lib/core/composables/mp'
-
 const emptyState: WorkspaceWizardState = {
   name: '',
   slug: '',
@@ -58,7 +56,6 @@ export const useWorkspacesWizard = () => {
   const { redirectToCheckout } = useBillingActions()
   const router = useRouter()
   const { triggerNotification } = useGlobalToast()
-  const mixpanel = useMixpanel()
   const inviteToWorkspace = useInviteUserToWorkspace()
   const { mutate: updateWorkspaceDefaultRegion } = useMutation(setDefaultRegionMutation)
   const { mutate: updateWorkspaceCreationState } = useMutation(
@@ -128,7 +125,6 @@ export const useWorkspacesWizard = () => {
 
   const completeWizard = async () => {
     wizardState.value.isLoading = true
-    mixpanel.stop_session_recording()
 
     const needsCheckout =
       wizardState.value.state.plan !== WorkspacePlans.Free ||
@@ -183,7 +179,6 @@ export const useWorkspacesWizard = () => {
     if (needsCheckout) {
       // Add workspace ID to URL, in case the user comes back from Stripe
       router.replace({ query: { workspaceId: workspaceId.value } })
-      mixpanel.track('Workspace Creation Checkout Session Started')
 
       // Go to Stripe
       await redirectToCheckout({
@@ -225,17 +220,6 @@ export const useWorkspacesWizard = () => {
 
       await inviteToWorkspace({ workspaceId, inputs, hideNotifications: true })
 
-      mixpanel.track('Invite Action', {
-        type: 'workspace invite',
-        name: 'send',
-        multiple: inputs.length !== 1,
-        count: inputs.length,
-        hasProject: true,
-        to: 'email',
-        source: 'wizard',
-        // eslint-disable-next-line camelcase
-        workspace_id: workspaceId
-      })
     }
 
     const result = await updateWorkspaceCreationState(

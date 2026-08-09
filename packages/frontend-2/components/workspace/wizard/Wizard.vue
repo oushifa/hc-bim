@@ -40,7 +40,6 @@ import { useQuery } from '@vue/apollo-composable'
 import { graphql } from '~~/lib/common/generated/gql'
 import type { WorkspaceWizardState } from '~~/lib/workspaces/helpers/types'
 import { PaidWorkspacePlans } from '~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useBillingActions } from '~/lib/billing/composables/actions'
 import { useCanCreateWorkspace } from '~/lib/projects/composables/permissions'
 
@@ -61,7 +60,6 @@ const props = defineProps<{
 
 const { cancelCheckoutSession } = useBillingActions()
 const route = useRoute()
-const mixpanel = useMixpanel()
 const { goToStep, currentStep, isLoading, state } = useWorkspacesWizard()
 
 const {
@@ -113,13 +111,11 @@ onResult((result) => {
         cancelCheckoutSession(route.query.session_id as string, props.workspaceId)
       }
 
-      mixpanel.track('Workspace Creation Checkout Session Canceled')
     }
   }
 })
 
 onMounted(() => {
-  mixpanel.start_session_recording()
 })
 
 watch(currentStep, (newStep, oldStep) => {

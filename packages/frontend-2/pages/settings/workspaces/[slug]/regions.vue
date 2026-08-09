@@ -119,7 +119,6 @@ import type { LayoutDialogButton } from '@speckle/ui-components'
 import { useMutationLoading, useQuery, useQueryLoading } from '@vue/apollo-composable'
 import { graphql } from '~/lib/common/generated/gql'
 import type { SettingsWorkspacesRegionsSelect_ServerRegionItemFragment } from '~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { settingsWorkspaceRegionsQuery } from '~/lib/settings/graphql/queries'
 import { useSetDefaultWorkspaceRegion } from '~/lib/workspaces/composables/management'
 import { settingsWorkspaceRoutes } from '~/lib/common/helpers/route'
@@ -163,7 +162,6 @@ useHead({
 const slug = computed(() => (route.params.slug as string) || '')
 
 const route = useRoute()
-const mp = useMixpanel()
 const pageFetchPolicy = usePageQueryStandardFetchPolicy()
 const isMutationLoading = useMutationLoading()
 const isQueryLoading = useQueryLoading()
@@ -215,11 +213,6 @@ const saveDefaultRegion = async () => {
     regionKey
   })
   if (res?.defaultRegion?.id) {
-    mp.track('Workspace Default Region Set', {
-      regionKey,
-      // eslint-disable-next-line camelcase
-      workspace_id: workspace.value?.id
-    })
     showDefaultRegionSaveDisclaimer.value = false
   }
 }

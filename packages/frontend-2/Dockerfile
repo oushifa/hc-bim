@@ -65,8 +65,6 @@ RUN yarn workspaces foreach --include "packages/frontend-2" -W run build
 FROM node:22-bookworm-slim@sha256:221ee67425de7a3c11ce4e81e63e50caaec82ede3a7d34599ab20e59d29a0cb5 AS production-stage
 ENV PORT=8080
 
-ENV NUXT_PUBLIC_MIXPANEL_TOKEN_ID=acd87c5a50b56df91a795e999812a3a4
-ENV NUXT_PUBLIC_MIXPANEL_API_HOST=http://61.145.255.42:3300
 ENV NUXT_PUBLIC_FF_RHINO_FILE_IMPORTER_ENABLED=true
 
 WORKDIR /speckle-server

@@ -12,7 +12,6 @@ import {
 } from '~/lib/common/generated/gql/graphql'
 import { settingsBillingCancelCheckoutSessionMutation } from '~/lib/settings/graphql/mutations'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { graphql } from '~~/lib/common/generated/gql'
 import type { MaybeNullOrUndefined } from '@speckle/shared'
 import { formatName } from '~/lib/billing/helpers/plan'
@@ -41,7 +40,6 @@ graphql(`
 `)
 
 export const useBillingActions = () => {
-  const mixpanel = useMixpanel()
   const route = useRoute()
   const router = useRouter()
   const { triggerNotification } = useGlobalToast()
@@ -57,11 +55,6 @@ export const useBillingActions = () => {
       logger.error('[Billing Portal] No workspaceId provided, returning early')
       return
     }
-
-    mixpanel.track('Workspace Billing Portal Button Clicked', {
-      // eslint-disable-next-line camelcase
-      workspace_id: workspaceId
-    })
 
     // We need to fetch this on click because the link expires very quickly
     const result = await apollo.query({
@@ -196,10 +189,6 @@ export const useBillingActions = () => {
       input: { sessionId, workspaceId }
     })
 
-    mixpanel.track('Checkout Session Cancelled', {
-      // eslint-disable-next-line camelcase
-      workspace_id: workspaceId
-    })
   }
 
   const validateCheckoutSession = (workspace: BillingActions_WorkspaceFragment) => {
@@ -214,10 +203,6 @@ export const useBillingActions = () => {
           title: '您的支付已取消'
         })
 
-        mixpanel.track('Workspace Upgrade Cancelled', {
-          // eslint-disable-next-line camelcase
-          workspace_id: workspace.id
-        })
       } else {
         triggerNotification({
           type: ToastNotificationType.Success,

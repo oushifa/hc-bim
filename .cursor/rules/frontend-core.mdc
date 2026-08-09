@@ -162,10 +162,9 @@ import type { ProjectFragment } from '~/lib/common/generated/gql/graphql'
 
 ### Analytics & Tracking
 
-- **Don't add Mixpanel events** unless specifically requested
+- **Don't add analytics events** unless specifically requested
 - **Event naming convention**: Past tense with every first letter capitalized
   - Examples: "Button Clicked", "Dialog Dismissed", "Form Submitted"
-- **Use mixpanel composable** from `~/lib/core/composables/mp`
 
 ## Error Handling
 

@@ -1,7 +1,7 @@
 import {
   Roles,
   type MaybeNullOrUndefined,
-  resolveMixpanelUserId
+  resolveDistinctId
 } from '@speckle/shared'
 import { useApolloClient, useQuery } from '@vue/apollo-composable'
 import { graphql } from '~~/lib/common/generated/gql'
@@ -60,7 +60,7 @@ export function useResolveUserDistinctId() {
     if (!user) return user // null or undefined
     if (!user.email) return null
 
-    return resolveMixpanelUserId(user.email)
+    return resolveDistinctId(user.email)
   }
 }
 

@@ -22,7 +22,6 @@
 <script setup lang="ts">
 import { SpeckleViewer } from '@speckle/shared'
 import { useCameraUtilities } from '~/lib/viewer/composables/ui'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import type { LayoutTabItem } from '~~/lib/layout/helpers/components'
 import { useInjectedViewerRequestedResources } from '~~/lib/viewer/composables/setup'
 
@@ -50,8 +49,6 @@ const open = computed({
   set: (newVal) => emit('update:open', newVal)
 })
 
-const mp = useMixpanel()
-
 const triggerZoomNotification = () => {
   triggerNotification({
     type: ToastNotificationType.Success,
@@ -72,13 +69,6 @@ const onModelChosen = async (params: { modelId: string }) => {
     ...SpeckleViewer.ViewerRoute.resourceBuilder().addModel(modelId).toResources()
   ])
 
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'federation',
-    action: 'add',
-    resource: 'model'
-  })
-
   triggerZoomNotification()
 
   open.value = false
@@ -93,13 +83,6 @@ const onObjectsChosen = async (params: { objectIds: string[] }) => {
   }
 
   await items.update([...items.value, ...resourcesApi.toResources()])
-
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'federation',
-    action: 'add',
-    resource: 'object'
-  })
 
   triggerZoomNotification()
 

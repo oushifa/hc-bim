@@ -21,20 +21,11 @@
 
 <script lang="ts" setup>
 import type { TutorialItem } from '~/lib/dashboard/helpers/types'
-import { useMixpanel } from '~~/lib/core/composables/mp'
-
-const mixpanel = useMixpanel()
-
 const props = defineProps<{
   tutorialItem: TutorialItem
   source: 'tutorials' | 'dashboard'
 }>()
 
 const trackClick = () => {
-  mixpanel.track('Tutorial clicked', {
-    title: props.tutorialItem.title,
-    url: props.tutorialItem.url,
-    source: props.source
-  })
 }
 </script>

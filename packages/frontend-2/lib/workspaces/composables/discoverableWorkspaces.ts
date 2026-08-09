@@ -5,7 +5,6 @@ import {
   requestToJoinWorkspaceMutation
 } from '~/lib/workspaces/graphql/mutations'
 import { graphql } from '~/lib/common/generated/gql'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import type { CacheObjectReference } from '~~/lib/common/helpers/graphql'
 import {
   convertThrowIntoFetchResult,
@@ -89,7 +88,6 @@ export const useDiscoverableWorkspaces = () => {
   const { mutate: dismissWorkspace } = useMutation(dismissDiscoverableWorkspaceMutation)
 
   const { activeUser } = useActiveUser()
-  const mixpanel = useMixpanel()
   const { triggerNotification } = useGlobalToast()
   const apollo = useApolloClient().client
 
@@ -183,12 +181,6 @@ export const useDiscoverableWorkspaces = () => {
       })
 
       if (workspace.discoverabilityAutoJoinEnabled) {
-        mixpanel.track('Workspace Auto Joined', {
-          workspaceId: workspace.id,
-          location,
-          // eslint-disable-next-line camelcase
-          workspace_id: workspace.id
-        })
 
         triggerNotification({
           title: 'Workspace joined',
@@ -196,12 +188,6 @@ export const useDiscoverableWorkspaces = () => {
           type: ToastNotificationType.Success
         })
       } else {
-        mixpanel.track('Workspace Join Request Sent', {
-          workspaceId: workspace.id,
-          location,
-          // eslint-disable-next-line camelcase
-          workspace_id: workspace.id
-        })
 
         triggerNotification({
           title: 'Request sent',

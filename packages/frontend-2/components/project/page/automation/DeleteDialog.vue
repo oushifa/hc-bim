@@ -27,7 +27,6 @@ import type { LayoutDialogButton } from '@speckle/ui-components'
 import { graphql } from '~/lib/common/generated/gql'
 import type { ProjectPageAutomationDeleteDialog_AutomationFragment } from '~/lib/common/generated/gql/graphql'
 import { projectRoute } from '~/lib/common/helpers/route'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useDeleteAutomation } from '~/lib/projects/composables/automationManagement'
 
 graphql(`
@@ -63,7 +62,6 @@ const props = defineProps<{
 const isOpen = defineModel<boolean>('open', { required: true })
 
 const router = useRouter()
-const mixpanel = useMixpanel()
 const deleteAutomation = useDeleteAutomation()
 
 const handleDelete = async () => {
@@ -71,9 +69,6 @@ const handleDelete = async () => {
 
   if (result) {
     router.push(projectRoute(props.projectId, 'automations'))
-    mixpanel.track('Automate Automation Deleted', {
-      automationId: props.automation.id
-    })
   }
 }
 

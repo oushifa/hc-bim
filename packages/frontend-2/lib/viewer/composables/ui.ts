@@ -29,7 +29,6 @@ import type {
   ViewerShortcut,
   ViewerShortcutAction
 } from '~/lib/viewer/helpers/shortcuts/types'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import type { defaultEdgeColorValue } from '~/lib/viewer/composables/setup/viewMode'
 import {
   defaultMeasurementOptions,
@@ -482,42 +481,20 @@ export function useHighlightedObjectsUtilities() {
 
 export function useViewModeUtilities() {
   const { viewMode } = useInjectedViewerInterfaceState()
-  const mp = useMixpanel()
-
   const setViewMode = (mode: ViewMode) => {
     viewMode.mode.value = mode
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'set-view-mode',
-      mode
-    })
   }
 
   const toggleEdgesEnabled = () => {
     viewMode.edgesEnabled.value = !viewMode.edgesEnabled.value
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'toggle-edges',
-      enabled: viewMode.edgesEnabled.value
-    })
   }
 
   const setEdgesWeight = (weight: number) => {
     viewMode.edgesWeight.value = Number(weight)
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'set-edges-weight',
-      weight: viewMode.edgesWeight.value
-    })
   }
 
   const setEdgesColor = (color: number | typeof defaultEdgeColorValue) => {
     viewMode.edgesColor.value = color
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'set-edges-color',
-      color: color.toString(16).padStart(6, '0')
-    })
   }
 
   return {

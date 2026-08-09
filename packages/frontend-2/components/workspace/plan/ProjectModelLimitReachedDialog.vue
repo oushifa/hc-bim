@@ -23,7 +23,6 @@ import {
 import type { LayoutDialogButton } from '@speckle/ui-components'
 import { settingsWorkspaceRoutes } from '~/lib/common/helpers/route'
 import { formatName } from '~/lib/billing/helpers/plan'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useFeatureFlags } from '~/lib/common/composables/env'
 
 const props = defineProps<{
@@ -39,7 +38,6 @@ const dialogOpen = defineModel<boolean>('open', {
   required: true
 })
 
-const mixpanel = useMixpanel()
 const featureFlags = useFeatureFlags()
 
 const planConfig = computed(() => {
@@ -52,12 +50,6 @@ const explorePlansButton: LayoutDialogButton = {
   disabled: props.workspaceRole === Roles.Workspace.Guest,
   disabledMessage: 'As a Guest you cannot access plans and billing',
   onClick: () => {
-    mixpanel.track('Limit Reached Dialog Upgrade Button Clicked', {
-      type: props.type,
-      location: props.location,
-      // eslint-disable-next-line camelcase
-      workspace_id: props.workspaceSlug
-    })
 
     return navigateTo(settingsWorkspaceRoutes.billing.route(props.workspaceSlug))
   }
@@ -75,13 +67,6 @@ const buttons = computed((): LayoutDialogButton[] => [cancelButton, explorePlans
 
 watch(dialogOpen, (value) => {
   if (value) {
-    mixpanel.track('Limit Reached Dialog Viewed', {
-      type: props.type,
-      location: props.location,
-      // eslint-disable-next-line camelcase
-      workspace_id: props.workspaceSlug,
-      limitType: props.type || 'project/model'
-    })
   }
 })
 </script>

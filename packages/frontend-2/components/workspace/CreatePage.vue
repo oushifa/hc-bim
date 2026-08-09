@@ -45,7 +45,6 @@
 import { homeRoute } from '~~/lib/common/helpers/route'
 import { WizardSteps } from '~/lib/workspaces/helpers/types'
 import { useWorkspacesWizard } from '~/lib/workspaces/composables/wizard'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useAuthManager } from '~/lib/auth/composables/auth'
 import { useQuery } from '@vue/apollo-composable'
 import { activeUserWorkspaceExistenceCheckQuery } from '~/lib/auth/graphql/queries'
@@ -55,7 +54,6 @@ defineProps<{
 }>()
 
 const { currentStep, resetWizardState } = useWorkspacesWizard()
-const mixpanel = useMixpanel()
 const { logout } = useAuthManager()
 const isWorkspacesEnabled = useIsWorkspacesEnabled()
 
@@ -90,7 +88,6 @@ const onCancelClick = () => {
   if (isFirstStep.value) {
     navigateTo(homeRoute)
     resetWizardState()
-    mixpanel.stop_session_recording()
   } else {
     isCancelDialogOpen.value = true
   }

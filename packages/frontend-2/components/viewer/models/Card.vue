@@ -113,7 +113,6 @@ import { containsAll } from '~~/lib/common/helpers/utils'
 import { getTargetObjectIds } from '~~/lib/object-sidebar/helpers'
 import { useLoadLatestVersion } from '~~/lib/viewer/composables/resources'
 import { SpeckleViewer } from '@speckle/shared'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useCopyModelLink } from '~~/lib/projects/composables/modelManagement'
 import { Ellipsis } from 'lucide-vue-next'
 
@@ -145,7 +144,6 @@ const {
   },
   ui: { filters }
 } = useInjectedViewerState()
-const mp = useMixpanel()
 const copyModelLink = useCopyModelLink()
 const { formattedRelativeDate, formattedFullDate } = useDateFormatters()
 
@@ -337,7 +335,6 @@ const removeModel = async (modelId: string) => {
         builder.addObject(loadedResource.objectId)
     }
   }
-  mp.track('Viewer Action', { type: 'action', name: 'federation', action: 'remove' })
   await items.update(builder.toResources())
 }
 

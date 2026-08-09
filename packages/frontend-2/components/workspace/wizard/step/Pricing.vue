@@ -38,13 +38,10 @@
 <script setup lang="ts">
 import { BillingInterval } from '~/lib/common/generated/gql/graphql'
 import { useWorkspacesWizard } from '~/lib/workspaces/composables/wizard'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { WorkspacePlans, type PaidWorkspacePlans } from '@speckle/shared'
 import { formatName } from '~/lib/billing/helpers/plan'
 
 const { goToNextStep, goToPreviousStep, state } = useWorkspacesWizard()
-const mixpanel = useMixpanel()
-
 const isYearlyIntervalSelected = defineModel<boolean>('isYearlyIntervalSelected', {
   default: false
 })
@@ -62,11 +59,6 @@ const onCtaClick = (plan: WorkspacePlans) => {
       ? BillingInterval.Yearly
       : BillingInterval.Monthly
 
-  mixpanel.track('Workspace Pricing Step Completed', {
-    plan: state.value.plan,
-    billingInterval: state.value.billingInterval
-  })
-
   goToNextStep()
 }
 
@@ -83,6 +75,5 @@ watch(
 )
 
 onMounted(() => {
-  mixpanel.track('Workspace Pricing Step Viewed')
 })
 </script>

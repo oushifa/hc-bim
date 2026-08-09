@@ -56,8 +56,6 @@ import {
   useNavigateToLogin,
   useNavigateToRegistration
 } from '~/lib/common/helpers/route'
-import { useMixpanel } from '~~/lib/core/composables/mp'
-
 const emit = defineEmits<{
   processed: [accept: boolean, token: Optional<string>]
 }>()
@@ -89,8 +87,6 @@ const { isLoggedIn } = useActiveUser()
 const postAuthRedirect = usePostAuthRedirect()
 const goToLogin = useNavigateToLogin()
 const goToSignUp = useNavigateToRegistration()
-const mixpanel = useMixpanel()
-
 const token = computed(
   () => props.invite?.token || (route.query.token as Optional<string>)
 )
@@ -146,24 +142,12 @@ const onLoginSignupClick = async () => {
 const onDeclineClick = (token?: string) => {
   emit('processed', false, token)
   if (props.invite.workspace) {
-    mixpanel.track('Invite Action', {
-      accepted: false,
-      type: 'workspace invite',
-      // eslint-disable-next-line camelcase
-      workspace_id: props.invite.workspace.id
-    })
   }
 }
 
 const onAcceptClick = (token?: string) => {
   emit('processed', true, token)
   if (props.invite.workspace) {
-    mixpanel.track('Invite Action', {
-      accepted: true,
-      type: 'workspace invite',
-      // eslint-disable-next-line camelcase
-      workspace_id: props.invite.workspace.id
-    })
   }
 }
 </script>

@@ -51,7 +51,6 @@ import {
   useInjectedViewerLoadedResources,
   useInjectedViewerRequestedResources
 } from '~~/lib/viewer/composables/setup'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import type { LayoutMenuItem } from '~~/lib/layout/helpers/components'
 import { HorizontalDirection } from '~~/lib/common/composables/window'
 
@@ -112,29 +111,6 @@ const includeArchived = computed({
     threadFilters.value.includeArchived || false ? 'includeArchived' : undefined,
   set: (newVal) => (threadFilters.value.includeArchived = !!newVal)
 })
-
-const mp = useMixpanel()
-watch(loadedVersionsOnly, (newVal) =>
-  mp.track('Comment Action', {
-    type: 'action',
-    name: 'settings-change',
-    loadedVersionsOnly: newVal
-  })
-)
-watch(includeArchived, (newVal) =>
-  mp.track('Comment Action', {
-    type: 'action',
-    name: 'settings-change',
-    includeArchived: newVal
-  })
-)
-watch(includeArchived, (newVal) =>
-  mp.track('Comment Action', {
-    type: 'action',
-    name: 'settings-change',
-    includeArchived: newVal
-  })
-)
 
 const actionsItems = computed<LayoutMenuItem[][]>(() => [
   [

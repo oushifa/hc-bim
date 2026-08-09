@@ -41,11 +41,6 @@
 
 <script setup lang="ts">
 import { tutorialItems } from '~/lib/dashboard/helpers/tutorials'
-import { useMixpanel } from '~~/lib/core/composables/mp'
-
-const mixpanel = useMixpanel()
-
 const trackViewAllClick = () => {
-  mixpanel.track('View All Tutorials Button Clicked')
 }
 </script>

@@ -73,7 +73,6 @@ import type { LayoutDialogButton } from '@speckle/ui-components'
 import { useMutationLoading } from '@vue/apollo-composable'
 import { useForm, useFieldArray } from 'vee-validate'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useServerInfo } from '~~/lib/core/composables/server'
 import { useInviteUserToProject } from '~~/lib/projects/composables/projectManagement'
 import { useInviteUserToServer } from '~~/lib/server/composables/invites'
@@ -105,7 +104,6 @@ const inviteUserToProject = useInviteUserToProject()
 const anyMutationsLoading = useMutationLoading()
 const { isAdmin } = useActiveUser()
 const { isGuestMode } = useServerInfo()
-const mixpanel = useMixpanel()
 const { triggerNotification } = useGlobalToast()
 
 const allowServerRoleSelect = computed(() => isAdmin.value || isGuestMode.value)
@@ -160,15 +158,6 @@ const onSubmit = handleSubmit(async () => {
         invites.length > 1
           ? 'Invites successfully send'
           : `Invite successfully sent to ${invites[0].value.email}`
-    })
-
-    mixpanel.track('Invite Action', {
-      type: 'server invite',
-      name: 'send',
-      multiple: fields.value.length !== 1,
-      count: fields.value.length,
-      hasProject: !!fields.value.some((invite) => invite.value.project),
-      to: 'email'
     })
 
     isOpen.value = false

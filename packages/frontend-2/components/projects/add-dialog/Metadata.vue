@@ -53,7 +53,6 @@
 <script setup lang="ts">
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 import type { MaybeNullOrUndefined } from '@speckle/shared'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useCreateProject } from '~~/lib/projects/composables/projectManagement'
 
 const props = defineProps<{
@@ -69,8 +68,6 @@ const emit = defineEmits<{
 
 const createProject = useCreateProject()
 const logger = useLogger()
-const mp = useMixpanel()
-
 const formData = ref({
   name: ''
 })
@@ -96,11 +93,6 @@ const onSubmit = async (e: Event) => {
 
     if (newProject?.id) {
       emit('created', { id: newProject.id })
-      mp.track('Stream Action', {
-        type: 'action',
-        name: 'create',
-        workspace_id: props.workspaceId
-      })
       
       // 重置表单
       formData.value.name = ''

@@ -29,13 +29,11 @@
 
 <script setup lang="ts">
 import { projectsRoute, workspaceCreateRoute } from '~/lib/common/helpers/route'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { navigationWorkspaceListQuery } from '~/lib/navigation/graphql/queries'
 import { useQuery } from '@vue/apollo-composable'
 import { useActiveWorkspaceSlug } from '~/lib/user/composables/activeWorkspace'
 
 const route = useRoute()
-const mixpanel = useMixpanel()
 const { isGuest } = useActiveUser()
 const isWorkspacesEnabled = useIsWorkspacesEnabled()
 const activeWorkspaceSlug = useActiveWorkspaceSlug()
@@ -63,8 +61,5 @@ const hasPersonalProjects = computed(
 
 const handlePlusClick = () => {
   navigateTo(workspaceCreateRoute)
-  mixpanel.track('Create Workspace Button Clicked', {
-    source: 'navigation'
-  })
 }
 </script>

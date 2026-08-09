@@ -102,7 +102,6 @@ import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
 import type { ViewerModelVersionCardItemFragment } from '~~/lib/common/generated/gql/graphql'
 import type { LayoutMenuItem } from '~~/lib/layout/helpers/components'
 import { HorizontalDirection } from '~~/lib/common/composables/window'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useCopyModelLink } from '~/lib/projects/composables/modelManagement'
 import { Ellipsis, Check, Lock } from 'lucide-vue-next'
 
@@ -135,7 +134,6 @@ const emit = defineEmits<{
   (e: 'removeVersion', versionId: string): void
 }>()
 
-const mp = useMixpanel()
 const {
   resources: {
     response: { project }
@@ -211,19 +209,10 @@ const actionsItems = computed<LayoutMenuItem[][]>(() => [
 const handleClick = () => {
   if (isLimited.value) return
   if (props.clickable) emit('changeVersion', props.version.id)
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'change-version'
-  })
 }
 
 const handleViewChanges = () => {
   emit('viewChanges', props.version)
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'diffs',
-    action: 'enable'
-  })
 }
 
 const onActionChosen = (params: { item: LayoutMenuItem }) => {

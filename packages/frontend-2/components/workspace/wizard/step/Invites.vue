@@ -57,7 +57,6 @@ import { useWorkspacesWizard } from '~/lib/workspaces/composables/wizard'
 import { PlusIcon } from '@heroicons/vue/24/outline'
 import { isEmailOrEmpty } from '~~/lib/common/helpers/validation'
 import { useForm, useFieldArray } from 'vee-validate'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useVerifiedUserEmailDomains } from '~/lib/workspaces/composables/security'
 import { isUndefined } from 'lodash-es'
 
@@ -67,7 +66,6 @@ interface InviteForm {
 
 const { domains } = useVerifiedUserEmailDomains()
 const { goToNextStep, goToPreviousStep, state } = useWorkspacesWizard()
-const mixpanel = useMixpanel()
 const { handleSubmit } = useForm<InviteForm>({
   initialValues: {
     fields: state.value.invites
@@ -121,14 +119,9 @@ const onSubmit = handleSubmit(() => {
     state.value.enableDomainDiscoverabilityForDomain = null
   }
 
-  mixpanel.track('Workspace Invites Step Completed', {
-    inviteCount: validInvites
-  })
-
   goToNextStep()
 })
 
 onMounted(() => {
-  mixpanel.track('Workspace Invites Step Viewed')
 })
 </script>

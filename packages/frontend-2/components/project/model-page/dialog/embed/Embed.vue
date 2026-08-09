@@ -199,7 +199,6 @@ import {
   SupportedProjectVisibility,
   castToSupportedVisibility
 } from '~/lib/projects/helpers/visibility'
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useAreSavedViewsEnabled } from '~/lib/viewer/composables/savedViews/general'
 
 graphql(`
@@ -236,7 +235,6 @@ const props = defineProps<{
 const isOpen = defineModel<boolean>('open', { required: true })
 const areOptionsExpanded = ref(false)
 
-const mixpanel = useMixpanel()
 const route = useRoute()
 const { copy } = useClipboard()
 const {
@@ -461,16 +459,8 @@ watch(
   isOpen,
   async (newValue) => {
     if (newValue) {
-      mixpanel.track('Embed Dialog Opened', {
-        projectId: props.project.id,
-        visibility: projectVisibility.value
-      })
 
       if (canCreateEmbedTokens.value) {
-        mixpanel.track('Embed Token Created', {
-          projectId: props.project.id,
-          visibility: projectVisibility.value
-        })
 
         const token = await createEmbedToken({
           projectId: props.project.id,

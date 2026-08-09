@@ -90,7 +90,6 @@ import type {
   ExtendedPropertyInfo
 } from '~/lib/viewer/helpers/filters/types'
 import { FilterType } from '~/lib/viewer/helpers/filters/types'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { X, Plus } from 'lucide-vue-next'
 import { FormButton } from '@speckle/ui-components'
 import { useFilterUtilities } from '~/lib/viewer/composables/filtering/filtering'
@@ -108,7 +107,6 @@ const {
 } = useFilterUtilities()
 
 const { filteredObjectsCount } = useFilteredObjectsCount()
-const mp = useMixpanel()
 const {
   filters: { hasAnyFiltersApplied }
 } = useInjectedViewerInterfaceState()
@@ -198,22 +196,12 @@ const addNewEmptyFilter = () => {
   swappingFilterId.value = null
   showPropertySelection.value = true
 
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'filters',
-    action: 'open-property-selection'
-  })
 }
 
 const startPropertySwap = (filterId: string) => {
   swappingFilterId.value = filterId
   showPropertySelection.value = true
 
-  mp.track('Viewer Action', {
-    type: 'action',
-    name: 'filters',
-    action: 'open-property-swap'
-  })
 }
 
 const handleAddFilterClick = () => {
@@ -260,22 +248,10 @@ const processPropertySelection = (
 ) => {
   if (swappingFilterId.value) {
     updateFilterProperty(swappingFilterId.value, property)
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'filters',
-      action: 'swap-filter-property',
-      value: propertyKey
-    })
   } else {
     // Set flag to scroll when new filter is added
     shouldScrollToNewFilter.value = true
     addActiveFilter(property)
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'filters',
-      action: 'add-new-filter',
-      value: propertyKey
-    })
   }
   showPropertySelection.value = false
   swappingFilterId.value = null

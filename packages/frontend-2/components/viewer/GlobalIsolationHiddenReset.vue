@@ -9,7 +9,6 @@
   </FormButton>
 </template>
 <script setup lang="ts">
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useFilterUtilities } from '~/lib/viewer/composables/filtering/filtering'
 import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
 
@@ -28,20 +27,12 @@ const buttonText = computed(() => {
   return '重置'
 })
 
-const mp = useMixpanel()
 const trackAndReset = () => {
   resetHiddenAndIsolations()
 
   if (hasAnyIsolationsApplied.value && hasAnyHiddenApplied.value) {
-    mp.track('Viewer Action', {
-      type: 'action',
-      name: 'isolations-hidden',
-      action: 'reset'
-    })
   } else if (hasAnyIsolationsApplied.value) {
-    mp.track('Viewer Action', { type: 'action', name: 'isolations', action: 'reset' })
   } else if (hasAnyHiddenApplied.value) {
-    mp.track('Viewer Action', { type: 'action', name: 'hidden', action: 'reset' })
   }
 }
 </script>

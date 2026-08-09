@@ -1,9 +1,7 @@
-import { useMixpanel } from '~/lib/core/composables/mp'
 import { useProcessProjectInvite } from '~/lib/projects/composables/projectManagement'
 
 export const useProjectInviteManager = () => {
   const processInvite = useProcessProjectInvite()
-  const mp = useMixpanel()
   const loading = ref(false)
 
   const useInvite = async (params: {
@@ -27,11 +25,6 @@ export const useProjectInviteManager = () => {
     loading.value = false
 
     if (!success) return false
-
-    mp.track('Invite Action', {
-      type: 'project invite',
-      accepted: accept
-    })
 
     return !!success
   }

@@ -50,7 +50,6 @@ import type { LayoutDialogButton } from '@speckle/ui-components'
 import { useMutationLoading } from '@vue/apollo-composable'
 import { useForm } from 'vee-validate'
 import type { ProjectPageLatestItemsModelItemFragment } from '~/lib/common/generated/gql/graphql'
-import { useMixpanel } from '~~/lib/core/composables/mp'
 import {
   useCreateNewModel,
   useModelNameValidationRules
@@ -86,8 +85,6 @@ const { handleSubmit } = useForm<FormValues>()
 const anyMutationsLoading = useMutationLoading()
 const rules = useModelNameValidationRules()
 const createModel = useCreateNewModel()
-const mp = useMixpanel()
-
 const newModelName = ref('')
 const newDescription = ref('')
 
@@ -106,7 +103,6 @@ const onSubmit = handleSubmit(async ({ name, description }) => {
   if (!res?.id) return
   emit('submit', { model: res })
 
-  mp.track('Branch Action', { type: 'action', name: 'create', mode: 'dialog' })
   openState.value = false
 })
 

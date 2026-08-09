@@ -69,8 +69,6 @@ export default defineNuxtConfig({
       dtpApiOrigin: '',
       dtpUIOrigin: '',
       baseUrl: '',
-      mixpanelApiHost: '',
-      mixpanelTokenId: '',
       logLevel: NUXT_PUBLIC_LOG_LEVEL,
       logPretty: isLogPretty,
       logCsrEmitProps: false,
@@ -172,23 +170,10 @@ export default defineNuxtConfig({
       rollupOptions: {
         output: {
           /**
-           * Overriding some output file names to avoid adblock.
            * Keep Nuxt's default dev filenames so Vite can serve virtual assets correctly.
            */
-          entryFileNames: (chunkInfo) => {
-            if (chunkInfo.name.includes('mixpanel')) {
-              return buildOutputFileName('mp')
-            }
-
-            return buildOutputFileName(chunkInfo.name)
-          },
-          chunkFileNames: (chunkInfo) => {
-            if (chunkInfo.name.includes('mixpanel')) {
-              return buildOutputFileName('mp-chunk')
-            }
-
-            return buildOutputFileName(chunkInfo.name)
-          }
+          entryFileNames: (chunkInfo) => buildOutputFileName(chunkInfo.name),
+          chunkFileNames: (chunkInfo) => buildOutputFileName(chunkInfo.name)
         },
         // Leave imports as is, they're server-side only
         external: ['jsdom']
