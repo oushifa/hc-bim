@@ -364,7 +364,7 @@ export const useWorkbenchUploadSync = () => {
     if (!task.modelId || !canResumeServerExecution(task)) return
     if (eventSources.value[task.id]) return
 
-    const streamUrl = `/api/projects/${task.projectId}/models/${task.modelId}/model-sync/tasks/${task.id}/events`
+    const streamUrl = `${apiOrigin}/api/v1/projects/${task.projectId}/models/${task.modelId}/model-sync/tasks/${task.id}/events`
     const source = new EventSource(streamUrl, {
       withCredentials: true
     })
@@ -453,7 +453,7 @@ export const useWorkbenchUploadSync = () => {
     )
     if (pageEventSources.value[subscriptionKey]) return
 
-    const streamUrl = `/api/projects/${
+    const streamUrl = `${apiOrigin}/api/v1/projects/${
       params.projectId
     }/model-sync/tasks/events?modelIds=${encodeURIComponent(
       normalizedModelIds.join(',')
