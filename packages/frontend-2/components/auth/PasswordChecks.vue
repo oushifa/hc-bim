@@ -6,7 +6,7 @@
       <div class="flex items-center space-x-2">
         <CheckIcon v-if="ruleFits(passwordLongEnough)" class="w-4 h-4 text-success" />
         <XMarkIcon v-else class="w-4 h-4 text-foreground-2" />
-        <div>8+ characters long</div>
+        <div>至少 8 个字符</div>
       </div>
       <div class="flex items-center space-x-2">
         <CheckIcon
@@ -14,7 +14,7 @@
           class="w-4 h-4 text-success"
         />
         <XMarkIcon v-else class="w-4 h-4 text-foreground-2" />
-        <div>One number</div>
+        <div>至少包含 1 个数字</div>
       </div>
       <div class="flex items-center space-x-2">
         <CheckIcon
@@ -22,7 +22,7 @@
           class="w-4 h-4 text-success"
         />
         <XMarkIcon v-else class="w-4 h-4 text-foreground-2" />
-        <div>One lowercase letter</div>
+        <div>至少包含 1 个小写字母</div>
       </div>
       <div class="flex items-center space-x-2">
         <CheckIcon
@@ -30,7 +30,7 @@
           class="w-4 h-4 text-success"
         />
         <XMarkIcon v-else class="w-4 h-4 text-foreground-2" />
-        <div>One uppercase letter</div>
+        <div>至少包含 1 个大写字母</div>
       </div>
     </div>
   </div>

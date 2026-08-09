@@ -3,7 +3,7 @@ import {
   type GenericSettingsMenuItem,
   type WorkspaceSettingsMenuItem
 } from '~/lib/settings/helpers/types'
-import { useIsMultipleEmailsEnabled, useActiveUser } from '~/composables/globals'
+import { useActiveUser } from '~/composables/globals'
 import { Roles, SeatTypes, type MaybeNullOrUndefined } from '@speckle/shared'
 import { useIsMultiregionEnabled } from '~/lib/multiregion/composables/main'
 import { graphql } from '~/lib/common/generated/gql'
@@ -34,7 +34,6 @@ graphql(`
 
 export const useSettingsMenu = () => {
   const isAutomateEnabled = useIsAutomateModuleEnabled()
-  const isMultipleEmailsEnabled = useIsMultipleEmailsEnabled().value
   const isMultiRegionEnabled = useIsMultiregionEnabled()
 
   const workspaceMenuItems = shallowRef<WorkspaceSettingsMenuItem[]>([

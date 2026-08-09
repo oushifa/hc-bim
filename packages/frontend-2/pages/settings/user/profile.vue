@@ -5,8 +5,6 @@
         <SettingsSectionHeader title="个人资料" text="管理您的个人资料" />
         <SettingsUserProfileDetails :user="user" />
         <hr class="my-6 md:my-8 border-outline-2" />
-        <SettingsUserProfileChangePassword :user="user" />
-        <hr class="my-6 md:my-8 border-outline-2" />
         <SettingsUserProfileDeleteAccount :user="user" />
         <hr class="my-6 md:my-8 border-outline-2" />
         <div class="text-body-2xs text-foreground-2 w-full flex flex-col space-y-2">

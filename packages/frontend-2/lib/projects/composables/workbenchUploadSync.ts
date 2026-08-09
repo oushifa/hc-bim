@@ -190,6 +190,7 @@ const mapServerTask = (task: ServerModelSyncTask): WorkbenchUploadSyncTask => ({
 export const useWorkbenchUploadSync = () => {
   const apollo = useApolloClient().client
   const apiOrigin = useApiOrigin()
+  const frontendOrigin = useFrontendOrigin()
   const logger = useLogger()
   const authToken = useAuthCookie()
   const { triggerNotification } = useGlobalToast()
@@ -409,7 +410,10 @@ export const useWorkbenchUploadSync = () => {
     if (!task.modelId || !canResumeServerExecution(task)) return
     if (eventSources.value[task.id]) return
 
-    const streamUrl = `/api/projects/${task.projectId}/models/${task.modelId}/model-sync/tasks/${task.id}/events`
+    const streamUrl = new URL(
+      `/api/projects/${task.projectId}/models/${task.modelId}/model-sync/tasks/${task.id}/events`,
+      frontendOrigin
+    ).toString()
     const source = new EventSource(streamUrl, {
       withCredentials: true
     })
@@ -516,10 +520,11 @@ export const useWorkbenchUploadSync = () => {
       return
     }
 
-    const streamUrl = `/api/model-sync/tasks/events?targets=${encodeURIComponent(
-      JSON.stringify(normalizedTargets)
-    )}`
-    const source = new EventSource(streamUrl, {
+    // EventSource cannot attach Authorization headers, so keep SSE on the frontend origin
+    // where the auth cookie is available and let the server proxy forward to apiOrigin.
+    const streamUrl = new URL('/api/model-sync/tasks/events', frontendOrigin)
+    streamUrl.searchParams.set('targets', JSON.stringify(normalizedTargets))
+    const source = new EventSource(streamUrl.toString(), {
       withCredentials: true
     })
 

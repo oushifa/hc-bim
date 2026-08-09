@@ -51,6 +51,7 @@ export const viewerDocsRoute = '/3d-viewer/interface-nav'
 
 export const settingsUserRoutes = {
   profile: '/settings/user/profile',
+  password: '/change-password',
   notifications: '/settings/user/notifications',
   developerSettings: '/settings/user/developer',
   emails: '/settings/user/emails'

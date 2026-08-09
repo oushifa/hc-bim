@@ -76,6 +76,17 @@
             </MenuItem> -->
             <MenuItem v-if="activeUser" v-slot="{ active }">
               <NuxtLink
+                :to="settingsUserRoutes.password"
+                :class="[
+                  active ? 'bg-highlight-1' : '',
+                  'text-body-xs flex px-2 py-1 text-foreground cursor-pointer transition mx-1 rounded'
+                ]"
+              >
+                更改密码
+              </NuxtLink>
+            </MenuItem>
+            <MenuItem v-if="activeUser" v-slot="{ active }">
+              <NuxtLink
                 :class="[
                   active ? 'bg-highlight-1' : '',
                   'text-body-xs flex px-2 py-1 text-foreground cursor-pointer transition mx-1 rounded'
@@ -116,58 +127,20 @@
         </MenuItems>
       </Transition>
     </Menu>
-    <InviteDialogServer v-model:open="showInviteDialog" />
   </div>
 </template>
 <script setup lang="ts">
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/vue'
 import { ChevronDownIcon } from '@heroicons/vue/24/outline'
-import { Roles } from '@speckle/shared'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { useAuthManager } from '~~/lib/auth/composables/auth'
-import { useTheme } from '~~/lib/core/composables/theme'
-import { settingsUserRoutes, settingsServerRoutes } from '~/lib/common/helpers/route'
+import { settingsUserRoutes } from '~/lib/common/helpers/route'
 import type { RouteLocationRaw } from 'vue-router'
-import { useServerInfo } from '~/lib/core/composables/server'
-import { useGenerateErrorReference } from '~/lib/core/composables/error'
 
 defineProps<{
   loginUrl?: RouteLocationRaw
 }>()
-const { $dtpFetch } = useNuxtApp()
 const { logout } = useAuthManager()
-const { activeUser, isGuest } = useActiveUser()
-const { isDarkTheme, toggleTheme } = useTheme()
-const { serverInfo } = useServerInfo()
+const { activeUser } = useActiveUser()
 const menuButtonId = useId()
-const { copyReference } = useGenerateErrorReference()
-
-const showInviteDialog = ref(false)
-
-const version = computed(() => serverInfo.value?.version)
-const isAdmin = computed(() => activeUser.value?.role === Roles.Server.Admin)
-
-const toggleInviteDialog = () => {
-  showInviteDialog.value = true
-}
-
-const copySupportReference = async () => {
-  await copyReference()
-}
-
-const test = async () => {
-  const data = await $dtpFetch('/v1/oauth/third-party/register', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json'
-    },
-    body: JSON.stringify({
-      username: 'srjAdmin',
-      contact: '17338404660',
-      mobile: 13000000000,
-      email: 'srj@163.com'
-    })
-  })
-}
 </script>
