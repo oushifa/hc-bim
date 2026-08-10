@@ -1,0 +1,106 @@
+【Speckle WS】推送: rvt_conversion_ack
+时间: 2026-08-10 13:02:47
+内容:
+{
+  "type": "rvt_conversion_ack",
+  "taskId": "7bc6ed393a",
+  "externalTaskId": "worker-db854599-c54f-4ded-b75e-ad31355ab9b6"
+}
+【Speckle WS】收到: start_rvt_conversion
+时间: 2026-08-10 13:02:47
+内容:
+{
+  "branchName": "test.rvt",
+  "fileId": "2f5000d328",
+  "fileName": "test.rvt",
+  "modelId": "2be4789618",
+  "projectId": "25d9ce53e8",
+  "sourceApplication": "External RVT Converter",
+  "sourceFileUrl": "http://192.168.20.155:3303/speckle-server/assets/25d9ce53e8/2f5000d328?X-Amz-Algorithm=AWS4-HMAC-SHA256\u0026X-Amz-Content-Sha256=UNSIGNED-PAYLOAD\u0026X-Amz-Credential=minioadmin%2F20260810%2Fus-east-1%2Fs3%2Faws4_request\u0026X-Amz-Date=20260810T050247Z\u0026X-Amz-Expires=86400\u0026X-Amz-Signature=2305faf7acb58633ba3a3ce9b8fb4706ae11cfd74835ab01d1990b5e16fa8895\u0026X-Amz-SignedHeaders=host\u0026x-id=GetObject",
+  "speckleServerUrl": "http://192.168.20.155:3301",
+  "speckleToken": "2fe1794ebd7393ac742d4ced7df8310ef1ca645720",
+  "speckleTokenId": "2fe1794ebd",
+  "taskId": "7bc6ed393a",
+  "type": "start_rvt_conversion",
+  "versionMessage": null,
+  "workerId": "worker-db854599-c54f-4ded-b75e-ad31355ab9b6"
+}
+【Speckle WS】推送: rvt_conversion_progress
+时间: 2026-08-10 13:02:50
+内容:
+{
+  "type": "rvt_conversion_progress",
+  "taskId": "7bc6ed393a",
+  "phase": "opening",
+  "progress": 5,
+  "message": "正在打开 Revit 文件"
+}
+【Speckle WS】推送: rvt_conversion_progress
+时间: 2026-08-10 13:02:50
+内容:
+{
+  "type": "rvt_conversion_progress",
+  "taskId": "7bc6ed393a",
+  "phase": "processing",
+  "progress": 10,
+  "message": "准备"
+}
+【Speckle WS】推送: rvt_conversion_progress
+时间: 2026-08-10 13:02:50
+内容:
+{
+  "type": "rvt_conversion_progress",
+  "taskId": "7bc6ed393a",
+  "phase": "converting",
+  "progress": 15,
+  "message": "正在解析模型 (10)"
+}
+【Speckle WS】推送: rvt_conversion_progress
+时间: 2026-08-10 13:03:45
+内容:
+{
+  "type": "rvt_conversion_progress",
+  "taskId": "7bc6ed393a",
+  "phase": "uploading_version",
+  "progress": 75,
+  "message": "正在上传 Speckle 对象"
+}
+【Speckle WS】推送: rvt_conversion_progress
+时间: 2026-08-10 13:03:55
+内容:
+{
+  "type": "rvt_conversion_progress",
+  "taskId": "7bc6ed393a",
+  "phase": "uploading_version",
+  "progress": 80,
+  "message": "正在上传 Speckle 对象"
+}
+【Speckle WS】推送: rvt_conversion_progress
+时间: 2026-08-10 13:04:05
+内容:
+{
+  "type": "rvt_conversion_progress",
+  "taskId": "7bc6ed393a",
+  "phase": "uploading_version",
+  "progress": 86,
+  "message": "正在上传 Speckle 对象"
+}
+【Speckle WS】推送: rvt_conversion_progress
+时间: 2026-08-10 13:04:38
+内容:
+{
+  "type": "rvt_conversion_progress",
+  "taskId": "7bc6ed393a",
+  "phase": "uploading_version",
+  "progress": 100,
+  "message": "转换完成"
+}
+【Speckle WS】推送: rvt_conversion_result
+时间: 2026-08-10 13:04:38
+内容:
+{
+  "type": "rvt_conversion_result",
+  "taskId": "7bc6ed393a",
+  "status": "success",
+  "versionId": "df98abe90f"
+}

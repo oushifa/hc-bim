@@ -95,8 +95,12 @@ type VisibleTaskTarget = {
   modelIds: string[]
 }
 
+type ClosableStream = {
+  close: () => void
+}
+
 type VisibleTaskSubscriptionState = {
-  source: EventSource
+  source: ClosableStream
   ownerIds: string[]
 }
 
@@ -108,7 +112,7 @@ const useWorkbenchUploadSyncTaskMap = () => {
 
 const useWorkbenchUploadSyncEventSources = () =>
   useScopedState('workbenchUploadSyncEventSources', () =>
-    ref<Record<string, EventSource | null>>({})
+    ref<Record<string, ClosableStream | null>>({})
   )
 
 const useWorkbenchUploadSyncPageEventSources = () =>
@@ -131,6 +135,120 @@ const buildVisibleTaskBatchSubscriptionKey = (targets: VisibleTaskTarget[]) =>
 const clampProgressPercent = (progress: number | null | undefined) => {
   if (typeof progress !== 'number' || Number.isNaN(progress)) return null
   return Math.max(0, Math.min(100, progress))
+}
+
+const openSseStream = (params: {
+  url: string
+  headers?: HeadersInit
+  onEvent: (eventName: string, data: string) => void
+  onError?: (error?: unknown) => void
+}) => {
+  const controller = new AbortController()
+  let closed = false
+
+  const flushBuffer = (buffer: string) => {
+    const events: string[] = []
+    let remaining = buffer
+
+    while (true) {
+      const separatorIndex = remaining.indexOf('\n\n')
+      if (separatorIndex === -1) break
+      events.push(remaining.slice(0, separatorIndex))
+      remaining = remaining.slice(separatorIndex + 2)
+    }
+
+    return { events, remaining }
+  }
+
+  const parseRawEvent = (rawEvent: string) => {
+    let eventName = 'message'
+    const dataLines: string[] = []
+
+    for (const rawLine of rawEvent.split('\n')) {
+      const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine
+      if (!line || line.startsWith(':')) continue
+
+      if (line.startsWith('event:')) {
+        eventName = line.slice(6).trim() || 'message'
+        continue
+      }
+
+      if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).trim())
+      }
+    }
+
+    if (!dataLines.length) return null
+
+    return {
+      eventName,
+      data: dataLines.join('\n')
+    }
+  }
+
+  const run = async () => {
+    try {
+      const response = await fetch(params.url, {
+        method: 'GET',
+        headers: {
+          Accept: 'text/event-stream',
+          ...(params.headers || {})
+        },
+        credentials: 'include',
+        signal: controller.signal
+      })
+
+      if (!response.ok || !response.body) {
+        throw new Error(
+          `subscribe failed${response.status ? ` (${response.status})` : ''}`
+        )
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const { events, remaining } = flushBuffer(buffer)
+        buffer = remaining
+
+        for (const rawEvent of events) {
+          const parsedEvent = parseRawEvent(rawEvent)
+          if (!parsedEvent) continue
+          params.onEvent(parsedEvent.eventName, parsedEvent.data)
+        }
+      }
+
+      buffer += decoder.decode()
+      const { events } = flushBuffer(`${buffer}\n\n`)
+      for (const rawEvent of events) {
+        const parsedEvent = parseRawEvent(rawEvent)
+        if (!parsedEvent) continue
+        params.onEvent(parsedEvent.eventName, parsedEvent.data)
+      }
+
+      if (!closed) {
+        params.onError?.(new Error('stream closed'))
+      }
+    } catch (error) {
+      if (closed && error instanceof Error && error.name === 'AbortError') return
+      if (closed) return
+      params.onError?.(error)
+    }
+  }
+
+  void run()
+
+  return {
+    close: () => {
+      closed = true
+      controller.abort()
+    }
+  }
 }
 
 export const mapClientUploadProgressToRuntimePercent = (
@@ -190,7 +308,6 @@ const mapServerTask = (task: ServerModelSyncTask): WorkbenchUploadSyncTask => ({
 export const useWorkbenchUploadSync = () => {
   const apollo = useApolloClient().client
   const apiOrigin = useApiOrigin()
-  const frontendOrigin = useFrontendOrigin()
   const logger = useLogger()
   const authToken = useAuthCookie()
   const { triggerNotification } = useGlobalToast()
@@ -410,40 +527,33 @@ export const useWorkbenchUploadSync = () => {
     if (!task.modelId || !canResumeServerExecution(task)) return
     if (eventSources.value[task.id]) return
 
-    const streamUrl = new URL(
-      `/api/projects/${task.projectId}/models/${task.modelId}/model-sync/tasks/${task.id}/events`,
-      frontendOrigin
-    ).toString()
-    const source = new EventSource(streamUrl, {
-      withCredentials: true
-    })
-
-    const handleMessage = async (event: MessageEvent<string>) => {
-      try {
-        const payload = JSON.parse(event.data) as ServerModelSyncTask
-        await handleTaskUpdate(payload, {
-          silentSuccess: true
-        })
-      } catch (error) {
-        logger.warn(
-          {
-            taskId: task.id,
-            error
-          },
-          '解析模型同步 SSE 消息失败'
-        )
+    const streamUrl = `${apiOrigin}/api/v1/projects/${task.projectId}/models/${task.modelId}/model-sync/tasks/${task.id}/events`
+    const source = openSseStream({
+      url: streamUrl,
+      headers: getHeaders(),
+      onEvent: (eventName, data) => {
+        if (eventName !== 'snapshot' && eventName !== 'update') return
+        void (async () => {
+          try {
+            const payload = JSON.parse(data) as ServerModelSyncTask
+            await handleTaskUpdate(payload, {
+              silentSuccess: true
+            })
+          } catch (error) {
+            logger.warn(
+              {
+                taskId: task.id,
+                error
+              },
+              '解析模型同步 SSE 消息失败'
+            )
+          }
+        })()
+      },
+      onError: () => {
+        stopTaskEventSource(task.id)
       }
-    }
-
-    source.addEventListener('snapshot', (event) => {
-      void handleMessage(event as MessageEvent<string>)
     })
-    source.addEventListener('update', (event) => {
-      void handleMessage(event as MessageEvent<string>)
-    })
-    source.onerror = () => {
-      stopTaskEventSource(task.id)
-    }
 
     eventSources.value = {
       ...eventSources.value,
@@ -491,8 +601,10 @@ export const useWorkbenchUploadSync = () => {
     taskMap.value = nextMap
   }
 
-  const shouldIgnoreVisibleTaskEvent = (subscriptionKey: string, source: EventSource) =>
-    pageEventSources.value[subscriptionKey]?.source !== source
+  const shouldIgnoreVisibleTaskEvent = (
+    subscriptionKey: string,
+    source: ClosableStream
+  ) => pageEventSources.value[subscriptionKey]?.source !== source
 
   const subscribeVisibleTasks = (targets: VisibleTaskTarget[]) => {
     if (import.meta.server) return
@@ -520,64 +632,59 @@ export const useWorkbenchUploadSync = () => {
       return
     }
 
-    // EventSource cannot attach Authorization headers, so keep SSE on the frontend origin
-    // where the auth cookie is available and let the server proxy forward to apiOrigin.
-    const streamUrl = new URL('/api/model-sync/tasks/events', frontendOrigin)
-    streamUrl.searchParams.set('targets', JSON.stringify(normalizedTargets))
-    const source = new EventSource(streamUrl.toString(), {
-      withCredentials: true
-    })
+    const rawTargets = JSON.stringify(normalizedTargets)
+    const source = openSseStream({
+      url:
+        apiOrigin.length > 0
+          ? `${apiOrigin}/api/v1/model-sync/tasks/events?targets=${encodeURIComponent(
+              rawTargets
+            )}`
+          : `/api/v1/model-sync/tasks/events?targets=${encodeURIComponent(rawTargets)}`,
+      headers: getHeaders(),
+      onEvent: (eventName, data) => {
+        try {
+          if (shouldIgnoreVisibleTaskEvent(subscriptionKey, source)) return
 
-    source.addEventListener('snapshot', (event) => {
-      try {
-        if (shouldIgnoreVisibleTaskEvent(subscriptionKey, source)) return
-        const payload = JSON.parse((event as MessageEvent<string>).data) as {
-          projectId: string
-          tasks: ServerModelSyncTask[]
+          if (eventName === 'snapshot') {
+            const payload = JSON.parse(data) as {
+              projectId: string
+              tasks: ServerModelSyncTask[]
+            }
+            replaceTasksForModels({
+              projectId: payload.projectId,
+              modelIds:
+                normalizedTargets.find(
+                  (target) => target.projectId === payload.projectId
+                )?.modelIds || [],
+              serverTasks: payload.tasks
+            })
+            return
+          }
+
+          if (eventName === 'update') {
+            const payload = JSON.parse(data) as ServerModelSyncTask
+            void handleTaskUpdate(payload, {
+              silentSuccess: true,
+              silentFailure: true
+            })
+          }
+        } catch (error) {
+          logger.warn(
+            {
+              targets: normalizedTargets,
+              error
+            },
+            eventName === 'snapshot'
+              ? '解析模型同步页面快照失败'
+              : '解析模型同步页面 SSE 消息失败'
+          )
         }
-        replaceTasksForModels({
-          projectId: payload.projectId,
-          modelIds:
-            normalizedTargets.find((target) => target.projectId === payload.projectId)
-              ?.modelIds || [],
-          serverTasks: payload.tasks
-        })
-      } catch (error) {
-        logger.warn(
-          {
-            targets: normalizedTargets,
-            error
-          },
-          '解析模型同步页面快照失败'
-        )
-      }
-    })
-
-    source.addEventListener('update', (event) => {
-      try {
+      },
+      onError: () => {
         if (shouldIgnoreVisibleTaskEvent(subscriptionKey, source)) return
-        const payload = JSON.parse(
-          (event as MessageEvent<string>).data
-        ) as ServerModelSyncTask
-        void handleTaskUpdate(payload, {
-          silentSuccess: true,
-          silentFailure: true
-        })
-      } catch (error) {
-        logger.warn(
-          {
-            targets: normalizedTargets,
-            error
-          },
-          '解析模型同步页面 SSE 消息失败'
-        )
+        stopVisibleTaskSubscription(subscriptionKey)
       }
     })
-
-    source.onerror = () => {
-      if (shouldIgnoreVisibleTaskEvent(subscriptionKey, source)) return
-      stopVisibleTaskSubscription(subscriptionKey)
-    }
 
     pageEventSources.value = {
       ...pageEventSources.value,
