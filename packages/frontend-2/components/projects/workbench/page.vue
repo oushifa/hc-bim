@@ -825,8 +825,16 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
   }
 
   const pendingUpload = model.raw.pendingImportedVersions?.[0]
+  const hasVersion = !!model.raw.lastVersion?.items?.[0]?.id
+  const isOrphanPendingUpload =
+    hasVersion &&
+    !pendingUpload?.convertedCommitId &&
+    !isModelSyncing({ projectId: props.projectId, modelId: model.id }) &&
+    activeModelUpload.value?.model?.id !== model.id
+
   if (
     pendingUpload &&
+    !isOrphanPendingUpload &&
     [FileUploadConvertedStatus.Queued, FileUploadConvertedStatus.Converting].includes(
       pendingUpload.convertedStatus as FileUploadConvertedStatus
     )

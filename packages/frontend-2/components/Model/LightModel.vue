@@ -1017,9 +1017,16 @@ const getModelRuntimeStatus = (model: Model) => {
   }
 
   const convertedStatus = model.latestUpload?.convertedStatus
+  const isOrphanPendingUpload =
+    model.hasModel &&
+    !model.latestUpload?.convertedCommitId &&
+    !isModelSyncing({ projectId: model.projectId, modelId: model.id }) &&
+    uploadingModelId.value !== model.id
+
   if (
-    convertedStatus === FileUploadConvertedStatus.Queued ||
-    convertedStatus === FileUploadConvertedStatus.Converting
+    !isOrphanPendingUpload &&
+    (convertedStatus === FileUploadConvertedStatus.Queued ||
+      convertedStatus === FileUploadConvertedStatus.Converting)
   ) {
     return '模型处理中'
   }
