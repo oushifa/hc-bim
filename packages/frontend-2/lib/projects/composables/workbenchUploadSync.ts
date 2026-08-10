@@ -583,42 +583,8 @@ export const useWorkbenchUploadSync = () => {
   }
 
   const subscribeTask = (task: WorkbenchUploadSyncTask) => {
-    if (import.meta.server) return
-    if (!task.modelId || !canResumeServerExecution(task)) return
-    if (eventSources.value[task.id]) return
-
-    const streamUrl = `${apiOrigin}/api/v1/projects/${task.projectId}/models/${task.modelId}/model-sync/tasks/${task.id}/events`
-    const source = openSseStream({
-      url: streamUrl,
-      headers: getHeaders(),
-      onEvent: (eventName, data) => {
-        if (eventName !== 'snapshot' && eventName !== 'update') return
-        void (async () => {
-          try {
-            const payload = JSON.parse(data) as ServerModelSyncTask
-            await handleTaskUpdate(payload, {
-              silentSuccess: true
-            })
-          } catch (error) {
-            logger.warn(
-              {
-                taskId: task.id,
-                error
-              },
-              '解析模型同步 SSE 消息失败'
-            )
-          }
-        })()
-      },
-      onError: () => {
-        stopTaskEventSource(task.id)
-      }
-    })
-
-    eventSources.value = {
-      ...eventSources.value,
-      [task.id]: source
-    }
+    // 禁用 SSE 连接，不再建立 /events 长链接
+    return
   }
 
   const fetchProjectTaskSnapshot = async (params: {
@@ -667,92 +633,8 @@ export const useWorkbenchUploadSync = () => {
   ) => pageEventSources.value[subscriptionKey]?.source !== source
 
   const subscribeVisibleTasks = (targets: VisibleTaskTarget[]) => {
-    if (import.meta.server) return
-    const normalizedTargets = targets
-      .map((target) => ({
-        projectId: target.projectId,
-        modelIds: [...new Set(target.modelIds)].filter(Boolean).sort()
-      }))
-      .filter((target) => target.projectId && target.modelIds.length)
-
-    if (!normalizedTargets.length) return
-
-    const subscriptionKey = buildVisibleTaskBatchSubscriptionKey(normalizedTargets)
-    const existingEntry = pageEventSources.value[subscriptionKey]
-    if (existingEntry) {
-      if (!existingEntry.ownerIds.includes(visibleTaskSubscriptionOwnerId)) {
-        pageEventSources.value = {
-          ...pageEventSources.value,
-          [subscriptionKey]: {
-            ...existingEntry,
-            ownerIds: existingEntry.ownerIds.concat(visibleTaskSubscriptionOwnerId)
-          }
-        }
-      }
-      return
-    }
-
-    const rawTargets = JSON.stringify(normalizedTargets)
-    const source = openSseStream({
-      url:
-        apiOrigin.length > 0
-          ? `${apiOrigin}/api/v1/model-sync/tasks/events?targets=${encodeURIComponent(
-              rawTargets
-            )}`
-          : `/api/v1/model-sync/tasks/events?targets=${encodeURIComponent(rawTargets)}`,
-      headers: getHeaders(),
-      onEvent: (eventName, data) => {
-        try {
-          if (shouldIgnoreVisibleTaskEvent(subscriptionKey, source)) return
-
-          if (eventName === 'snapshot') {
-            const payload = JSON.parse(data) as {
-              projectId: string
-              tasks: ServerModelSyncTask[]
-            }
-            replaceTasksForModels({
-              projectId: payload.projectId,
-              modelIds:
-                normalizedTargets.find(
-                  (target) => target.projectId === payload.projectId
-                )?.modelIds || [],
-              serverTasks: payload.tasks
-            })
-            return
-          }
-
-          if (eventName === 'update') {
-            const payload = JSON.parse(data) as ServerModelSyncTask
-            void handleTaskUpdate(payload, {
-              silentSuccess: true,
-              silentFailure: true
-            })
-          }
-        } catch (error) {
-          logger.warn(
-            {
-              targets: normalizedTargets,
-              error
-            },
-            eventName === 'snapshot'
-              ? '解析模型同步页面快照失败'
-              : '解析模型同步页面 SSE 消息失败'
-          )
-        }
-      },
-      onError: () => {
-        if (shouldIgnoreVisibleTaskEvent(subscriptionKey, source)) return
-        stopVisibleTaskSubscription(subscriptionKey)
-      }
-    })
-
-    pageEventSources.value = {
-      ...pageEventSources.value,
-      [subscriptionKey]: {
-        source,
-        ownerIds: [visibleTaskSubscriptionOwnerId]
-      }
-    }
+    // 禁用 SSE 连接，不再从 /api/v1/model-sync/tasks/events 接收推送
+    return
   }
 
   const createUploadTask = async (params: {
