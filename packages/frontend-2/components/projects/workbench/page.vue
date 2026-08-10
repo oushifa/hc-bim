@@ -826,11 +826,13 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
 
   const pendingUpload = model.raw.pendingImportedVersions?.[0]
   const hasVersion = !!model.raw.lastVersion?.items?.[0]?.id
+  const latestTask = getLatestModelTask(model)
   const isOrphanPendingUpload =
-    hasVersion &&
-    !pendingUpload?.convertedCommitId &&
+    !!pendingUpload &&
+    !pendingUpload.convertedCommitId &&
     !isModelSyncing({ projectId: props.projectId, modelId: model.id }) &&
-    activeModelUpload.value?.model?.id !== model.id
+    activeModelUpload.value?.model?.id !== model.id &&
+    (hasVersion || !latestTask || latestTask.status === 'succeeded')
 
   if (
     pendingUpload &&
@@ -865,12 +867,6 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
   ) {
     return '同步中'
   }
-
-  if (latestUploadStatus === FileUploadConvertedStatus.Completed) {
-    return '待同步'
-  }
-
-  const latestTask = getLatestModelTask(model)
 
   if (latestTask && ['speckle_converting', 'failed'].includes(latestTask.status)) {
     return '待同步'

@@ -1017,11 +1017,13 @@ const getModelRuntimeStatus = (model: Model) => {
   }
 
   const convertedStatus = model.latestUpload?.convertedStatus
+  const latestTask = getLatestModelTask(model)
   const isOrphanPendingUpload =
-    model.hasModel &&
-    !model.latestUpload?.convertedCommitId &&
+    !!model.latestUpload &&
+    !model.latestUpload.convertedCommitId &&
     !isModelSyncing({ projectId: model.projectId, modelId: model.id }) &&
-    uploadingModelId.value !== model.id
+    uploadingModelId.value !== model.id &&
+    (model.hasModel || !latestTask || latestTask.status === 'succeeded')
 
   if (
     !isOrphanPendingUpload &&
@@ -1046,12 +1048,6 @@ const getModelRuntimeStatus = (model: Model) => {
   if (isModelSyncing({ projectId: model.projectId, modelId: model.id })) {
     return '同步中'
   }
-
-  if (convertedStatus === FileUploadConvertedStatus.Completed) {
-    return '待同步'
-  }
-
-  const latestTask = getLatestModelTask(model)
 
   if (latestTask && ['speckle_converting', 'failed'].includes(latestTask.status)) {
     return '待同步'
