@@ -1054,6 +1054,21 @@ const getModelRuntimeStatus = (model: Model) => {
 }
 
 const getModelRuntimeStatusDescription = (model: Model) => {
+  const isRvtFile =
+    model.latestUpload?.fileType?.toLowerCase() === 'rvt' ||
+    /\.rvt$/i.test(model.latestUpload?.fileName || '') ||
+    /\.rvt$/i.test(model.title || '')
+  if (!isRvtFile) return null
+
+  const convertedStatus = model.latestUpload?.convertedStatus
+  const latestTask = getLatestModelTask(model)
+  const isConvertingStage =
+    convertedStatus === FileUploadConvertedStatus.Queued ||
+    convertedStatus === FileUploadConvertedStatus.Converting ||
+    latestTask?.status === 'speckle_converting'
+
+  if (!isConvertingStage) return null
+
   const message = getModelRuntimeProgressMessage({
     projectId: model.projectId,
     modelId: model.id

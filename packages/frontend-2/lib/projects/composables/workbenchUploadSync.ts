@@ -268,6 +268,7 @@ export const mapRvtConversionProgressToRuntimePercent = (
 ) => {
   const normalizedProgress = clampProgressPercent(progress)
   if (normalizedProgress === null) return null
+  if (normalizedProgress >= 100) return RVT_CONVERSION_RUNTIME_END
 
   return Math.min(
     RVT_CONVERSION_RUNTIME_END,
@@ -383,7 +384,33 @@ export const useWorkbenchUploadSync = () => {
     modelId: string
   }): WorkbenchModelSyncRuntimeProgress | null => {
     const task = getLatestTask(params)
-    if (!task || !isRvtSyncTask(task)) return null
+    if (!task) return null
+
+    if (
+      task.status !== 'waiting_upload' &&
+      task.status !== 'speckle_converting' &&
+      task.status !== 'failed'
+    ) {
+      return {
+        percent: RVT_CONVERSION_RUNTIME_END,
+        phase: 'completed',
+        message: '转换完成'
+      }
+    }
+
+    if (!isRvtSyncTask(task)) return null
+
+    if (
+      task.versionId ||
+      task.progressPercent === 100 ||
+      task.progressPhase === 'completed'
+    ) {
+      return {
+        percent: RVT_CONVERSION_RUNTIME_END,
+        phase: 'completed',
+        message: '转换完成'
+      }
+    }
 
     const percent = mapRvtConversionProgressToRuntimePercent(task.progressPercent)
     if (percent === null) return null

@@ -107,94 +107,58 @@ const containerClasses = computed(() => {
     'border-gray-200/60'
   ]
 
-  if (props.status === '转换失败' || props.status === '待同步')
+  if (props.status === '转换失败')
     base.push('bg-danger/15', 'border-danger/30')
-  if (props.status === '已同步') base.push('bg-success/15', 'border-success/30')
+  if (props.status === '已同步' || props.status === '待同步')
+    base.push('bg-success/15', 'border-success/30')
   return base.join(' ')
 })
 
 const barClasses = computed(() => {
-  if (props.status === '转换失败' || props.status === '待同步') return 'bg-danger'
-  if (props.status === '已同步') return 'bg-success'
+  if (props.status === '转换失败') return 'bg-danger'
+  if (props.status === '已同步' || props.status === '待同步') return 'bg-success'
   return 'bg-primary'
 })
 
 const textClasses = computed(() => {
-  if (props.status === '转换失败' || props.status === '待同步') return 'text-danger'
-  if (props.status === '已同步') return 'text-success'
+  if (props.status === '转换失败') return 'text-danger'
+  if (props.status === '已同步' || props.status === '待同步') return 'text-success'
   return 'text-foreground-on-primary'
 })
 
-const startAuto = (min: number, max: number) => {
-  stop()
-  if (displayProgress.value < min) displayProgress.value = min
-  timer = setInterval(() => {
-    const cur = displayProgress.value
-    const next = cur + (max - cur) * 0.08
-    displayProgress.value = Math.min(max, Number(next.toFixed(2)))
-    if (displayProgress.value >= max) stop()
-  }, 250)
-}
-
 watch(
-  [stage, realProgress, runtimePhaseStage],
-  ([s, actualProgress, phaseStage]) => {
-    if (!s) {
-      stop()
-      displayProgress.value = 0
-      return
-    }
-
-    const activeStage = phaseStage || s
-
+  [realProgress, () => props.status, () => props.progressPhase],
+  ([actualProgress, status]) => {
     if (actualProgress !== null) {
-      if (!phaseStage) {
-        stop()
-        displayProgress.value = actualProgress
-        return
-      }
-
-      const nextMin = Math.max(activeStage.min, actualProgress)
-      if (activeStage.mode === 'done' || nextMin >= activeStage.max) {
-        stop()
-        displayProgress.value = activeStage.mode === 'done' ? 100 : nextMin
-        return
-      }
-
-      stop()
-      if (displayProgress.value < nextMin) {
-        displayProgress.value = nextMin
-      }
-      startAuto(nextMin, activeStage.max)
+      displayProgress.value = actualProgress
       return
     }
 
-    if (activeStage.mode === 'done') {
-      stop()
-      displayProgress.value = 100
-      return
+    switch (status) {
+      case '上传中':
+        displayProgress.value = 0
+        break
+      case '模型处理中':
+        displayProgress.value = 20
+        break
+      case '待同步':
+        displayProgress.value = 60
+        break
+      case '同步中':
+        displayProgress.value = 60
+        break
+      case '已同步':
+        displayProgress.value = 100
+        break
+      case '转换失败':
+        displayProgress.value = 60
+        break
+      default:
+        displayProgress.value = 0
     }
-
-    if (activeStage.mode === 'error') {
-      stop()
-      if (displayProgress.value < activeStage.min)
-        displayProgress.value = activeStage.min
-      return
-    }
-
-    if (activeStage.mode === 'hold') {
-      stop()
-      if (displayProgress.value < activeStage.min)
-        displayProgress.value = activeStage.min
-      return
-    }
-
-    startAuto(activeStage.min, activeStage.max)
   },
   { immediate: true }
 )
-
-onBeforeUnmount(stop)
 </script>
 
 <style scoped>

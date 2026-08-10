@@ -872,13 +872,28 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
 }
 
 const getModelRuntimeStatusDescription = (model: ModelListItem) => {
+  const pendingUpload = model.raw.pendingImportedVersions?.[0]
+  const isRvtFile =
+    pendingUpload?.fileType?.toLowerCase() === 'rvt' ||
+    /\.rvt$/i.test(pendingUpload?.fileName || '') ||
+    /\.rvt$/i.test(model.name || '')
+  if (!isRvtFile) return null
+
+  const convertedStatus = pendingUpload?.convertedStatus
+  const latestTask = getLatestModelTask(model)
+  const isConvertingStage =
+    convertedStatus === FileUploadConvertedStatus.Queued ||
+    convertedStatus === FileUploadConvertedStatus.Converting ||
+    latestTask?.status === 'speckle_converting'
+
+  if (!isConvertingStage) return null
+
   const message = getModelRuntimeProgressMessage({
     projectId: props.projectId,
     modelId: model.id
   })
   if (message?.trim()) return message.trim()
 
-  const pendingUpload = model.raw.pendingImportedVersions?.[0]
   if (pendingUpload?.progressMessage?.trim()) return pendingUpload.progressMessage.trim()
 
   const phaseDescription = mapProgressPhaseToDescription(pendingUpload?.progressPhase)
