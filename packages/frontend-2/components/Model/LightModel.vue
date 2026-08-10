@@ -1115,14 +1115,18 @@ const getLocalUploadRuntimeProgress = (model: Model) => {
   return mapClientUploadProgressToRuntimePercent(uploadingModelProgress.value)
 }
 
-const getModelRuntimeProgress = (model: Model) =>
-  getLocalUploadRuntimeProgress(model) ??
-  mapIfcConversionProgressToRuntimePercent(model.latestUpload?.progressPercent) ??
-  getTaskRuntimeProgress({
+const getModelRuntimeProgress = (model: Model) => {
+  const localUploadProgress = getLocalUploadRuntimeProgress(model)
+  if (localUploadProgress !== null) return localUploadProgress
+
+  const taskProgress = getTaskRuntimeProgress({
     projectId: model.projectId,
     modelId: model.id
-  })?.percent ??
-  null
+  })?.percent
+  if (typeof taskProgress === 'number') return taskProgress
+
+  return mapIfcConversionProgressToRuntimePercent(model.latestUpload?.progressPercent)
+}
 
 const getModelRuntimeProgressPhase = (model: Model) =>
   getTaskRuntimeProgress({

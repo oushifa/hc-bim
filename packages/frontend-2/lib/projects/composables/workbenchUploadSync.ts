@@ -750,7 +750,30 @@ export const useWorkbenchUploadSync = () => {
     })
   }
 
+  const activeTaskPoller = useScopedState(
+    'workbenchUploadSyncTaskPoller',
+    () => ref<ReturnType<typeof setInterval> | null>(null)
+  )
+  let currentVisibleTargets: VisibleTaskTarget[] = []
+
+  const startPollingIfNeeded = () => {
+    if (import.meta.server) return
+    const hasActiveTask = tasks.value.some((task) => canResumeServerExecution(task))
+
+    if (hasActiveTask) {
+      if (activeTaskPoller.value) return
+      activeTaskPoller.value = setInterval(() => {
+        if (!currentVisibleTargets.length) return
+        void syncVisibleTasks(currentVisibleTargets)
+      }, 2000)
+    } else if (activeTaskPoller.value) {
+      clearInterval(activeTaskPoller.value)
+      activeTaskPoller.value = null
+    }
+  }
+
   const syncVisibleTasks = async (targets: VisibleTaskTarget[]) => {
+    currentVisibleTargets = targets
     visibleTaskSyncRunId += 1
     const currentRunId = visibleTaskSyncRunId
     const normalizedTargets = targets
@@ -791,6 +814,7 @@ export const useWorkbenchUploadSync = () => {
     )
 
     if (currentRunId !== visibleTaskSyncRunId) return
+    startPollingIfNeeded()
 
     const nextSubscriptionKey = targetsWithTasks.length
       ? buildVisibleTaskBatchSubscriptionKey(targetsWithTasks)
