@@ -1098,7 +1098,8 @@ const mapIfcConversionProgressToRuntimePercent = (
 
   const normalizedProgress = Math.max(0, Math.min(100, progress))
   const runtimeStart = 20
-  const runtimeEnd = 59
+  const runtimeEnd = 60
+  if (normalizedProgress >= 100) return runtimeEnd
 
   return Math.min(
     runtimeEnd,
