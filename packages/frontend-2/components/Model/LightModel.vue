@@ -233,7 +233,7 @@
                           v-if="getModelRuntimeStatus(model)"
                           class="ml-2 text-xs font-normal text-gray-400"
                         >
-                          {{ getModelRuntimeStatus(model) }}
+                          {{ getModelRuntimeStatusText(model) }}
                         </span>
                         <div v-if="getModelRuntimeStatus(model)" class="mt-1">
                           <CommonModelRuntimeProgressBar
@@ -254,7 +254,7 @@
                   <td class="px-4 py-3">
                     <span class="inline-flex items-center gap-1">
                       <span class="text-xs text-gray-500">
-                        {{ getModelRuntimeStatus(model) || '-' }}
+                        {{ getModelRuntimeStatusText(model) || '-' }}
                       </span>
                       <button
                         v-if="shouldShowRetryAction(model)"
@@ -655,6 +655,7 @@ import {
 } from '~~/lib/projects/composables/modelManagement'
 import {
   mapClientUploadProgressToRuntimePercent,
+  mapProgressPhaseToDescription,
   useWorkbenchUploadSync
 } from '~~/lib/projects/composables/workbenchUploadSync'
 import { sanitizeModelName } from '~~/lib/projects/helpers/models'
@@ -781,7 +782,8 @@ const {
   retryTask,
   syncVisibleTasks,
   cleanupVisibleTaskSubscriptions,
-  getModelRuntimeProgress: getTaskRuntimeProgress
+  getModelRuntimeProgress: getTaskRuntimeProgress,
+  getModelRuntimeProgressMessage
 } = useWorkbenchUploadSync()
 const modelLibraryFileInput = ref<HTMLInputElement | null>(null)
 const creatingModel = ref(false)
@@ -1049,6 +1051,29 @@ const getModelRuntimeStatus = (model: Model) => {
   }
 
   return null
+}
+
+const getModelRuntimeStatusDescription = (model: Model) => {
+  const message = getModelRuntimeProgressMessage({
+    projectId: model.projectId,
+    modelId: model.id
+  })
+  if (message?.trim()) return message.trim()
+
+  const latestUploadMessage = model.latestUpload?.progressMessage
+  if (latestUploadMessage?.trim()) return latestUploadMessage.trim()
+
+  const phaseDescription = mapProgressPhaseToDescription(model.latestUpload?.progressPhase)
+  if (phaseDescription) return phaseDescription
+
+  return null
+}
+
+const getModelRuntimeStatusText = (model: Model) => {
+  const status = getModelRuntimeStatus(model)
+  if (!status) return null
+  const desc = getModelRuntimeStatusDescription(model)
+  return desc ? `${status}（${desc}）` : status
 }
 
 const mapIfcConversionProgressToRuntimePercent = (

@@ -279,6 +279,29 @@ export const mapRvtConversionProgressToRuntimePercent = (
   )
 }
 
+export const mapProgressPhaseToDescription = (
+  phase: string | null | undefined
+): string | null => {
+  if (!phase) return null
+  switch (phase) {
+    case 'acknowledged':
+      return '已接收转码任务'
+    case 'opening':
+      return '正在打开 RVT 模型'
+    case 'converting':
+    case 'converting_model':
+      return '正在转换模型构件'
+    case 'uploading_version':
+      return '正在生成模型版本'
+    case 'completed':
+      return '转换完成'
+    case 'failed':
+      return '转换失败'
+    default:
+      return phase
+  }
+}
+
 const isRvtSyncTask = (task: Pick<WorkbenchUploadSyncTask, 'status' | 'fileName'>) =>
   task.status === 'speckle_converting' && RVT_FILE_NAME_RE.test(task.fileName || '')
 
@@ -370,6 +393,16 @@ export const useWorkbenchUploadSync = () => {
       phase: task.progressPhase,
       message: task.progressMessage
     }
+  }
+
+  const getModelRuntimeProgressMessage = (params: {
+    projectId: string
+    modelId: string
+  }): string | null => {
+    const task = getLatestTask(params)
+    if (!task) return null
+    if (task.progressMessage?.trim()) return task.progressMessage.trim()
+    return mapProgressPhaseToDescription(task.progressPhase)
   }
 
   const activeProjectIds = computed(() => {
@@ -946,6 +979,7 @@ export const useWorkbenchUploadSync = () => {
     activeProjectIds,
     getLatestTask,
     getModelRuntimeProgress,
+    getModelRuntimeProgressMessage,
     uploadModelFile,
     retryTask,
     executeTask: retryTask,

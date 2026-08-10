@@ -245,7 +245,7 @@
                         class="ml-2 inline-flex items-center gap-1 align-middle"
                       >
                         <span class="text-xs font-normal text-gray-400">
-                          {{ getModelRuntimeStatus(model) }}
+                          {{ getModelRuntimeStatusText(model) }}
                         </span>
                         <button
                           v-if="shouldShowRetryAction(model)"
@@ -345,7 +345,7 @@
                               class="ml-2 inline-flex items-center gap-1 align-middle"
                             >
                               <span class="text-xs font-normal text-gray-400">
-                                {{ getModelRuntimeStatus(model) }}
+                                {{ getModelRuntimeStatusText(model) }}
                               </span>
                               <button
                                 v-if="shouldShowRetryAction(model)"
@@ -649,6 +649,7 @@ import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import {
   mapClientUploadProgressToRuntimePercent,
+  mapProgressPhaseToDescription,
   useWorkbenchUploadSync
 } from '~~/lib/projects/composables/workbenchUploadSync'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
@@ -744,7 +745,8 @@ const {
   retryTask,
   syncVisibleTasks,
   cleanupVisibleTaskSubscriptions,
-  getModelRuntimeProgress: getTaskRuntimeProgress
+  getModelRuntimeProgress: getTaskRuntimeProgress,
+  getModelRuntimeProgressMessage
 } = useWorkbenchUploadSync()
 
 const downloadsDialogOpen = ref(false)
@@ -867,6 +869,29 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
   }
 
   return null
+}
+
+const getModelRuntimeStatusDescription = (model: ModelListItem) => {
+  const message = getModelRuntimeProgressMessage({
+    projectId: props.projectId,
+    modelId: model.id
+  })
+  if (message?.trim()) return message.trim()
+
+  const pendingUpload = model.raw.pendingImportedVersions?.[0]
+  if (pendingUpload?.progressMessage?.trim()) return pendingUpload.progressMessage.trim()
+
+  const phaseDescription = mapProgressPhaseToDescription(pendingUpload?.progressPhase)
+  if (phaseDescription) return phaseDescription
+
+  return null
+}
+
+const getModelRuntimeStatusText = (model: ModelListItem) => {
+  const status = getModelRuntimeStatus(model)
+  if (!status) return null
+  const desc = getModelRuntimeStatusDescription(model)
+  return desc ? `${status}（${desc}）` : status
 }
 
 const mapIfcConversionProgressToRuntimePercent = (
