@@ -541,7 +541,7 @@ import { useApolloClient, useMutation, useQuery } from '@vue/apollo-composable'
 import { gql } from 'graphql-tag'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useApiOrigin } from '~~/composables/env'
-import { isValidPhoneNumber } from '~~/lib/common/helpers/validation'
+import { isValidPhoneNumber, normalizePhoneNumber } from '~~/lib/common/helpers/validation'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 
 type OrganizationTreeRow = {
@@ -1034,7 +1034,7 @@ const submitCreateMember = async () => {
   }
 
   const name = newMemberForm.value.name.trim()
-  const phone = newMemberForm.value.phone.trim()
+  const phone = normalizePhoneNumber(newMemberForm.value.phone.trim())
 
   if (!name) {
     memberFormError.value = '请输入姓名'

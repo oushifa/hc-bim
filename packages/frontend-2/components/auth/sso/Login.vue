@@ -41,7 +41,7 @@
 
 <script setup lang="ts">
 import { useForm } from 'vee-validate'
-import { isPhone, isRequired } from '~/lib/common/helpers/validation'
+import { isPhone, isRequired, normalizePhoneNumber } from '~/lib/common/helpers/validation'
 import { loginRoute } from '~/lib/common/helpers/route'
 import { useQuery } from '@vue/apollo-composable'
 import { workspaceSsoByEmailQuery } from '~/lib/workspaces/graphql/queries'
@@ -92,7 +92,7 @@ const {
   onResult
 } = useQuery(
   workspaceSsoByEmailQuery,
-  () => ({ email: email.value }),
+  () => ({ email: normalizePhoneNumber(email.value) }),
   () => ({
     enabled: emailCheckState.value === 'checking'
   })

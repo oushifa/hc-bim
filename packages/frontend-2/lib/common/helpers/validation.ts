@@ -46,13 +46,19 @@ export function fullyResetForm(
 }
 
 /**
+ * Normalize phone number by stripping whitespace and hyphens
+ * (e.g. "5123 4567", "5123-4567" -> "51234567")
+ */
+export const normalizePhoneNumber = (value: string) => value.replace(/[\s-]/g, '')
+
+/**
  * Mobile phone number validation rule
  * - Mainland China: 11 digits starting with 1 (second digit 3-9)
  * - Hong Kong: 8 digits starting with 1-9
  * Whitespace and hyphens (e.g. "5123 4567", "5123-4567") are stripped before validation
  */
 export const isValidPhoneNumber = (value: string) => {
-  const compact = value.replace(/[\s-]/g, '')
+  const compact = normalizePhoneNumber(value)
   return /^1[3-9]\d{9}$/.test(compact) || /^[1-9]\d{7}$/.test(compact)
 }
 

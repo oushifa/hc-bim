@@ -62,7 +62,7 @@
 </template>
 <script setup lang="ts">
 import { useForm } from 'vee-validate'
-import { isPhone, isRequired } from '~~/lib/common/helpers/validation'
+import { isPhone, isRequired, normalizePhoneNumber } from '~~/lib/common/helpers/validation'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { ensureError } from '@speckle/shared'
 import { useAuthManager } from '~~/lib/auth/composables/auth'
@@ -113,7 +113,7 @@ const finalLoginRoute = computed(() => {
 const onSubmit = handleSubmit(async (fullUser) => {
   try {
     loading.value = true
-    const user = fullUser
+    const user = { ...fullUser, email: normalizePhoneNumber(fullUser.email) }
     await signUpWithEmail({
       user,
       challenge: props.challenge,
