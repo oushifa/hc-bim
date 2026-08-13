@@ -541,6 +541,7 @@ import { useApolloClient, useMutation, useQuery } from '@vue/apollo-composable'
 import { gql } from 'graphql-tag'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useApiOrigin } from '~~/composables/env'
+import { isValidPhoneNumber } from '~~/lib/common/helpers/validation'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 
 type OrganizationTreeRow = {
@@ -1043,7 +1044,7 @@ const submitCreateMember = async () => {
     memberFormError.value = '请输入手机号'
     return
   }
-  if (!/^1[3-9]\d{9}$/.test(phone)) {
+  if (!isValidPhoneNumber(phone)) {
     memberFormError.value = '请输入有效的手机号'
     return
   }
