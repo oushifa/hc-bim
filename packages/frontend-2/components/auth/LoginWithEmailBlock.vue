@@ -77,7 +77,7 @@
 
 <script setup lang="ts">
 import { useForm } from 'vee-validate'
-import { isPhone, isRequired } from '~~/lib/common/helpers/validation'
+import { isPhone, isRequired, normalizePhoneNumber } from '~~/lib/common/helpers/validation'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { ensureError } from '@speckle/shared'
 import { useAuthManager } from '~~/lib/auth/composables/auth'
@@ -125,9 +125,9 @@ const onSubmit = handleSubmit(async ({ email, password }) => {
   try {
     loading.value = true
 
-    // 1. 先调用原有的登录接口
+    // 1. 先调用原有的登录接口（手机号统一压缩为纯数字后提交）
     await loginWithEmail({
-      email,
+      email: normalizePhoneNumber(email),
       password,
       challenge: props.challenge
     })
