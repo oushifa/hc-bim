@@ -8,6 +8,12 @@ import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useScopedState } from '~~/lib/common/composables/scopedState'
 import { nanoid } from 'nanoid'
+import {
+  resumableUpload,
+  type ResumableUploadBackend,
+  type ResumableUploadPart,
+  type UploadedPart
+} from '~/lib/core/api/resumableUpload'
 
 const LOCAL_UPLOAD_RUNTIME_END = 20
 const RVT_CONVERSION_RUNTIME_START = 20
@@ -76,7 +82,7 @@ type CreateUploadTaskResponse = {
   data: ServerModelSyncTask
   upload?: {
     fileId: string
-    uploadUrl: string
+    uploadId: string
   }
 }
 
@@ -507,43 +513,56 @@ export const useWorkbenchUploadSync = () => {
     ])
   }
 
-  const uploadToSignedUrl = async (
-    file: File,
-    uploadUrl: string,
-    onProgress?: (percentage: number) => void
-  ): Promise<{ etag: string }> => {
-    const request = new XMLHttpRequest()
+  const getPartUploadUrl = async (params: {
+    projectId: string
+    modelId: string
+    taskId: string
+    uploadId: string
+    partNumber: number
+  }): Promise<string> => {
+    const res = await $fetch<{ data: { url: string; partNumber: number } }>(
+      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/model-sync/tasks/${params.taskId}/part-upload-url`,
+      {
+        method: 'POST',
+        headers: getHeaders(),
+        body: { uploadId: params.uploadId, partNumber: params.partNumber }
+      }
+    )
 
-    return await new Promise<{ etag: string }>((resolve, reject) => {
-      request.open('PUT', uploadUrl)
-      request.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    return res.data.url
+  }
 
-      request.upload.addEventListener('progress', (e) => {
-        if (!e.lengthComputable) return
-        onProgress?.((e.loaded / e.total) * 100)
-      })
+  const listUploadedParts = async (params: {
+    projectId: string
+    modelId: string
+    taskId: string
+    uploadId: string
+  }): Promise<UploadedPart[]> => {
+    const res = await $fetch<{ data: { parts: UploadedPart[] } }>(
+      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/model-sync/tasks/${params.taskId}/parts`,
+      {
+        headers: getHeaders(),
+        query: { uploadId: params.uploadId }
+      }
+    )
 
-      request.addEventListener('load', () => {
-        if (request.status < 200 || request.status >= 300) {
-          return reject(
-            new Error(`模型文件上传失败${request.status ? ` (${request.status})` : ''}`)
-          )
-        }
+    return res.data.parts || []
+  }
 
-        const etag = request.getResponseHeader('ETag')
-        if (!etag) {
-          return reject(new Error('模型文件上传成功，但未返回 ETag'))
-        }
-
-        resolve({ etag })
-      })
-
-      request.addEventListener('error', () => {
-        reject(new Error('模型文件上传失败'))
-      })
-
-      request.send(file)
-    })
+  const abortUploadTask = async (params: {
+    projectId: string
+    modelId: string
+    taskId: string
+    uploadId: string
+  }): Promise<void> => {
+    await $fetch(
+      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/model-sync/tasks/${params.taskId}/abort-upload`,
+      {
+        method: 'POST',
+        headers: getHeaders(),
+        body: { uploadId: params.uploadId }
+      }
+    )
   }
 
   const handleTaskUpdate = async (
@@ -659,7 +678,8 @@ export const useWorkbenchUploadSync = () => {
     projectId: string
     modelId: string
     taskId: string
-    etag: string
+    uploadId: string
+    parts: ResumableUploadPart[]
   }) => {
     return await $fetch<{ data: ServerModelSyncTask }>(
       `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/model-sync/tasks/${params.taskId}/complete-upload`,
@@ -667,7 +687,8 @@ export const useWorkbenchUploadSync = () => {
         method: 'POST',
         headers: getHeaders(),
         body: {
-          etag: params.etag
+          uploadId: params.uploadId,
+          parts: params.parts
         }
       }
     )
@@ -703,24 +724,53 @@ export const useWorkbenchUploadSync = () => {
       silentSuccess: true
     })
 
-    if (!createResponse.upload?.uploadUrl) {
-      throw new Error('创建上传任务成功，但未返回上传地址')
+    if (!createResponse.upload?.fileId || !createResponse.upload?.uploadId) {
+      throw new Error('创建上传任务成功，但未返回上传标识')
     }
 
-    const { etag } = await uploadToSignedUrl(
-      params.file,
-      createResponse.upload.uploadUrl,
-      params.onProgress
-    )
+    const { fileId, uploadId } = createResponse.upload
 
-    const completeResponse = await completeUploadTask({
-      projectId: params.projectId,
-      modelId: params.modelId,
-      taskId: createdTask.id,
-      etag
+    const backend: ResumableUploadBackend = {
+      createMultipart: async () => ({ fileId, uploadId }),
+      getPartUploadUrl: ({ uploadId: partUploadId, partNumber }) =>
+        getPartUploadUrl({
+          projectId: params.projectId,
+          modelId: params.modelId,
+          taskId: createdTask.id,
+          uploadId: partUploadId,
+          partNumber
+        }),
+      listUploadedParts: ({ uploadId: partUploadId }) =>
+        listUploadedParts({
+          projectId: params.projectId,
+          modelId: params.modelId,
+          taskId: createdTask.id,
+          uploadId: partUploadId
+        }),
+      completeMultipart: ({ uploadId: partUploadId, parts }) =>
+        completeUploadTask({
+          projectId: params.projectId,
+          modelId: params.modelId,
+          taskId: createdTask.id,
+          uploadId: partUploadId,
+          parts
+        }).then((res) => res.data),
+      abortMultipart: ({ uploadId: partUploadId }) =>
+        abortUploadTask({
+          projectId: params.projectId,
+          modelId: params.modelId,
+          taskId: createdTask.id,
+          uploadId: partUploadId
+        })
+    }
+
+    const uploaded = await resumableUpload(backend, {
+      file: params.file,
+      onProgress: params.onProgress,
+      storageKey: `workbench-upload:${createdTask.id}`
     })
 
-    const task = await handleTaskUpdate(completeResponse.data, {
+    const task = await handleTaskUpdate(uploaded.result as ServerModelSyncTask, {
       silentSuccess: true
     })
     subscribeTask(task)

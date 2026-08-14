@@ -67,6 +67,10 @@ export interface FilterMaterialOptions {
 export default class Materials {
   public static readonly UNIFORM_VECTORS_USED = 33
   public static readonly DEFAULT_ARTIFICIAL_ROUGHNESS = 0.6 /** The inverse of "shininess" */
+  public static readonly DEFAULT_MESH_GHOST_OPACITY = 0.1
+  public static readonly DEFAULT_LINE_GHOST_OPACITY = 0.1
+  public static readonly DEFAULT_POINT_GHOST_OPACITY = 0.01
+  public static readonly DEFAULT_TEXT_GHOST_OPACITY = 0.1
   private readonly materialMap: { [hash: number]: Material } = {}
   private meshGhostMaterial: Material
   private meshGradientMaterial: Material
@@ -89,6 +93,12 @@ export default class Materials {
   private textHiddenMaterial: Material
 
   private defaultGradientTextureData!: ImageData
+  private ghostOpacityOverride: number | null = null
+
+  private markAsGhostMaterial(material: Material) {
+    material.userData.isGhostFilterMaterial = true
+    ;(material as unknown as SpeckleMaterial).needsCopy = true
+  }
 
   private static readonly NullRenderMaterialHash = this.hashCode(
     GeometryType.MESH.toString()
@@ -352,8 +362,9 @@ export default class Materials {
       color: 0xffffff,
       side: FrontSide,
       transparent: true,
-      opacity: 0.1
+      opacity: Materials.DEFAULT_MESH_GHOST_OPACITY
     })
+    this.markAsGhostMaterial(this.meshGhostMaterial)
     this.meshGhostMaterial.depthWrite = false
     this.meshGhostMaterial.alphaTest = 1
 
@@ -415,8 +426,10 @@ export default class Materials {
     ;(<SpeckleLineMaterial>this.lineGhostMaterial).pixelThreshold = 0.5
     ;(<SpeckleLineMaterial>this.lineGhostMaterial).resolution = new Vector2()
     ;(<SpeckleLineMaterial>this.lineGhostMaterial).toneMapped = false
-    ;(<SpeckleLineMaterial>this.lineGhostMaterial).opacity = 0.1
+    ;(<SpeckleLineMaterial>this.lineGhostMaterial).opacity =
+      Materials.DEFAULT_LINE_GHOST_OPACITY
     ;(<SpeckleLineMaterial>this.lineGhostMaterial).transparent = true
+    this.markAsGhostMaterial(this.lineGhostMaterial)
 
     this.lineColoredMaterial = new SpeckleLineMaterial({
       color: 0xffffff,
@@ -456,9 +469,10 @@ export default class Materials {
       color: 0xffffff,
       vertexColors: false,
       size: 2,
-      opacity: 0.01,
+      opacity: Materials.DEFAULT_POINT_GHOST_OPACITY,
       sizeAttenuation: false
     })
+    this.markAsGhostMaterial(this.pointGhostMaterial)
 
     this.pointCloudColouredMaterial = new SpecklePointColouredMaterial(
       {
@@ -488,9 +502,10 @@ export default class Materials {
   private async createDefaultTextMaterials() {
     this.textGhostMaterial = new SpeckleTextMaterial({
       color: 0xffffff,
-      opacity: 0.1,
+      opacity: Materials.DEFAULT_TEXT_GHOST_OPACITY,
       side: DoubleSide
     })
+    this.markAsGhostMaterial(this.textGhostMaterial)
     this.textGhostMaterial.transparent =
       this.textGhostMaterial.opacity < 1 ? true : false
     this.textGhostMaterial.depthWrite = this.textGhostMaterial.transparent
@@ -675,6 +690,58 @@ export default class Materials {
     await this.createDefaultTextMaterials()
     await this.createDefaultNullMaterials()
     this.defaultGradientTextureData = await Assets.getTextureData(defaultGradient)
+    if (this.ghostOpacityOverride !== null)
+      this.applyGhostOpacity(this.ghostOpacityOverride)
+  }
+
+  private setMaterialOpacity(
+    material: Material | undefined,
+    opacity: number,
+    transparent = true
+  ) {
+    if (!material) return
+    material.opacity = opacity
+    material.transparent = transparent ? opacity < 1 : material.transparent
+    material.depthWrite = material.transparent ? false : true
+    material.needsUpdate = true
+  }
+
+  private applyGhostOpacity(opacity: number) {
+    this.setMaterialOpacity(this.meshGhostMaterial, opacity)
+    this.setMaterialOpacity(this.lineGhostMaterial, opacity)
+    this.setMaterialOpacity(this.pointGhostMaterial, opacity)
+    this.setMaterialOpacity(this.textGhostMaterial, opacity)
+  }
+
+  public get ghostOpacity(): number {
+    if (this.ghostOpacityOverride !== null) return this.ghostOpacityOverride
+    return Materials.DEFAULT_MESH_GHOST_OPACITY
+  }
+
+  public setGhostOpacity(opacity: number) {
+    const normalized = Math.min(1, Math.max(0, opacity))
+    this.ghostOpacityOverride = normalized
+    this.applyGhostOpacity(normalized)
+  }
+
+  public resetGhostOpacity() {
+    this.ghostOpacityOverride = null
+    this.setMaterialOpacity(
+      this.meshGhostMaterial,
+      Materials.DEFAULT_MESH_GHOST_OPACITY
+    )
+    this.setMaterialOpacity(
+      this.lineGhostMaterial,
+      Materials.DEFAULT_LINE_GHOST_OPACITY
+    )
+    this.setMaterialOpacity(
+      this.pointGhostMaterial,
+      Materials.DEFAULT_POINT_GHOST_OPACITY
+    )
+    this.setMaterialOpacity(
+      this.textGhostMaterial,
+      Materials.DEFAULT_TEXT_GHOST_OPACITY
+    )
   }
 
   private makeMeshMaterial(materialData: RenderMaterial): Material {

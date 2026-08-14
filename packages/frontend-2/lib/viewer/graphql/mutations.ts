@@ -42,6 +42,16 @@ export const createCommentReplyMutation = graphql(`
   }
 `)
 
+export const editCommentMutation = graphql(`
+  mutation EditComment($input: EditCommentInput!) {
+    commentMutations {
+      edit(input: $input) {
+        ...ViewerCommentThread
+      }
+    }
+  }
+`)
+
 export const archiveCommentMutation = graphql(`
   mutation ArchiveComment($input: ArchiveCommentInput!) {
     commentMutations {

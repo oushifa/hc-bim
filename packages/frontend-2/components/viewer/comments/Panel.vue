@@ -56,7 +56,6 @@ import { HorizontalDirection } from '~~/lib/common/composables/window'
 
 enum ActionTypes {
   HideBubbles = 'hide-bubbles',
-  IncludeArchived = 'include-archived',
   LoadedVersionsOnly = 'loaded-versions-only'
 }
 
@@ -90,7 +89,7 @@ graphql(`
   }
 `)
 
-const { commentThreads, commentThreadsMetadata } = useInjectedViewerLoadedResources()
+const { commentThreads } = useInjectedViewerLoadedResources()
 const { threadFilters } = useInjectedViewerRequestedResources()
 const {
   threads: { hideBubbles }
@@ -106,25 +105,12 @@ const loadedVersionsOnly = computed({
   set: (newVal) => (threadFilters.value.loadedVersionsOnly = !!newVal)
 })
 
-const includeArchived = computed({
-  get: () =>
-    threadFilters.value.includeArchived || false ? 'includeArchived' : undefined,
-  set: (newVal) => (threadFilters.value.includeArchived = !!newVal)
-})
-
 const actionsItems = computed<LayoutMenuItem[][]>(() => [
   [
     {
       title: '显示模型标注',
       id: ActionTypes.HideBubbles,
       active: !hideBubbles.value
-    },
-    {
-      title: `显示已解决的问题 (${
-        commentThreadsMetadata.value?.totalArchivedCount || 0
-      })`,
-      id: ActionTypes.IncludeArchived,
-      active: !!includeArchived.value
     },
     {
       title: '排除其他版本的线程',
@@ -140,9 +126,6 @@ const onActionChosen = (params: { item: LayoutMenuItem; event: MouseEvent }) => 
   switch (item.id) {
     case ActionTypes.HideBubbles:
       hideBubbles.value = !hideBubbles.value
-      break
-    case ActionTypes.IncludeArchived:
-      includeArchived.value = includeArchived.value ? undefined : 'includeArchived'
       break
     case ActionTypes.LoadedVersionsOnly:
       loadedVersionsOnly.value = loadedVersionsOnly.value

@@ -1,4 +1,10 @@
 import { useAuthCookie } from '~/lib/auth/composables/auth'
+import {
+  resumableUpload,
+  type ResumableUploadBackend,
+  type ResumableUploadPart,
+  type UploadedPart
+} from '~/lib/core/api/resumableUpload'
 
 export type ModelLibraryProject = {
   id: string
@@ -28,7 +34,7 @@ export type ModelLibraryPrepareUploadResponse = {
   modelId: string
   modelName: string
   fileId: string
-  uploadUrl: string
+  uploadId: string
 }
 
 export type ModelLibraryImportResponse = {
@@ -143,47 +149,52 @@ export function useModelLibraryApi() {
     return res.data
   }
 
-  const uploadToSignedUrl = async (
-    file: File,
-    uploadUrl: string,
-    onProgress?: UploadProgressCallback
-  ): Promise<{ etag: string }> => {
-    const request = new XMLHttpRequest()
+  const getPartUploadUrl = async (params: {
+    fileId: string
+    uploadId: string
+    partNumber: number
+  }): Promise<string> => {
+    const res = await $fetch<{ data: { url: string; partNumber: number } }>(
+      `${apiOrigin}/api/internal/model-library/uploads/part-upload-url`,
+      {
+        method: 'POST',
+        headers: getHeaders(),
+        body: params
+      }
+    )
 
-    return await new Promise<{ etag: string }>((resolve, reject) => {
-      request.open('PUT', uploadUrl)
-      request.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    return res.data.url
+  }
 
-      request.upload.addEventListener('progress', (e) => {
-        if (!e.lengthComputable) return
-        onProgress?.((e.loaded / e.total) * 100)
-      })
+  const listUploadedParts = async (params: {
+    fileId: string
+    uploadId: string
+  }): Promise<UploadedPart[]> => {
+    const res = await $fetch<{ data: { parts: UploadedPart[] } }>(
+      `${apiOrigin}/api/internal/model-library/uploads/parts`,
+      {
+        headers: getHeaders(),
+        query: params
+      }
+    )
 
-      request.addEventListener('load', () => {
-        if (request.status < 200 || request.status >= 300) {
-          return reject(
-            new Error(`模型库文件上传失败${request.status ? ` (${request.status})` : ''}`)
-          )
-        }
+    return res.data.parts || []
+  }
 
-        const etag = request.getResponseHeader('ETag')
-        if (!etag) {
-          return reject(new Error('模型库文件上传成功，但未返回 ETag'))
-        }
-
-        resolve({ etag })
-      })
-
-      request.addEventListener('error', () => {
-        reject(new Error('模型库文件上传失败'))
-      })
-
-      request.send(file)
+  const abortUpload = async (params: {
+    fileId: string
+    uploadId: string
+  }): Promise<void> => {
+    await $fetch(`${apiOrigin}/api/internal/model-library/uploads/abort`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: params
     })
   }
 
   const importUpload = async (payload: {
-    etag: string
+    uploadId: string
+    parts: ResumableUploadPart[]
     fileId: string
     modelId?: string
     modelName?: string
@@ -221,19 +232,34 @@ export function useModelLibraryApi() {
       modelDescription
     })
 
-    const { etag } = await uploadToSignedUrl(file, prepared.uploadUrl, onProgress)
+    const backend: ResumableUploadBackend = {
+      createMultipart: async () => ({
+        fileId: prepared.fileId,
+        uploadId: prepared.uploadId
+      }),
+      getPartUploadUrl,
+      listUploadedParts,
+      completeMultipart: async ({ fileId, uploadId, parts }) =>
+        await importUpload({
+          uploadId,
+          parts,
+          fileId,
+          modelId: modelId || prepared.modelId,
+          modelName,
+          modelDescription
+        }),
+      abortMultipart: abortUpload
+    }
 
-    const imported = await importUpload({
-      etag,
-      fileId: prepared.fileId,
-      modelId: modelId || prepared.modelId,
-      modelName,
-      modelDescription
+    const uploaded = await resumableUpload(backend, {
+      file,
+      onProgress,
+      storageKey: `model-library:${prepared.fileId}`
     })
 
     return {
       prepared,
-      imported
+      imported: uploaded.result as ModelLibraryImportResponse
     }
   }
 
@@ -242,8 +268,10 @@ export function useModelLibraryApi() {
     listModels,
     ensureModel,
     prepareUpload,
-    uploadToSignedUrl,
+    getPartUploadUrl,
+    listUploadedParts,
     importUpload,
+    abortUpload,
     uploadFile
   }
 }

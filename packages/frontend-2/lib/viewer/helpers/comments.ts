@@ -10,11 +10,16 @@ import type { CommentEditorValue } from '~~/lib/viewer/composables/commentManage
 import { ViewerHashStateKeys } from '~~/lib/viewer/composables/setup/urlHashState'
 
 export function convertCommentEditorValueToInput(
-  value: CommentEditorValue
+  value: CommentEditorValue,
+  options?: { existingBlobIds?: string[] }
 ): CommentContentInput {
+  const existingBlobIds = options?.existingBlobIds || []
   return {
     doc: value.doc || null,
-    blobIds: value.attachments?.map((a) => a.result.blobId) || []
+    blobIds: [
+      ...existingBlobIds,
+      ...(value.attachments?.map((a) => a.result.blobId) || [])
+    ]
   }
 }
 

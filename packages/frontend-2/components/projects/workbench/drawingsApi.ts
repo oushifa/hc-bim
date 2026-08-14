@@ -1,4 +1,8 @@
 import { useAuthCookie } from '~/lib/auth/composables/auth'
+import type {
+  ResumableUploadPart,
+  UploadedPart
+} from '~/lib/core/api/resumableUpload'
 
 export type WorkbenchDrawing = {
   id: string
@@ -60,9 +64,9 @@ export function useWorkbenchDrawingsApi() {
       )
     ).data
 
-  const generateUploadUrl = async (projectId: string, fileName: string) =>
+  const createMultipartUpload = async (projectId: string, fileName: string) =>
     (
-      await request<{ data: { blobId: string; uploadUrl: string } }>(
+      await request<{ data: { blobId: string; uploadId: string } }>(
         `/api/v1/projects/${projectId}/drawings/uploads/generate-url`,
         {
           method: 'POST',
@@ -70,6 +74,55 @@ export function useWorkbenchDrawingsApi() {
         }
       )
     ).data
+
+  const getPartUploadUrl = async (
+    projectId: string,
+    payload: { blobId: string; uploadId: string; partNumber: number }
+  ) =>
+    (
+      await request<{ data: { url: string; partNumber: number } }>(
+        `/api/v1/projects/${projectId}/drawings/uploads/part-upload-url`,
+        {
+          method: 'POST',
+          body: payload
+        }
+      )
+    ).data
+
+  const listUploadedParts = async (
+    projectId: string,
+    payload: { blobId: string; uploadId: string }
+  ): Promise<UploadedPart[]> =>
+    (
+      await request<{ data: { parts: UploadedPart[] } }>(
+        `/api/v1/projects/${projectId}/drawings/uploads/parts`,
+        { query: payload }
+      )
+    ).data.parts || []
+
+  const completeMultipartUpload = async (
+    projectId: string,
+    payload: { blobId: string; uploadId: string; parts: ResumableUploadPart[] }
+  ) =>
+    (
+      await request<{ data: { blobId: string; fileSize: number | null; fileHash: string | null } }>(
+        `/api/v1/projects/${projectId}/drawings/uploads/complete`,
+        {
+          method: 'POST',
+          body: payload
+        }
+      )
+    ).data
+
+  const abortMultipartUpload = async (
+    projectId: string,
+    payload: { blobId: string; uploadId: string }
+  ) => {
+    await request(`/api/v1/projects/${projectId}/drawings/uploads/abort`, {
+      method: 'POST',
+      body: payload
+    })
+  }
 
   const createDrawing = async (
     projectId: string,
@@ -105,7 +158,11 @@ export function useWorkbenchDrawingsApi() {
   return {
     listDrawings,
     getDrawing,
-    generateUploadUrl,
+    createMultipartUpload,
+    getPartUploadUrl,
+    listUploadedParts,
+    completeMultipartUpload,
+    abortMultipartUpload,
     createDrawing,
     deleteDrawing,
     convertToDxf,

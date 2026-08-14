@@ -150,6 +150,36 @@ export class LegacyViewer extends Viewer {
     return this.speckleRenderer
   }
 
+  public setGhostOpacity(opacity: number) {
+    this.speckleRenderer.setGhostOpacity(opacity)
+    this.preserveSelectionHighlightFilter(() => this.filtering.refreshFilters())
+    this.requestRender(UpdateFlags.RENDER_RESET | UpdateFlags.SHADOWS)
+  }
+
+  public getGhostOpacity(): number {
+    return this.speckleRenderer.getGhostOpacity()
+  }
+
+  public resetGhostOpacity() {
+    this.speckleRenderer.resetGhostOpacity()
+    this.preserveSelectionHighlightFilter(() => this.filtering.refreshFilters())
+    this.requestRender(UpdateFlags.RENDER_RESET | UpdateFlags.SHADOWS)
+  }
+
+  public setBackgroundColor(color: number, alpha = 1) {
+    this.speckleRenderer.setBackgroundColor(color, alpha)
+    this.requestRender(UpdateFlags.RENDER)
+  }
+
+  public getBackgroundColor() {
+    return this.speckleRenderer.getBackgroundColor()
+  }
+
+  public resetBackgroundColor() {
+    this.speckleRenderer.resetBackgroundColor()
+    this.requestRender(UpdateFlags.RENDER)
+  }
+
   /** SECTION BOX */
   public setSectionBox(
     boxData?: SpeckleViewer.ViewerState.SectionBoxData,

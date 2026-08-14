@@ -592,7 +592,10 @@ function setupResourceRequest(
     }
   )
 
-  const threadFilters = ref({ loadedVersionsOnly: discussionLoadedVersionOnly.value })
+  const threadFilters = ref({
+    loadedVersionsOnly: discussionLoadedVersionOnly.value,
+    includeArchived: true
+  })
 
   const switchModelToVersion = async (modelId: string, versionId?: string) => {
     const resourceArr = resources.value.slice()

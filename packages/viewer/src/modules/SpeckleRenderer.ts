@@ -128,6 +128,8 @@ export const DefaultObjectPickConfiguration = {
 }
 
 export default class SpeckleRenderer {
+  public static readonly DEFAULT_BACKGROUND_COLOR = 0xffffff
+  public static readonly DEFAULT_BACKGROUND_ALPHA = 0
   protected readonly SHOW_HELPERS = false
   protected readonly IGNORE_ZERO_OPACITY_OBJECTS = true
   public SHOW_BVH = false
@@ -155,6 +157,8 @@ export default class SpeckleRenderer {
   protected _clippingVolume: OBB = new OBB()
 
   protected _renderOverride: (() => void) | null = null
+  protected _backgroundColor = SpeckleRenderer.DEFAULT_BACKGROUND_COLOR
+  protected _backgroundAlpha = SpeckleRenderer.DEFAULT_BACKGROUND_ALPHA
 
   public objectPickConfiguration: ObjectPickConfiguration =
     DefaultObjectPickConfiguration
@@ -167,6 +171,14 @@ export default class SpeckleRenderer {
    * Renderer and rendering flags */
   public get renderer(): SpeckleWebGLRenderer {
     return this._renderer
+  }
+
+  public get backgroundColor(): number {
+    return this._backgroundColor
+  }
+
+  public get backgroundAlpha(): number {
+    return this._backgroundAlpha
   }
 
   public set needsRender(value: boolean) {
@@ -431,6 +443,7 @@ export default class SpeckleRenderer {
     this.container = container
     this._renderer.setSize(container.offsetWidth, container.offsetHeight)
     container.appendChild(this._renderer.domElement)
+    this.updateCanvasBackground()
 
     this.batcher = new Batcher(this.renderer.capabilities)
 
@@ -504,6 +517,51 @@ export default class SpeckleRenderer {
     if (this.sunConfiguration.shadowcatcher && this._shadowcatcher) {
       this._shadowcatcher.update(this._scene)
     }
+  }
+
+  public setBackgroundColor(color: number, alpha = 1) {
+    this._backgroundColor = color
+    this._backgroundAlpha = alpha
+    this.updateCanvasBackground()
+    this.needsRender = true
+  }
+
+  public getBackgroundColor() {
+    return {
+      color: this._backgroundColor,
+      alpha: this._backgroundAlpha
+    }
+  }
+
+  public resetBackgroundColor() {
+    this.setBackgroundColor(
+      SpeckleRenderer.DEFAULT_BACKGROUND_COLOR,
+      SpeckleRenderer.DEFAULT_BACKGROUND_ALPHA
+    )
+  }
+
+  public setGhostOpacity(opacity: number) {
+    this.batcher.materials.setGhostOpacity(opacity)
+    this.needsRender = true
+  }
+
+  public getGhostOpacity(): number {
+    return this.batcher.materials.ghostOpacity
+  }
+
+  public resetGhostOpacity() {
+    this.batcher.materials.resetGhostOpacity()
+    this.needsRender = true
+  }
+
+  private updateCanvasBackground() {
+    if (!this._renderer || !this.container) return
+    const r = (this._backgroundColor >> 16) & 0xff
+    const g = (this._backgroundColor >> 8) & 0xff
+    const b = this._backgroundColor & 0xff
+    const background = `rgba(${r}, ${g}, ${b}, ${this._backgroundAlpha})`
+    this._renderer.domElement.style.backgroundColor = background
+    this.container.style.backgroundColor = background
   }
 
   private updateRTEShadowBuffers(): boolean {

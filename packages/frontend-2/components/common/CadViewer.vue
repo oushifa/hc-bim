@@ -218,37 +218,96 @@
         "
       >
         <div
-          class="text-xs font-medium"
-          :class="theme === 'dark' ? 'text-gray-200' : 'text-slate-800'"
+          class="flex items-center gap-1 rounded-lg p-1"
+          :class="theme === 'dark' ? 'bg-white/5' : 'bg-slate-900/5'"
         >
-          图层
-        </div>
-        <div class="flex items-center gap-2">
           <button
-            class="text-xs"
+            type="button"
+            class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
             :class="
-              theme === 'dark'
-                ? 'text-gray-200 hover:text-white'
-                : 'text-slate-700 hover:text-slate-900'
+              layerPanelTab === 'layers'
+                ? theme === 'dark'
+                  ? 'bg-white/10 text-white'
+                  : 'bg-white text-slate-900 border border-slate-200'
+                : theme === 'dark'
+                  ? 'text-slate-300 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
             "
-            @click="setAllLayersVisible(true)"
+            @click="layerPanelTab = 'layers'"
           >
-            全显
+            图层
           </button>
           <button
+            type="button"
+            class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors"
+            :class="
+              layerPanelTab === 'views'
+                ? theme === 'dark'
+                  ? 'bg-white/10 text-white'
+                  : 'bg-white text-slate-900 border border-slate-200'
+                : theme === 'dark'
+                  ? 'text-slate-300 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
+            "
+            @click="layerPanelTab = 'views'"
+          >
+            已保存视图
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <template v-if="layerPanelTab === 'layers'">
+            <button
+              class="text-xs"
+              :class="
+                theme === 'dark'
+                  ? 'text-gray-200 hover:text-white'
+                  : 'text-slate-700 hover:text-slate-900'
+              "
+              @click="openCreateSavedViewDialog"
+            >
+              保存视图
+            </button>
+            <button
+              class="text-xs"
+              :class="
+                theme === 'dark'
+                  ? 'text-gray-200 hover:text-white'
+                  : 'text-slate-700 hover:text-slate-900'
+              "
+              @click="setAllLayersVisible(true)"
+            >
+              全显
+            </button>
+            <button
+              class="text-xs"
+              :class="
+                theme === 'dark'
+                  ? 'text-gray-200 hover:text-white'
+                  : 'text-slate-700 hover:text-slate-900'
+              "
+              @click="setAllLayersVisible(false)"
+            >
+              全隐
+            </button>
+          </template>
+          <button
+            v-else
             class="text-xs"
             :class="
               theme === 'dark'
                 ? 'text-gray-200 hover:text-white'
                 : 'text-slate-700 hover:text-slate-900'
             "
-            @click="setAllLayersVisible(false)"
+            @click="openCreateSavedViewDialog"
           >
-            全隐
+            保存当前
           </button>
         </div>
       </div>
-      <div class="overflow-y-auto overflow-x-hidden flex-1 min-h-0 pb-2">
+      <div
+        v-if="layerPanelTab === 'layers'"
+        class="overflow-y-auto overflow-x-hidden flex-1 min-h-0 pb-2"
+      >
         <button
           v-for="name in layerNames"
           :key="name"
@@ -289,6 +348,116 @@
             {{ layerCounts[name] || 0 }}
           </span>
         </button>
+      </div>
+      <div v-else class="overflow-y-auto overflow-x-hidden flex-1 min-h-0 p-3 space-y-3">
+        <div
+          v-if="!savedViews.length"
+          class="rounded-xl border border-dashed px-4 py-10 text-center"
+          :class="
+            theme === 'dark'
+              ? 'border-white/10 bg-white/5 text-slate-400'
+              : 'border-slate-200 bg-slate-50 text-slate-500'
+          "
+        >
+          <div class="text-sm font-medium">暂无已保存视图</div>
+          <div class="text-xs mt-1">保存当前勾选的图层配置，后续可一键加载</div>
+          <button
+            type="button"
+            class="mt-4 px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+            :class="
+              theme === 'dark'
+                ? 'bg-white/10 text-white hover:bg-white/15'
+                : 'bg-slate-900 text-white hover:bg-slate-800'
+            "
+            @click="openCreateSavedViewDialog"
+          >
+            保存当前视图
+          </button>
+        </div>
+        <div
+          v-for="view in savedViews"
+          :key="view.id"
+          class="rounded-xl p-3"
+          :class="
+            theme === 'dark'
+              ? 'bg-white/5 border border-white/10'
+              : 'bg-white border border-slate-200'
+          "
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div
+                class="text-sm font-medium truncate"
+                :class="theme === 'dark' ? 'text-slate-100' : 'text-slate-900'"
+              >
+                {{ view.name }}
+              </div>
+              <div
+                class="text-[11px] mt-1"
+                :class="theme === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+              >
+                {{ view.visibleLayerNames.length }} 个可见图层
+              </div>
+              <div
+                class="text-[11px] mt-1"
+                :class="theme === 'dark' ? 'text-slate-500' : 'text-slate-500'"
+              >
+                更新于 {{ formatSavedViewTime(view.updatedAt) }}
+              </div>
+            </div>
+            <button
+              type="button"
+              class="px-2.5 py-1 rounded-md text-xs font-medium transition-colors shrink-0"
+              :class="
+                theme === 'dark'
+                  ? 'bg-[#0b2c2c] text-[#00b4b6] hover:bg-[#00b4b6] hover:text-white'
+                  : 'bg-[#e6f7f8] text-[#00b4b6] hover:bg-[#00b4b6] hover:text-white'
+              "
+              @click="applySavedView(view)"
+            >
+              加载
+            </button>
+          </div>
+          <div class="flex items-center gap-3 mt-3">
+            <button
+              type="button"
+              class="text-xs transition-colors"
+              :class="
+                theme === 'dark'
+                  ? 'text-slate-300 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
+              "
+              @click="overwriteSavedView(view.id)"
+            >
+              覆盖
+            </button>
+            <button
+              type="button"
+              class="text-xs transition-colors"
+              :class="
+                theme === 'dark'
+                  ? 'text-slate-300 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900'
+              "
+              @click="openRenameSavedViewDialog(view)"
+            >
+              重命名
+            </button>
+            <button
+              type="button"
+              class="text-xs transition-colors flex items-center gap-1"
+              :class="
+                theme === 'dark'
+                  ? 'text-red-300 hover:text-red-200'
+                  : 'text-red-600 hover:text-red-700'
+              "
+              @click="openDeleteSavedViewDialog(view.id)"
+            >
+              <Trash2 :size="12" />
+              <span>删除</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -633,6 +802,217 @@
         </div>
       </div>
     </div>
+
+    <div
+      v-if="savedViewDialogOpen"
+      class="fixed inset-0 z-[60] flex items-center justify-center"
+    >
+      <button
+        type="button"
+        class="absolute inset-0 backdrop-blur-[2px]"
+        :class="theme === 'dark' ? 'bg-black/55' : 'bg-slate-900/30'"
+        aria-label="关闭弹窗"
+        @click="closeSavedViewDialog"
+      ></button>
+      <div
+        class="relative w-[460px] max-w-[calc(100vw-32px)] rounded-xl overflow-hidden"
+        :class="
+          theme === 'dark'
+            ? 'bg-[#111827] border border-white/10 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]'
+            : 'bg-white border border-slate-900/10 shadow-[0_20px_60px_-25px_rgba(2,6,23,0.35)]'
+        "
+        role="dialog"
+        aria-modal="true"
+        :aria-label="savedViewDialogMode === 'create' ? '保存视图' : '编辑视图'"
+      >
+        <div
+          class="px-4 py-3 flex items-center justify-between"
+          :class="
+            theme === 'dark'
+              ? 'border-b border-white/10'
+              : 'border-b border-slate-900/10'
+          "
+        >
+          <div
+            class="text-sm font-semibold"
+            :class="theme === 'dark' ? 'text-slate-100' : 'text-slate-900'"
+          >
+            {{ savedViewDialogMode === 'create' ? '保存视图' : '编辑视图' }}
+          </div>
+          <button
+            type="button"
+            class="px-2 py-1 rounded-md text-xs font-medium"
+            :class="
+              theme === 'dark'
+                ? 'bg-white/5 text-slate-200 hover:bg-white/10'
+                : 'bg-slate-900/5 text-slate-700 hover:bg-slate-900/10'
+            "
+            @click="closeSavedViewDialog"
+          >
+            关闭
+          </button>
+        </div>
+        <div class="p-4 space-y-3">
+          <div
+            class="text-xs"
+            :class="theme === 'dark' ? 'text-slate-300' : 'text-slate-600'"
+          >
+            {{
+              savedViewDialogMode === 'create'
+                ? '保存当前已勾选的图层配置'
+                : '修改视图名称'
+            }}
+          </div>
+          <div class="space-y-2">
+            <label
+              for="cadviewer-saved-view-name"
+              class="text-xs"
+              :class="theme === 'dark' ? 'text-slate-300' : 'text-slate-700'"
+            >
+              视图名称
+            </label>
+            <input
+              id="cadviewer-saved-view-name"
+              ref="savedViewInputEl"
+              v-model="savedViewName"
+              type="text"
+              placeholder="请输入视图名称"
+              class="w-full rounded-md py-2 px-3 text-sm focus:outline-none focus:border-blue-500 transition-all"
+              :class="
+                theme === 'dark'
+                  ? 'bg-slate-900/50 border border-slate-700 text-white placeholder-slate-500'
+                  : 'bg-white border border-slate-200 text-slate-900 placeholder-slate-400'
+              "
+              @keydown.enter.prevent="submitSavedViewDialog"
+            />
+          </div>
+        </div>
+        <div
+          class="px-4 py-3 flex items-center justify-end gap-2"
+          :class="
+            theme === 'dark'
+              ? 'border-t border-white/10'
+              : 'border-t border-slate-900/10'
+          "
+        >
+          <button
+            type="button"
+            class="px-3 py-2 rounded-md text-sm font-medium"
+            :class="
+              theme === 'dark'
+                ? 'bg-white/5 text-slate-200 hover:bg-white/10'
+                : 'bg-slate-900/5 text-slate-700 hover:bg-slate-900/10'
+            "
+            @click="closeSavedViewDialog"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            class="px-3 py-2 rounded-md text-sm font-semibold bg-blue-600 text-white hover:bg-blue-500"
+            @click="submitSavedViewDialog"
+          >
+            保存
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="deleteSavedViewDialogOpen"
+      class="fixed inset-0 z-[60] flex items-center justify-center"
+    >
+      <button
+        type="button"
+        class="absolute inset-0 backdrop-blur-[2px]"
+        :class="theme === 'dark' ? 'bg-black/55' : 'bg-slate-900/30'"
+        aria-label="关闭弹窗"
+        @click="closeDeleteSavedViewDialog"
+      ></button>
+      <div
+        class="relative w-[420px] max-w-[calc(100vw-32px)] rounded-xl overflow-hidden"
+        :class="
+          theme === 'dark'
+            ? 'bg-[#111827] border border-white/10 shadow-[0_20px_60px_-20px_rgba(0,0,0,0.8)]'
+            : 'bg-white border border-slate-900/10 shadow-[0_20px_60px_-25px_rgba(2,6,23,0.35)]'
+        "
+        role="dialog"
+        aria-modal="true"
+        aria-label="删除视图确认"
+      >
+        <div
+          class="px-4 py-3 flex items-center justify-between"
+          :class="
+            theme === 'dark'
+              ? 'border-b border-white/10'
+              : 'border-b border-slate-900/10'
+          "
+        >
+          <div
+            class="text-sm font-semibold"
+            :class="theme === 'dark' ? 'text-slate-100' : 'text-slate-900'"
+          >
+            确认删除
+          </div>
+          <button
+            type="button"
+            class="px-2 py-1 rounded-md text-xs font-medium"
+            :class="
+              theme === 'dark'
+                ? 'bg-white/5 text-slate-200 hover:bg-white/10'
+                : 'bg-slate-900/5 text-slate-700 hover:bg-slate-900/10'
+            "
+            @click="closeDeleteSavedViewDialog"
+          >
+            关闭
+          </button>
+        </div>
+        <div class="p-4 space-y-2">
+          <div
+            class="text-sm"
+            :class="theme === 'dark' ? 'text-slate-200' : 'text-slate-800'"
+          >
+            确认删除视图
+            <span class="font-semibold">“{{ deletingSavedView?.name || '' }}”</span>
+            吗？
+          </div>
+          <div
+            class="text-xs"
+            :class="theme === 'dark' ? 'text-slate-400' : 'text-slate-500'"
+          >
+            删除后不可恢复。
+          </div>
+        </div>
+        <div
+          class="px-4 py-3 flex items-center justify-end gap-2"
+          :class="
+            theme === 'dark'
+              ? 'border-t border-white/10'
+              : 'border-t border-slate-900/10'
+          "
+        >
+          <button
+            type="button"
+            class="px-3 py-2 rounded-md text-sm font-medium"
+            :class="
+              theme === 'dark'
+                ? 'bg-white/5 text-slate-200 hover:bg-white/10'
+                : 'bg-slate-900/5 text-slate-700 hover:bg-slate-900/10'
+            "
+            @click="closeDeleteSavedViewDialog"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            class="px-3 py-2 rounded-md text-sm font-semibold bg-red-600 text-white hover:bg-red-500"
+            @click="confirmDeleteSavedView"
+          >
+            删除
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -701,11 +1081,13 @@ const hoverMarkerEl = useTemplateRef<HTMLDivElement>('hoverMarkerEl')
 const annotationTitleInputEl = useTemplateRef<HTMLInputElement>(
   'annotationTitleInputEl'
 )
+const savedViewInputEl = useTemplateRef<HTMLInputElement>('savedViewInputEl')
 
 const isLoading = ref(false)
 const error = ref<string | null>(null)
 const layersOpen = ref(true)
 const annotationsOpen = ref(true)
+const layerPanelTab = ref<'layers' | 'views'>('layers')
 
 let renderer: WebGLRenderer | null = null
 let scene: Scene | null = null
@@ -732,6 +1114,14 @@ const rawSegments = ref<RawSegment[]>([])
 const hiddenLayers = reactive<Record<string, boolean>>({})
 const layerColors = reactive<Record<string, string>>({})
 const layerCounts = reactive<Record<string, number>>({})
+
+type SavedLayerView = {
+  id: string
+  name: string
+  visibleLayerNames: string[]
+  createdAt: string
+  updatedAt: string
+}
 
 type AnnotationItem = {
   id: string
@@ -764,9 +1154,19 @@ const pickedCameraState = ref<{
   position: { x: number; y: number; z: number }
   target: { x: number; y: number; z: number }
 } | null>(null)
+const savedViews = ref<SavedLayerView[]>([])
+const savedViewDialogOpen = ref(false)
+const savedViewDialogMode = ref<'create' | 'edit'>('create')
+const editingSavedViewId = ref<string | null>(null)
+const savedViewName = ref('')
+const deleteSavedViewDialogOpen = ref(false)
+const deletingSavedView = ref<SavedLayerView | null>(null)
 
 const layerNames = computed(() =>
   Object.keys(layerCounts).sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'))
+)
+const savedViewsStorageKey = computed(
+  () => `cadViewerSavedViews:${props.projectId}:${props.drawingId}`
 )
 
 const visibleAnnotations = computed(() => annotations.value.filter((a) => a.visible))
@@ -820,6 +1220,180 @@ const toUiAnnotation = (a: ApiAnnotation): AnnotationItem => {
     date,
     creatorInitial
   }
+}
+
+const sortSavedViews = (items: SavedLayerView[]) =>
+  [...items].sort((a, b) => {
+    const bTime = new Date(b.updatedAt).getTime()
+    const aTime = new Date(a.updatedAt).getTime()
+    return bTime - aTime
+  })
+
+const persistSavedViews = (items: SavedLayerView[]) => {
+  savedViews.value = sortSavedViews(items)
+  if (!import.meta.client) return
+  window.localStorage.setItem(savedViewsStorageKey.value, JSON.stringify(savedViews.value))
+}
+
+const loadSavedViews = () => {
+  if (!import.meta.client) {
+    savedViews.value = []
+    return
+  }
+  try {
+    const raw = window.localStorage.getItem(savedViewsStorageKey.value)
+    if (!raw) {
+      savedViews.value = []
+      return
+    }
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) {
+      savedViews.value = []
+      return
+    }
+    const items = parsed
+      .filter(
+        (item): item is SavedLayerView =>
+          !!item &&
+          typeof item.id === 'string' &&
+          typeof item.name === 'string' &&
+          Array.isArray(item.visibleLayerNames) &&
+          typeof item.createdAt === 'string' &&
+          typeof item.updatedAt === 'string'
+      )
+      .map((item) => ({
+        ...item,
+        visibleLayerNames: item.visibleLayerNames.filter(
+          (layer): layer is string => typeof layer === 'string'
+        )
+      }))
+    savedViews.value = sortSavedViews(items)
+  } catch {
+    savedViews.value = []
+  }
+}
+
+const getVisibleLayerNames = () => layerNames.value.filter((name) => !hiddenLayers[name])
+
+const formatSavedViewTime = (value: string) => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}`
+}
+
+const openCreateSavedViewDialog = () => {
+  savedViewDialogMode.value = 'create'
+  editingSavedViewId.value = null
+  savedViewName.value = ''
+  savedViewDialogOpen.value = true
+}
+
+const openRenameSavedViewDialog = (view: SavedLayerView) => {
+  savedViewDialogMode.value = 'edit'
+  editingSavedViewId.value = view.id
+  savedViewName.value = view.name
+  savedViewDialogOpen.value = true
+}
+
+const closeSavedViewDialog = () => {
+  savedViewDialogOpen.value = false
+  editingSavedViewId.value = null
+  savedViewName.value = ''
+}
+
+const openDeleteSavedViewDialog = (viewId: string) => {
+  const target = savedViews.value.find((item) => item.id === viewId) || null
+  if (!target) return
+  deletingSavedView.value = target
+  deleteSavedViewDialogOpen.value = true
+}
+
+const closeDeleteSavedViewDialog = () => {
+  deleteSavedViewDialogOpen.value = false
+  deletingSavedView.value = null
+}
+
+const submitSavedViewDialog = () => {
+  const name = savedViewName.value.trim()
+  if (!name) {
+    triggerNotification({
+      type: ToastNotificationType.Warning,
+      title: '请输入视图名称'
+    })
+    return
+  }
+
+  const now = new Date().toISOString()
+  if (savedViewDialogMode.value === 'create') {
+    const item: SavedLayerView = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      visibleLayerNames: getVisibleLayerNames(),
+      createdAt: now,
+      updatedAt: now
+    }
+    persistSavedViews([item, ...savedViews.value])
+    layerPanelTab.value = 'views'
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '视图保存成功'
+    })
+  } else if (editingSavedViewId.value) {
+    persistSavedViews(
+      savedViews.value.map((item) =>
+        item.id === editingSavedViewId.value ? { ...item, name, updatedAt: now } : item
+      )
+    )
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '视图更新成功'
+    })
+  }
+
+  closeSavedViewDialog()
+}
+
+const applySavedView = (view: SavedLayerView) => {
+  const visible = new Set(view.visibleLayerNames)
+  for (const name of layerNames.value) {
+    hiddenLayers[name] = !visible.has(name)
+  }
+  rebuildMergedView()
+  triggerNotification({
+    type: ToastNotificationType.Success,
+    title: '视图加载成功'
+  })
+}
+
+const overwriteSavedView = (viewId: string) => {
+  const target = savedViews.value.find((item) => item.id === viewId)
+  if (!target) return
+  const now = new Date().toISOString()
+  persistSavedViews(
+    savedViews.value.map((item) =>
+      item.id === viewId
+        ? { ...item, visibleLayerNames: getVisibleLayerNames(), updatedAt: now }
+        : item
+    )
+  )
+  triggerNotification({
+    type: ToastNotificationType.Success,
+    title: `已覆盖视图「${target.name}」`
+  })
+}
+
+const confirmDeleteSavedView = () => {
+  const target = deletingSavedView.value
+  if (!target) return
+  persistSavedViews(savedViews.value.filter((item) => item.id !== target.id))
+  closeDeleteSavedViewDialog()
+  triggerNotification({
+    type: ToastNotificationType.Success,
+    title: `已删除视图「${target.name}」`
+  })
 }
 
 const loadAnnotations = async () => {
@@ -1387,6 +1961,9 @@ const parseDxf = (text: string) => {
   if (!dxf) {
     throw new Error('DXF parse failed')
   }
+  rawSegments.value = []
+  for (const key of Object.keys(layerCounts)) delete layerCounts[key]
+  for (const key of Object.keys(layerColors)) delete layerColors[key]
   const segments: RawSegment[] = []
   const counts: Record<string, number> = {}
   const colors: Record<string, string> = {}
@@ -1558,6 +2135,10 @@ const parseDxf = (text: string) => {
   if (dxf.entities) traverse(dxf.entities, new Matrix4(), '0', null)
 
   rawSegments.value = segments
+  const currentNames = new Set(Object.keys(counts))
+  for (const key of Object.keys(hiddenLayers)) {
+    if (!currentNames.has(key)) delete hiddenLayers[key]
+  }
   for (const [k, v] of Object.entries(counts)) layerCounts[k] = v
   for (const [k, v] of Object.entries(colors)) layerColors[k] = v
   for (const name of Object.keys(counts)) {
@@ -1599,9 +2180,16 @@ onMounted(async () => {
     if (e.key !== 'Escape') return
     if (isPickMode.value) cancelPickAnnotation()
     else if (createFormOpen.value) cancelCreate()
+    else if (savedViewDialogOpen.value) closeSavedViewDialog()
+    else if (deleteSavedViewDialogOpen.value) closeDeleteSavedViewDialog()
+  }
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === savedViewsStorageKey.value) loadSavedViews()
   }
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('storage', onStorage)
 
+  loadSavedViews()
   await Promise.all([load(), loadAnnotations()])
   onBeforeUnmount(() => {
     if (canvasEl.value) {
@@ -1610,12 +2198,14 @@ onMounted(async () => {
       canvasEl.value.removeEventListener('pointerleave', onCanvasPointerLeave, true)
     }
     window.removeEventListener('keydown', onKeydown)
+    window.removeEventListener('storage', onStorage)
   })
 })
 
 watch(
   () => [props.projectId, props.drawingId, props.blobId, props.fileName],
   async () => {
+    loadSavedViews()
     await Promise.all([load(), loadAnnotations()])
   }
 )
@@ -1632,6 +2222,13 @@ watch(createFormOpen, async (open) => {
   if (!open) return
   await nextTick()
   annotationTitleInputEl.value?.focus()
+})
+
+watch(savedViewDialogOpen, async (open) => {
+  if (!open) return
+  await nextTick()
+  savedViewInputEl.value?.focus()
+  savedViewInputEl.value?.select()
 })
 
 onBeforeUnmount(() => {

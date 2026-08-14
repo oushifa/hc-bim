@@ -645,6 +645,10 @@ import DrawingsTab from '~/components/projects/workbench/DrawingsTab.vue'
 import ProjectCardImportFileArea from '~/components/project/CardImportFileArea.vue'
 import WorkbenchUploadSyncProjectSubscriber from '~/components/singleton/WorkbenchUploadSyncProjectSubscriber.vue'
 import { useWorkbenchDrawingsApi } from '~/components/projects/workbench/drawingsApi'
+import {
+  resumableUpload,
+  type ResumableUploadBackend
+} from '~/lib/core/api/resumableUpload'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { useUserPermissions } from '~~/lib/auth/composables/userPermissions'
 import {
@@ -995,34 +999,60 @@ const onDrawingFilePicked = async (e: Event) => {
   isDrawingUploading.value = true
   drawingUploadProgress.value = 0
   try {
-    const { blobId, uploadUrl } = await drawingsApi.generateUploadUrl(
-      props.projectId,
-      file.name
-    )
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest()
-      xhr.open('PUT', uploadUrl)
-      xhr.upload.onprogress = (ev) => {
-        if (!ev.lengthComputable) return
-        drawingUploadProgress.value = Math.min(
-          99,
-          Math.round((ev.loaded / ev.total) * 100)
+    const backend: ResumableUploadBackend = {
+      createMultipart: async () => {
+        const { blobId, uploadId } = await drawingsApi.createMultipartUpload(
+          props.projectId,
+          file.name
         )
-      }
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) resolve()
-        else reject(new Error('上传图纸文件失败'))
-      }
-      xhr.onerror = () => reject(new Error('上传图纸文件失败'))
-      xhr.send(file)
+        return { fileId: blobId, uploadId }
+      },
+      getPartUploadUrl: ({ fileId, uploadId, partNumber }) =>
+        drawingsApi
+          .getPartUploadUrl(props.projectId, {
+            blobId: fileId,
+            uploadId,
+            partNumber
+          })
+          .then((res) => res.url),
+      listUploadedParts: ({ fileId, uploadId }) =>
+        drawingsApi.listUploadedParts(props.projectId, {
+          blobId: fileId,
+          uploadId
+        }),
+      completeMultipart: ({ fileId, uploadId, parts }) =>
+        drawingsApi.completeMultipartUpload(props.projectId, {
+          blobId: fileId,
+          uploadId,
+          parts
+        }),
+      abortMultipart: ({ fileId, uploadId }) =>
+        drawingsApi.abortMultipartUpload(props.projectId, {
+          blobId: fileId,
+          uploadId
+        })
+    }
+
+    const uploaded = await resumableUpload(backend, {
+      file,
+      onProgress: (pct) => {
+        drawingUploadProgress.value = Math.min(99, pct)
+      },
+      storageKey: `drawing-upload:${props.projectId}:${file.name}:${file.size}`
     })
+
+    const blobId = uploaded.fileId
+    const completed = uploaded.result as {
+      fileSize: number | null
+      fileHash: string | null
+    }
 
     const name = file.name.replace(/\.[^/.]+$/, '')
     await drawingsApi.createDrawing(props.projectId, {
       blobId,
       fileName: file.name,
       contentType: file.type || 'application/octet-stream',
-      fileSize: file.size,
+      fileSize: completed?.fileSize ?? file.size,
       folderId: activeDir.value === ROOT_ID ? null : activeDir.value,
       name: name.trim() || file.name
     })

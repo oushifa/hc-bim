@@ -149,7 +149,7 @@
                     type="button"
                     class="p-1 rounded-sm text-foreground-2 hover:text-warning hover:bg-warning-muted transition-colors"
                     :title="getNodeLockButtonTitle(node)"
-                    :disabled="isSaving"
+                    :disabled="isSaving || isTreeNodeLockedByAncestor(node)"
                     @click.stop="
                       onToggleNodeLocked(String(node.key), !isTreeNodeLocked(node))
                     "
@@ -322,6 +322,7 @@ type CatalogTreeNode = {
   key: string
   title: string
   locked?: boolean
+  lockedByAncestor?: boolean
   children?: CatalogTreeNode[]
 }
 
@@ -522,8 +523,7 @@ const saveToNode = async ({
   const existingChildren = Array.isArray(currentCatalog.childrens)
     ? currentCatalog.childrens
     : []
-  const targetNode = findNodeById(existingChildren, targetNodeId)
-  if (targetNode?.locked) {
+  if (isNodeLockedInTree(existingChildren, targetNodeId)) {
     triggerNotification({
       type: ToastNotificationType.Danger,
       title: '保存失败',
@@ -602,18 +602,32 @@ const activeCatalogId = computed(
 const isTreeNodeLocked = (node: unknown) =>
   Boolean((node as { locked?: boolean } | null)?.locked)
 
-const getNodeLockButtonTitle = (node: unknown) =>
-  isTreeNodeLocked(node) ? '解锁节点' : '锁定节点'
+const isTreeNodeLockedByAncestor = (node: unknown) =>
+  Boolean((node as { lockedByAncestor?: boolean } | null)?.lockedByAncestor)
 
-const mapCatalogChildrenToTreeNodes = (nodes: RawCatalogNode[]): CatalogTreeNode[] => {
+const getNodeLockButtonTitle = (node: unknown) =>
+  isTreeNodeLockedByAncestor(node)
+    ? '父级已锁定'
+    : isTreeNodeLocked(node)
+      ? '解锁节点'
+      : '锁定节点'
+
+const mapCatalogChildrenToTreeNodes = (
+  nodes: RawCatalogNode[],
+  parentLocked = false
+): CatalogTreeNode[] => {
   if (!Array.isArray(nodes)) return []
   return nodes.map((node) => ({
     key: node.id,
     title: node.title,
-    locked: node.locked ?? false,
+    locked: parentLocked || (node.locked ?? false),
+    lockedByAncestor: parentLocked,
     children:
       Array.isArray(node.childrens) && node.childrens.length
-        ? mapCatalogChildrenToTreeNodes(node.childrens)
+        ? mapCatalogChildrenToTreeNodes(
+            node.childrens,
+            parentLocked || (node.locked ?? false)
+          )
         : undefined
   }))
 }
@@ -699,6 +713,36 @@ const findNodeById = (
   }
 
   return undefined
+}
+
+const findNodePathById = (
+  nodes: RawCatalogNode[],
+  nodeId: string,
+  ancestors: RawCatalogNode[] = []
+): { node: RawCatalogNode; ancestors: RawCatalogNode[] } | undefined => {
+  for (const node of nodes) {
+    if (node.id === nodeId) {
+      return {
+        node,
+        ancestors
+      }
+    }
+
+    const children = node.childrens || []
+    if (!children.length) continue
+
+    const found = findNodePathById(children, nodeId, [...ancestors, node])
+    if (found) return found
+  }
+
+  return undefined
+}
+
+const isNodeLockedInTree = (nodes: RawCatalogNode[], nodeId: string) => {
+  const result = findNodePathById(nodes, nodeId)
+  if (!result) return false
+
+  return result.ancestors.some((node) => node.locked) || Boolean(result.node.locked)
 }
 
 const applyNodeFilters = (node: RawCatalogNode) => {

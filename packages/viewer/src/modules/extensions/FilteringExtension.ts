@@ -210,6 +210,10 @@ export class FilteringExtension extends Extension {
     return this.filteringState
   }
 
+  public refreshFilters(): FilteringState {
+    return this.setFilters()
+  }
+
   private setNumericColorFilter(numProp: NumericPropertyInfo, ghost: boolean) {
     this.ColorNumericFilterState = new ColorNumericFilterState()
     this.ColorNumericFilterState.currentProp = numProp

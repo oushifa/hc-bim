@@ -21,6 +21,7 @@ import {
   archiveCommentMutation,
   createCommentReplyMutation,
   createCommentThreadMutation,
+  editCommentMutation,
   markCommentViewedMutation
 } from '~~/lib/viewer/graphql/mutations'
 import { onViewerCommentsUpdatedSubscription } from '~~/lib/viewer/graphql/subscriptions'
@@ -194,6 +195,43 @@ export function useSubmitReply() {
     triggerNotification({
       type: ToastNotificationType.Danger,
       title: 'Reply creation failed',
+      description: errMsg
+    })
+
+    return null
+  }
+}
+
+export function useEditComment() {
+  const { isLoggedIn } = useActiveUser()
+  const client = useApolloClient().client
+  const { triggerNotification } = useGlobalToast()
+
+  return async (input: {
+    projectId: string
+    commentId: string
+    content: CommentContentInput
+  }) => {
+    if (!isLoggedIn.value) return null
+    if (!isValidCommentContentInput(input.content)) return null
+
+    const { data, errors } = await client
+      .mutate({
+        mutation: editCommentMutation,
+        variables: {
+          input
+        }
+      })
+      .catch(convertThrowIntoFetchResult)
+
+    if (data?.commentMutations.edit) {
+      return data.commentMutations.edit
+    }
+
+    const errMsg = getFirstErrorMessage(errors)
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: 'Comment update failed',
       description: errMsg
     })
 

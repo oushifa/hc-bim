@@ -40,6 +40,16 @@
         />
         <ViewerControlsButtonToggle
           v-tippy="
+            getTooltipProps('显示设置', {
+              placement: 'right'
+            })
+          "
+          :active="activePanel === 'displaySettings'"
+          :icon="SlidersHorizontal"
+          @click="toggleActivePanel('displaySettings')"
+        />
+        <ViewerControlsButtonToggle
+          v-tippy="
             getTooltipProps(
               getShortcutDisplayText(shortcuts.ToggleDiscussions, {
                 format: 'separate'
@@ -142,6 +152,7 @@
           v-if="activePanel === 'models'"
           v-model:sub-view="modelsSubView"
         />
+        <ViewerSettingsPanel v-if="activePanel === 'displaySettings'" />
         <ViewerFiltersPanel v-if="activePanel === 'filters'" />
         <ViewerCommentsPanel
           v-if="resourceItems.length !== 0 && activePanel === 'discussions'"
@@ -218,6 +229,7 @@ import {
   Camera,
   Box,
   ListFilter,
+  SlidersHorizontal,
   MessageSquareText,
   ArrowLeft,
   ListTree,

@@ -16,7 +16,7 @@
     <!-- Comment bubbles -->
     <ViewerAnchoredPointThread
       v-for="thread in Object.values(commentThreads)"
-      v-show="!hideBubbles || isOpenThread(thread.id)"
+      v-show="shouldShowThreadBubbles && (!hideBubbles || isOpenThread(thread.id))"
       :key="thread.id"
       :model-value="thread"
       :class="openThread?.id === thread.id ? 'z-[12]' : 'z-[11]'"
@@ -185,6 +185,7 @@ const followers = computed(() => {
 
 const {
   spotlightUserSessionId,
+  panels: { active: activePanel },
   threads: {
     openThread: { thread: openThread },
     items: commentThreads,
@@ -220,15 +221,13 @@ const onThreadExpandedChange = (isExpanded: boolean) => {
 
 const shouldShowNewThread = computed(
   () =>
-    !isEmbedEnabled.value && !state.ui.measurement.enabled.value && canPostComment.value
+    !isEmbedEnabled.value &&
+    activePanel.value === 'discussions' &&
+    !state.ui.measurement.enabled.value &&
+    canPostComment.value
 )
 
-console.log(
-  'shouldShowNewThread',
-  state.ui.measurement.enabled.value,
-  canPostComment.value,
-  !isEmbedEnabled.value
-)
+const shouldShowThreadBubbles = computed(() => activePanel.value === 'discussions')
 
 const allThreadsChronologicalOrder = computed(() => {
   const vals = Object.values(commentThreads.value)
@@ -315,6 +314,17 @@ watch(
       closeNewThread()
     }
   }
+)
+
+watch(
+  activePanel,
+  (newVal, oldVal) => {
+    if (newVal === oldVal || newVal === 'discussions') return
+
+    closeNewThread()
+    closeAllThreads()
+  },
+  { flush: 'post' }
 )
 
 defineExpose({
