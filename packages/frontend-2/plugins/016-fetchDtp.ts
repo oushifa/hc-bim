@@ -5,6 +5,8 @@ let pendingDtpTokenRequest: Promise<string | null> | null = null
 let pendingDtpTokenValidation: Promise<string | null> | null = null
 // 清缓存时递增：使清除前发起的在途登录请求作废，避免其回填过期 token
 let dtpTokenGeneration = 0
+// 已成功上报给后端的最新 token（去重：相同 token 不重复上报）
+let lastReportedDtpToken: string | null = null
 
 type DtpFetchOptions = {
   originPath?: boolean
@@ -24,10 +26,46 @@ const joinUrlPath = (base: string, path: string) => {
   return `${normalizedBase}${normalizedPath}`
 }
 
+/**
+ * 将最新获取的 DTP token 上报给后端（GET /api/dtp-token 供其他开发获取最新 token）。
+ * 仅客户端执行；失败静默（console.warn），不影响主流程。相同 token 只上报一次。
+ */
+const reportDtpToken = async (token: string): Promise<void> => {
+  if (!import.meta.client) return
+  if (lastReportedDtpToken === token) return
+
+  try {
+    const apiOrigin = useApiOrigin({ absolute: true })
+    const response = await fetch(`${apiOrigin}/api/dtp-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      credentials: 'include',
+      body: JSON.stringify({ token })
+    })
+    if (response.ok) {
+      lastReportedDtpToken = token
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'DTP token report failed:',
+        response.status,
+        response.statusText
+      )
+    }
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn('DTP token report error:', error)
+  }
+}
+
 export const clearDtpTokenCache = () => {
   dtpTokenGeneration++
   cachedDtpToken = null
   pendingDtpTokenRequest = null
+  lastReportedDtpToken = null
   if (import.meta.client) {
     localStorage.removeItem('dtp-token')
   }
@@ -102,6 +140,7 @@ export default defineNuxtPlugin(() => {
     const storedToken = localStorage.getItem('dtp-token')
     if (storedToken) {
       cachedDtpToken = storedToken
+      void reportDtpToken(storedToken)
       return storedToken
     }
 
@@ -169,6 +208,7 @@ export default defineNuxtPlugin(() => {
         if (import.meta.client) {
           localStorage.setItem('dtp-token', dtpToken)
         }
+        void reportDtpToken(dtpToken)
 
         return dtpToken
       } catch (error) {
