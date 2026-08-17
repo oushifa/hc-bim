@@ -13,6 +13,31 @@ export type WdpSaveResult = {
   message: string
 }
 
+/** WDP 保存失败错误码 */
+export const WdpSaveErrorCode = {
+  /** 编辑器未就绪（未进入编辑状态，无需保存） */
+  EDITOR_NOT_READY: 'EDITOR_NOT_READY',
+  /** 等待回执超时 */
+  TIMEOUT: 'TIMEOUT',
+  /** 三方返回 success:false（编辑器已就绪但保存异常） */
+  SAVE_FAILED: 'SAVE_FAILED'
+} as const
+export type WdpSaveErrorCode = (typeof WdpSaveErrorCode)[keyof typeof WdpSaveErrorCode]
+
+/** WDP 保存失败异常，携带错误码供调用方区分处理 */
+export class WdpSaveError extends Error {
+  code: WdpSaveErrorCode
+
+  constructor(code: WdpSaveErrorCode, message: string) {
+    super(message)
+    this.name = 'WdpSaveError'
+    this.code = code
+  }
+}
+
+/** 三方回执中"编辑器未就绪"的 message 值（2.md 协议约定） */
+const EDITOR_NOT_READY_MESSAGE = 'editor not ready'
+
 type WdpSaveResponse = {
   type?: string
   requestId?: string
@@ -39,12 +64,11 @@ export function wdpSave(
   const targetOrigin = getDtpUIOrigin()
 
   return new Promise((resolve, reject) => {
-    const requestId =
-      'req-' + Date.now() + '-' + Math.random().toString(36).slice(2)
+    const requestId = 'req-' + Date.now() + '-' + Math.random().toString(36).slice(2)
 
     const timer = setTimeout(() => {
       window.removeEventListener('message', onMessage)
-      reject(new Error('WDP 保存超时'))
+      reject(new WdpSaveError(WdpSaveErrorCode.TIMEOUT, 'WDP 保存超时'))
     }, timeout)
 
     function onMessage(e: MessageEvent) {
@@ -65,7 +89,12 @@ export function wdpSave(
           message: data.message ?? ''
         })
       } else {
-        reject(new Error(data.message || 'WDP 保存失败'))
+        const message = data.message || 'WDP 保存失败'
+        reject(
+          message === EDITOR_NOT_READY_MESSAGE
+            ? new WdpSaveError(WdpSaveErrorCode.EDITOR_NOT_READY, message)
+            : new WdpSaveError(WdpSaveErrorCode.SAVE_FAILED, message)
+        )
       }
     }
 

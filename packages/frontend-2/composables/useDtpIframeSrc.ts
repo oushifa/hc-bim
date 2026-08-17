@@ -10,6 +10,7 @@ const DTP_UI_ORIGIN_MAP: Record<string, string> = {
   '61.145.255.42': 'http://61.145.255.42:30080',
   '192.168.20.157': 'http://192.168.20.157:30080',
   '192.168.20.155': 'http://192.168.20.157:30080',
+  '120.133.226.216': 'http://10.66.8.187:30080',
   'model.coitzh.com': 'https://3dcenter.coitzh.com:4443'
 }
 
@@ -25,6 +26,7 @@ const DTP_UI_ORIGIN_MAP: Record<string, string> = {
  *   访问 http://61.145.255.42:任端口 → http://61.145.255.42:30080
  *   访问 http://192.168.20.157:任端口 → http://192.168.20.157:30080
  *   访问 http://192.168.20.155:任端口 → http://192.168.20.157:30080
+ *   访问 http://120.133.226.216:3300 → http://10.66.8.187:30080
  *   访问 https://model.coitzh.com:4443 → https://3dcenter.coitzh.com:4443
  */
 export function getDtpUIOrigin(): string {
