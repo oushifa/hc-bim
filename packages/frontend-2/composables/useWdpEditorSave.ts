@@ -38,6 +38,23 @@ export class WdpSaveError extends Error {
 /** 三方回执中"编辑器未就绪"的 message 值（2.md 协议约定） */
 const EDITOR_NOT_READY_MESSAGE = 'editor not ready'
 
+/** 三方回执中"预览/调试态"的 message 前缀（2.md 协议约定） */
+const PREVIEW_STATE_MESSAGE_PREFIX = 'previewState'
+
+/** 三方回执中"保存过程异常"的 message 前缀（2.md 协议约定） */
+const SAVE_EXCEPTION_MESSAGE_PREFIX = 'save exception'
+
+/** 将三方原始失败 message 映射为面向用户的中文提示（未匹配的场景保留原文） */
+const toFriendlyMessage = (message: string): string => {
+  if (message.startsWith(PREVIEW_STATE_MESSAGE_PREFIX)) {
+    return '当前处于预览/调试状态，无法保存，请退出预览后重试'
+  }
+  if (message.startsWith(SAVE_EXCEPTION_MESSAGE_PREFIX)) {
+    return '保存过程发生异常，请重试'
+  }
+  return message
+}
+
 type WdpSaveResponse = {
   type?: string
   requestId?: string
@@ -93,7 +110,7 @@ export function wdpSave(
         reject(
           message === EDITOR_NOT_READY_MESSAGE
             ? new WdpSaveError(WdpSaveErrorCode.EDITOR_NOT_READY, message)
-            : new WdpSaveError(WdpSaveErrorCode.SAVE_FAILED, message)
+            : new WdpSaveError(WdpSaveErrorCode.SAVE_FAILED, toFriendlyMessage(message))
         )
       }
     }

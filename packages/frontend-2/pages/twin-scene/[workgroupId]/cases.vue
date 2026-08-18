@@ -91,9 +91,9 @@ useHead({
 
 // ---- 离开前自动保存（WDP postMessage 协议）----
 // 离开时先静默发送保存通知，按回执决定行为：
-// - iframe 未加载完成 / editor not ready（未进入编辑）→ 静默放行
+// - iframe 未加载完成 / editor not ready（未进入编辑）/ 保存超时 → 静默放行
 // - 保存成功 → 放行
-// - 其它保存失败 / 超时（编辑器已就绪但保存异常）→ 弹窗提供「重试 / 放弃更改」
+// - 三方明确回执保存失败（success:false）→ 弹窗提供「重试 / 放弃更改」
 // 等待超过 2s 时展示 Loading toast，避免保存期间无反馈
 
 const router = useRouter()
@@ -146,7 +146,7 @@ const saveDialogButtons = computed<LayoutDialogButton[]>(() => [
   }
 ])
 
-/** 静默发送保存通知：保存成功或未进入编辑（editor not ready）时直接放行，仅真正失败时弹窗 */
+/** 静默发送保存通知：保存成功、未进入编辑（editor not ready）或超时均直接放行，仅三方明确回执失败时弹窗 */
 const runSilentSave = async () => {
   const frame = iframeRef.value?.contentWindow
   if (!frame || !iframeLoaded.value) {
@@ -173,13 +173,14 @@ const runSilentSave = async () => {
   } catch (error) {
     if (
       error instanceof WdpSaveError &&
-      error.code === WdpSaveErrorCode.EDITOR_NOT_READY
+      (error.code === WdpSaveErrorCode.EDITOR_NOT_READY ||
+        error.code === WdpSaveErrorCode.TIMEOUT)
     ) {
-      // 编辑器未就绪（用户未进入编辑，仅浏览列表）→ 无需保存，静默放行
+      // 编辑器未就绪（用户未进入编辑）或保存超时 → 无需打扰用户，静默放行
       allowLeave.value = true
       void navigateToTargetRoute()
     } else {
-      // 编辑器已就绪但保存失败/超时 → 弹窗让用户选择重试或放弃
+      // 三方明确回执保存失败 → 弹窗让用户选择重试或放弃
       saveErrorMessage.value = error instanceof Error ? error.message : 'WDP 保存失败'
       showSaveDialog.value = true
     }
