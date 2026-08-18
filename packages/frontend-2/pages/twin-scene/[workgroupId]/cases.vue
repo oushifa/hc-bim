@@ -16,6 +16,7 @@
         title="团队案例"
         frameborder="0"
         allowfullscreen
+        @load="onIframeLoad"
       />
       <div
         v-else-if="loadError"
@@ -54,6 +55,7 @@ import {
   WdpSaveError,
   WdpSaveErrorCode
 } from '~~/composables/useWdpEditorSave'
+import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 
 definePageMeta({
   middleware: ['auth', 'permission']
@@ -89,10 +91,13 @@ useHead({
 
 // ---- 离开前自动保存（WDP postMessage 协议）----
 // 离开时先静默发送保存通知，按回执决定行为：
-// - 保存成功 / editor not ready（未进入编辑）/ iframe 未加载 → 静默放行
+// - iframe 未加载完成 / editor not ready（未进入编辑）→ 静默放行
+// - 保存成功 → 放行
 // - 其它保存失败 / 超时（编辑器已就绪但保存异常）→ 弹窗提供「重试 / 放弃更改」
+// 等待超过 2s 时展示 Loading toast，避免保存期间无反馈
 
 const router = useRouter()
+const { triggerNotification } = useGlobalToast()
 
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const targetRoute = ref<RouteLocationRaw | undefined>(undefined)
@@ -100,6 +105,12 @@ const showSaveDialog = ref(false)
 const saving = ref(false)
 const allowLeave = ref(false)
 const saveErrorMessage = ref('')
+/** iframe 是否已完成加载（VPN/网络慢时页面加载耗时长，未加载完成前保存消息会丢失） */
+const iframeLoaded = ref(false)
+
+const onIframeLoad = () => {
+  iframeLoaded.value = true
+}
 
 const navigateToTargetRoute = async () => {
   const route = targetRoute.value
@@ -138,16 +149,24 @@ const saveDialogButtons = computed<LayoutDialogButton[]>(() => [
 /** 静默发送保存通知：保存成功或未进入编辑（editor not ready）时直接放行，仅真正失败时弹窗 */
 const runSilentSave = async () => {
   const frame = iframeRef.value?.contentWindow
-  if (!frame) {
-    // 编辑器不存在（iframe 未加载/加载失败）→ 等同未进入编辑，直接放行
+  if (!frame || !iframeLoaded.value) {
+    // 编辑器不存在或 iframe 尚未加载完成（VPN/网络慢时常见，此时编辑器不可能就绪，
+    // 且 postMessage 发送到未加载完成的窗口会丢失）→ 等同未进入编辑，直接放行
     allowLeave.value = true
     void navigateToTargetRoute()
     return
   }
 
   saving.value = true
+  // 保存等待超过 2s 时提示进度，避免用户无反馈干等
+  const toastTimer = setTimeout(() => {
+    triggerNotification({
+      type: ToastNotificationType.Loading,
+      title: '正在保存更改…'
+    })
+  }, 2000)
   try {
-    await wdpSave(frame)
+    await wdpSave(frame, { timeout: 20000 })
     // 保存成功（编辑器已保存完整场景），放行
     allowLeave.value = true
     void navigateToTargetRoute()
@@ -165,6 +184,7 @@ const runSilentSave = async () => {
       showSaveDialog.value = true
     }
   } finally {
+    clearTimeout(toastTimer)
     saving.value = false
   }
 }
