@@ -12,9 +12,7 @@
   </WorkspacePlanLimitReachedDialog>
 </template>
 <script setup lang="ts">
-import { Roles } from '@speckle/shared'
 import type { LayoutDialogButton } from '@speckle/ui-components'
-import { settingsWorkspaceRoutes } from '~/lib/common/helpers/route'
 import { useEmbed } from '~/lib/viewer/composables/setup/embed'
 import { useWorkspaceLimits } from '~/lib/workspaces/composables/limits'
 import { graphql } from '~/lib/common/generated/gql'
@@ -25,12 +23,6 @@ import { useLoadLatestVersion } from '~/lib/viewer/composables/resources'
 graphql(`
   fragment ViewerLimitsWorkspaceDialog_Project on Project {
     id
-    workspace {
-      id
-      role
-      slug
-      ...WorkspacePlanLimits_Workspace
-    }
     ...UseLoadLatestVersion_Project
   }
 `)
@@ -46,9 +38,10 @@ const dialogOpen = defineModel<boolean>('open', {
 })
 
 const { isEnabled: isEmbedEnabled } = useEmbed()
+// workspace 数据在服务器上不可用（workspaces 模块未启用），限制信息恒为空
 const { versionLimitFormatted } = useWorkspaceLimits({
-  slug: computed(() => props.project.workspace?.slug),
-  workspace: computed(() => props.project.workspace)
+  slug: computed(() => undefined),
+  workspace: computed(() => undefined)
 })
 
 const { createButton: loadLatestButton } = useLoadLatestVersion({
@@ -84,13 +77,11 @@ const message = computed(() => {
 
 const explorePlansButton: LayoutDialogButton = {
   text: 'Explore plans',
-  disabled: props.project.workspace?.role === Roles.Workspace.Guest,
+  // workspace 数据在服务器上不可用（workspaces 模块未启用），无计划可查看
+  disabled: true,
   disabledMessage: 'As a Guest you cannot access plans and billing',
   onClick: () => {
-    const slug = props.project.workspace?.slug
-    if (!slug) return
-
-    return navigateTo(settingsWorkspaceRoutes.billing.route(slug))
+    return
   }
 }
 

@@ -5,12 +5,6 @@
     :variant="variant"
     :project="project"
   />
-  <ViewerResourcesUpgradeLimitAlert
-    v-else-if="project?.workspace"
-    :limit-type="limitType"
-    :variant="variant"
-    :workspace="project.workspace"
-  />
   <div v-else />
 </template>
 <script setup lang="ts">
@@ -26,11 +20,6 @@ graphql(`
   fragment ViewerResourcesLimitAlert_Project on Project {
     id
     workspaceId
-    workspace {
-      id
-      slug
-      ...ViewerResourcesWorkspaceLimitAlert_Workspace
-    }
     ...WorkspaceMoveProject_Project
   }
 `)

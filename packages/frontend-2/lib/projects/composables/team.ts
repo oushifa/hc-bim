@@ -1,5 +1,5 @@
 import { Roles } from '@speckle/shared'
-import type { Nullable, ServerRoles, WorkspaceRoles } from '@speckle/shared'
+import type { Nullable, ServerRoles } from '@speckle/shared'
 import { graphql } from '~/lib/common/generated/gql/gql'
 import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import type {
@@ -24,8 +24,6 @@ graphql(`
     }
     team {
       role
-      seatType
-      workspaceRole
       user {
         id
         role
@@ -83,8 +81,9 @@ export function useTeamInternals(
         role: collaborator.role,
         inviteId: null,
         serverRole: collaborator.user.role as ServerRoles,
-        workspaceRole: collaborator.workspaceRole as WorkspaceRoles,
-        seatType: collaborator.seatType
+        // workspace 数据在服务器上不可用（workspaces 模块未启用），恒为 null
+        workspaceRole: null,
+        seatType: null
       })
     }
 

@@ -72,17 +72,6 @@ graphql(`
     id
     name
     workspaceId
-    workspace {
-      id
-      name
-      role
-      domainBasedMembershipProtectionEnabled
-      domains {
-        domain
-        id
-      }
-      ...WorkspacesPlan_Workspace
-    }
     ...InviteDialogProjectRow_Project
   }
 `)
@@ -112,12 +101,14 @@ const {
 
 const showAdditionalSeatsDisclaimer = ref(false)
 
-const workspaceSlug = computed(() => props.project.workspace?.slug || '')
+// workspace 数据在服务器上不可用（workspaces 模块未启用），空 slug 下 useWorkspacePlan 不会发起请求
+const workspaceSlug = computed(() => '')
 const { isPaidPlan, editorSeatPriceWithIntervalFormatted } =
   useWorkspacePlan(workspaceSlug)
 
 const isInWorkspace = computed(() => !!props.project.workspaceId)
-const isAdmin = computed(() => props.project.workspace?.role === Roles.Workspace.Admin)
+// workspace 数据在服务器上不可用，管理员角色判断恒为 false
+const isAdmin = computed(() => false)
 const dialogButtons = computed((): LayoutDialogButton[] => [
   {
     text: 'Cancel',
@@ -141,7 +132,8 @@ const workspaceCostInfo = computed(() => {
 
 const purchasableEditorCount = computed(() => {
   if (!isPaidPlan.value) return 0
-  const seatsAvailable = props.project.workspace?.seats?.editors?.available || 0
+  // workspace 数据在服务器上不可用，可用席位恒为 0
+  const seatsAvailable = 0
   const newEditorContributors = fields.value.filter((i) => {
     // Has to be a contributor
     if (i.value.projectRole !== Roles.Stream.Contributor) return false

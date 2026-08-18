@@ -172,10 +172,6 @@ export const projectPageLatestItemsModelsFragment = graphql(`
     id
     role
     visibility
-    workspace {
-      id
-      readOnly
-    }
     modelCount: models(limit: 0) {
       totalCount
     }

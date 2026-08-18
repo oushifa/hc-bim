@@ -146,10 +146,6 @@ graphql(`
     }
     ...ProjectModelPageVersionsPagination
     ...ProjectsModelPageEmbed_Project
-    workspace {
-      id
-      readOnly
-    }
   }
 `)
 

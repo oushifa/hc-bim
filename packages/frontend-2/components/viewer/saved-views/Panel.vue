@@ -109,7 +109,6 @@ import { useMutationLoading } from '@vue/apollo-composable'
 import { Search, FolderPlus, Plus, X } from 'lucide-vue-next'
 import { useSynchronizedCookie } from '~/lib/common/composables/reactiveCookie'
 import { graphql } from '~/lib/common/generated/gql'
-import { WorkspaceSeatType } from '~/lib/common/generated/gql/graphql'
 import { useCreateSavedView } from '~/lib/viewer/composables/savedViews/management'
 import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
 import { ViewsType, viewsTypeLabels } from '~/lib/viewer/helpers/savedViews'
@@ -123,11 +122,6 @@ graphql(`
       canCreateSavedView {
         ...FullPermissionCheckResult
       }
-    }
-    workspace {
-      id
-      seatType
-      planSupportsSavedViews: hasAccessToFeature(featureName: savedViews)
     }
   }
 `)
@@ -164,9 +158,8 @@ useKeepAliveScrollState(useTemplateRef('groupsScrollArea'))
 const canCreateViewOrGroup = computed(
   () => project.value?.permissions.canCreateSavedView
 )
-const isViewerSeat = computed(
-  () => project.value?.workspace?.seatType === WorkspaceSeatType.Viewer
-)
+// workspace 数据在服务器上不可用（workspaces 模块未启用），席位类型判断恒为 false
+const isViewerSeat = computed(() => false)
 const onAddView = async () => {
   if (isLoading.value) return
   const view = await createSavedView({})

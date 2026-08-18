@@ -11,9 +11,6 @@ import { modelRoute } from '~/lib/common/helpers/route'
 graphql(`
   fragment UseLoadLatestVersion_Project on Project {
     id
-    workspace {
-      slug
-    }
   }
 `)
 
@@ -21,7 +18,6 @@ export const useLoadLatestVersion = (params: {
   project: Ref<MaybeNullOrUndefined<UseLoadLatestVersion_ProjectFragment>>
   resourceIdString: Ref<string>
 }) => {
-  const workspaceSlug = computed(() => unref(params.project)?.workspace?.slug)
   const projectId = computed(() => unref(params.project)?.id)
 
   const stripVersionIds = (resourceIdString: string) => {

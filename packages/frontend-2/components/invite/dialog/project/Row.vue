@@ -151,10 +151,6 @@ graphql(`
   fragment InviteDialogProjectRow_Project on Project {
     id
     workspaceId
-    workspace {
-      id
-      role
-    }
   }
 `)
 
@@ -236,9 +232,8 @@ const { result, loading: isSearchLoading } = useQuery(
   })
 )
 
-const isWorkspaceAdmin = computed(() => {
-  return props.project.workspace?.role === Roles.Workspace.Admin
-})
+// workspace 数据在服务器上不可用（workspaces 模块未启用），管理员判断恒为 false
+const isWorkspaceAdmin = computed(() => false)
 const isInWorkspace = computed(() => !!props.project.workspaceId)
 const canInviteNewMembers = computed(() => {
   if (!isInWorkspace.value) return true

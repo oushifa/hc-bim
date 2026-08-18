@@ -43,9 +43,6 @@ graphql(`
         role
       }
     }
-    workspace {
-      id
-    }
     permissions {
       canLeave {
         ...FullPermissionCheckResult

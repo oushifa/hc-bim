@@ -120,10 +120,6 @@ import { isPendingVersionFragment } from '~~/lib/projects/helpers/models'
 graphql(`
   fragment ProjectModelPageVersionsCard_Project on Project {
     id
-    workspace {
-      id
-      slug
-    }
     ...ViewerResourcesLimitAlert_Project
   }
 `)

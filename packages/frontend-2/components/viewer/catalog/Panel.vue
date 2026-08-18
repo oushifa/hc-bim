@@ -271,11 +271,6 @@ graphql(`
         ...FullPermissionCheckResult
       }
     }
-    workspace {
-      id
-      seatType
-      planSupportsSavedViews: hasAccessToFeature(featureName: savedViews)
-    }
   }
 `)
 

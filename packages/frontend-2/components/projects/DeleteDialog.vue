@@ -58,10 +58,6 @@ graphql(`
     models(limit: 0) {
       totalCount
     }
-    workspace {
-      slug
-      id
-    }
     versions(limit: 0) {
       totalCount
     }

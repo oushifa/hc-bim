@@ -19,15 +19,8 @@
       <!-- Nav -->
       <Portal to="navigation">
         <ViewerScope :state="state">
-          <template v-if="project?.workspace && isWorkspacesEnabled">
-            <HeaderNavLink
-              :to="workspaceRoute(project?.workspace.slug)"
-              name="项目管理"
-              :separator="false"
-            />
-          </template>
+          <!-- workspace 数据在服务器上不可用（workspaces 模块未启用），统一跳转项目列表 -->
           <HeaderNavLink
-            v-else
             :to="projectsRoute"
             name="项目管理"
             :separator="false"
@@ -130,7 +123,7 @@ import { useAlignmentState } from '~/lib/viewer/composables/setup/alignment'
 import dayjs from 'dayjs'
 import { graphql } from '~~/lib/common/generated/gql'
 import { useEmbed } from '~/lib/viewer/composables/setup/embed'
-import { projectsRoute, workspaceRoute } from '~~/lib/common/helpers/route'
+import { projectsRoute } from '~~/lib/common/helpers/route'
 import { parseUrlParameters, resourceBuilder } from '@speckle/shared/viewer/route'
 import { ViewerLimitsDialogType } from '~/lib/projects/helpers/limits'
 import { TailwindBreakpoints } from '~~/lib/common/helpers/tailwind'
@@ -163,7 +156,6 @@ graphql(`
 `)
 
 const route = useRoute()
-const isWorkspacesEnabled = useIsWorkspacesEnabled()
 const breakpoints = useBreakpoints(TailwindBreakpoints)
 const isMobile = breakpoints.smaller('sm')
 

@@ -180,16 +180,6 @@ graphql(`
         ...FormUsersSelectItem
       }
     }
-    workspace {
-      id
-      role
-      slug
-      name
-      readOnly
-      plan {
-        name
-      }
-    }
     permissions {
       canCreateModel {
         ...FullPermissionCheckResult
@@ -303,15 +293,12 @@ const onActionChosen = async (params: { item: LayoutMenuItem; event: MouseEvent 
       handleCreateModelClick()
       break
     case AddNewModelActionTypes.NewAccSyncItem:
-      // need to check connection before meaningful action. it will refresh the crediantials
-      await checkConnection(
-        props.project?.workspace?.slug as string,
-        props.project?.workspace?.id as string
-      )
+      // workspace 数据在服务器上不可用（workspaces 模块未启用），ACC 同步流程不可用
+      await checkConnection('', '')
       if (integration.value.status === 'connected') {
         showNewAccSync.value = true
       } else {
-        router.push(workspaceIntegrationSettingsRoute(props.project?.workspace?.slug))
+        router.push(workspaceIntegrationSettingsRoute(''))
       }
 
       break

@@ -111,15 +111,6 @@ graphql(`
         ...FullPermissionCheckResult
       }
     }
-    workspace {
-      id
-      slug
-      permissions {
-        canMoveProjectToWorkspace(projectId: $projectId) {
-          ...FullPermissionCheckResult
-        }
-      }
-    }
   }
 `)
 

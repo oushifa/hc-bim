@@ -8,10 +8,7 @@
       />
       <WorkspacePlanProjectModelLimitReachedDialog
         v-model:open="openWorkspaceLimitsHit"
-        :workspace-name="project.workspace?.name"
-        :plan="project.workspace?.plan?.name"
-        :workspace-role="project.workspace?.role"
-        :workspace-slug="project.workspace?.slug || ''"
+        :workspace-slug="''"
         location="models"
         type="model"
       />
@@ -39,14 +36,6 @@ import { useCanCreateModel } from '~/lib/projects/composables/permissions'
 graphql(`
   fragment ProjectModelsAdd_Project on Project {
     id
-    workspace {
-      name
-      slug
-      role
-      plan {
-        name
-      }
-    }
     ...UseCanCreateModel_Project
     ...WorkspaceMoveProject_Project
   }

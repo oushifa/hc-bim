@@ -4,7 +4,7 @@
       <HeaderNavLink
         v-if="showWorkspaceLink"
         link-class="text-white/60 hover:!text-white/80"
-        :to="workspaceRoute(project.workspace?.slug)"
+        :to="projectsRoute"
         name="项目管理"
         :separator="false"
         active-class="!text-white"
@@ -47,20 +47,12 @@
 import { graphql } from '~~/lib/common/generated/gql'
 import type { ProjectPageProjectHeaderFragment } from '~~/lib/common/generated/gql/graphql'
 import { projectRoute, projectsRoute } from '~~/lib/common/helpers/route'
-import { workspaceRoute } from '~/lib/common/helpers/route'
 
 graphql(`
   fragment ProjectPageProjectHeader on Project {
     id
     name
     description
-    workspace {
-      id
-      slug
-      name
-      logo
-      role
-    }
   }
 `)
 
@@ -69,7 +61,6 @@ const props = defineProps<{
 }>()
 
 const isWorkspacesEnabled = useIsWorkspacesEnabled()
-const showWorkspaceLink = computed(
-  () => !!props.project.workspace?.role && isWorkspacesEnabled.value
-)
+// workspace 数据在服务器上不可用（workspaces 模块未启用），工作空间链接恒不显示
+const showWorkspaceLink = computed(() => false)
 </script>
