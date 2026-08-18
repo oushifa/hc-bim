@@ -187,10 +187,11 @@
 import {
   SavedViewVisibility,
   type FormSelectSavedView_SavedViewFragment,
+  type PermissionCheckResult,
   type ProjectsModelPageEmbed_ProjectFragment
 } from '~~/lib/common/generated/gql/graphql'
 import { useClipboard } from '~~/composables/browser'
-import { SpeckleViewer, Roles } from '@speckle/shared'
+import { SpeckleViewer } from '@speckle/shared'
 import { graphql } from '~~/lib/common/generated/gql'
 import type { LayoutDialogButton } from '@speckle/ui-components'
 import { settingsWorkspaceRoutes } from '~/lib/common/helpers/route'
@@ -208,19 +209,6 @@ graphql(`
     permissions {
       canCreateEmbedTokens {
         ...FullPermissionCheckResult
-      }
-    }
-    workspace {
-      id
-      slug
-      role
-      embedOptions {
-        hideSpeckleBranding
-      }
-      permissions {
-        canEditEmbedOptions {
-          ...FullPermissionCheckResult
-        }
       }
     }
   }
@@ -263,7 +251,8 @@ const embeddedSavedView = defineModel<FormSelectSavedView_SavedViewFragment>('vi
 const optionLabelClasses = computed(
   () => 'flex items-center gap-1 cursor-pointer max-w-max'
 )
-const isAdmin = computed(() => props.project.workspace?.role === Roles.Workspace.Admin)
+// workspace 数据在服务器上不可用（workspaces 模块未启用），相关角色判断恒为 false
+const isAdmin = computed(() => false)
 
 const routeModelId = computed(() => route.params.modelId as string)
 
@@ -362,12 +351,11 @@ const buttons = computed((): LayoutDialogButton[] => [
     : [])
 ])
 
-const workspaceSlug = computed(() => {
-  return props.project.workspace?.slug
-})
-const canEditEmbedOptions = computed(() => {
-  return props.project.workspace?.permissions?.canEditEmbedOptions
-})
+// workspace 数据在服务器上不可用，以下值恒为 undefined/false
+const workspaceSlug = computed(() => undefined)
+const canEditEmbedOptions = computed<PermissionCheckResult | undefined>(
+  () => undefined
+)
 const canCreateEmbedTokens = computed(() => {
   return props.project.permissions?.canCreateEmbedTokens?.authorized
 })
@@ -377,10 +365,7 @@ const projectVisibility = computed(() =>
 const isPublicProject = computed(
   () => projectVisibility.value === SupportedProjectVisibility.Public
 )
-const workspaceHideSpeckleBrandingEnabled = computed(() => {
-  if (!isWorkspacesEnabled.value) return false
-  return props.project.workspace?.embedOptions?.hideSpeckleBranding
-})
+const workspaceHideSpeckleBrandingEnabled = computed(() => false)
 const hideSpeckleBrandingTooltip = computed(() => {
   if (!isWorkspacesEnabled.value) return ''
   if (workspaceHideSpeckleBrandingEnabled.value) {
@@ -443,17 +428,6 @@ const embedDialogOptions = [
     value: manuallyLoadModel
   }
 ]
-
-watch(
-  () => props.project.workspace?.embedOptions?.hideSpeckleBranding,
-  () => {
-    if (isWorkspacesEnabled.value) {
-      hideSpeckleBranding.value =
-        props.project.workspace?.embedOptions?.hideSpeckleBranding ?? false
-    }
-  },
-  { immediate: true }
-)
 
 watch(
   isOpen,

@@ -8,7 +8,7 @@
       >
         <div class="flex flex-col">
           <CommonBadge
-            v-if="!project.workspace?.id && isWorkspacesEnabled && isOwner"
+            v-if="isWorkspacesEnabled && isOwner"
             v-tippy="'只能项目所有者才能将项目移动到工作空间'"
             class="mb-2 max-w-max"
             rounded
@@ -98,20 +98,6 @@
           <UserAvatarGroup :users="teamUsers" :max-count="2" />
         </div>
         <div class="pt-3">
-          <NuxtLink
-            v-if="project.workspace && showWorkspaceLink && isWorkspacesEnabled"
-            :to="workspaceRoute(project.workspace.slug) + '/workbench'"
-            class="my-3 flex items-center"
-          >
-            <WorkspaceAvatar
-              :logo="project.workspace.logo"
-              :name="project.workspace.name"
-              size="sm"
-            />
-            <p class="text-body-2xs text-foreground ml-2 line-clamp-2">
-              {{ project.workspace.name }}
-            </p>
-          </NuxtLink>
           <div class="flex gap-2">
             <FormButton
               :to="allProjectModelsRoute(project.id) + '/'"
@@ -122,7 +108,7 @@
               {{ `${modelItemTotalCount} 个模型` }}
             </FormButton>
             <div
-              v-if="!project.workspace?.id && isWorkspacesEnabled"
+              v-if="isWorkspacesEnabled"
               v-tippy="
                 !isOwner && !isServerAdmin
                   ? '只能项目所有者才能将项目移动到工作空间'
@@ -297,7 +283,6 @@ import type { ProjectDashboardItemFragment } from '~~/lib/common/generated/gql/g
 import { projectRoute, allProjectModelsRoute } from '~~/lib/common/helpers/route'
 import { useGeneralProjectPageUpdateTracking } from '~~/lib/projects/composables/projectPages'
 import { ChevronRightIcon } from '@heroicons/vue/20/solid'
-import { workspaceRoute } from '~/lib/common/helpers/route'
 import { RoleInfo, type StreamRoles } from '@speckle/shared'
 import type { FileAreaUploadingPayload } from '~/lib/form/helpers/fileUpload'
 import { getModelItemRoute } from '~/lib/projects/helpers/models'
@@ -314,6 +299,7 @@ defineEmits<{
 
 const props = defineProps<{
   project: ProjectDashboardItemFragment
+  // 保留 prop 以兼容调用方（workspace 链接已随数据移除）
   showWorkspaceLink?: boolean
   workspacePage?: boolean
 }>()
@@ -531,7 +517,7 @@ const onDeleteProject = async () => {
   deletingProject.value = true
   try {
     const deleted = await deleteProject(props.project.id, {
-      workspaceSlug: props.project.workspace?.slug || undefined
+      workspaceSlug: undefined
     })
     if (deleted) {
       showDeleteDialog.value = false

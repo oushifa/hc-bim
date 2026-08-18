@@ -90,10 +90,6 @@ graphql(`
 graphql(`
   fragment ProjectPageModelsActions_Project on Project {
     id
-    workspace {
-      id
-      slug
-    }
     permissions {
       canReadAccIntegrationSettings {
         ...FullPermissionCheckResult
@@ -144,7 +140,8 @@ const { copy } = useClipboard()
 const menuId = useId()
 const { isLoggedIn } = useActiveUser()
 const router = useRouter()
-const { statusIsCanceled } = useWorkspacePlan(props.project.workspace?.slug || '')
+// workspace 数据在服务器上不可用（workspaces 模块未启用），空 slug 下 useWorkspacePlan 不会发起请求
+const { statusIsCanceled } = useWorkspacePlan('')
 
 const showActionsMenu = ref(false)
 const openDialog = ref(null as Nullable<ActionTypes>)

@@ -67,13 +67,6 @@ export const projectDashboardItemFragment = graphql(`
         ...ProjectPageLatestItemsModelItem
       }
     }
-    workspace {
-      id
-      slug
-      name
-      logo
-      readOnly
-    }
     pendingImportedModels(limit: 3) {
       ...PendingFileUpload
     }
