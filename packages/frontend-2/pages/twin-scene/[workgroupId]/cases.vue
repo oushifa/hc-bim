@@ -55,7 +55,6 @@ import {
   WdpSaveError,
   WdpSaveErrorCode
 } from '~~/composables/useWdpEditorSave'
-import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 
 definePageMeta({
   middleware: ['auth', 'permission']
@@ -90,14 +89,14 @@ useHead({
 })
 
 // ---- 离开前自动保存（WDP postMessage 协议）----
-// 离开时先静默发送保存通知，按回执决定行为：
-// - iframe 未加载完成 / editor not ready（未进入编辑）/ 保存超时 → 静默放行
-// - 保存成功 → 放行
-// - 三方明确回执保存失败（success:false）→ 弹窗提供「重试 / 放弃更改」
-// 等待超过 2s 时展示 Loading toast，避免保存期间无反馈
+// 离开时先判断用户是否与 iframe 交互过（点击过内部才可能进入编辑）：
+// - 从未交互 → 判定未进入编辑，直接放行（不发保存、不等回执）
+// - 已交互 → 静默发送保存通知，按回执决定行为：
+//   - iframe 未加载完成 / editor not ready（未进入编辑）/ 保存超时（1s）→ 静默放行
+//   - 保存成功 → 放行
+//   - 三方明确回执保存失败（success:false）→ 弹窗提供「重试 / 放弃更改」
 
 const router = useRouter()
-const { triggerNotification } = useGlobalToast()
 
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const targetRoute = ref<RouteLocationRaw | undefined>(undefined)
@@ -107,10 +106,19 @@ const allowLeave = ref(false)
 const saveErrorMessage = ref('')
 /** iframe 是否已完成加载（VPN/网络慢时页面加载耗时长，未加载完成前保存消息会丢失） */
 const iframeLoaded = ref(false)
+/** 用户是否曾与 iframe 交互（点击其内部会使父窗口失焦）——从未交互视为未进入编辑 */
+const iframeInteracted = ref(false)
 
 const onIframeLoad = () => {
   iframeLoaded.value = true
 }
+
+// 用户点击 iframe 内部时焦点从父窗口移入 iframe，父窗口触发 blur；以此近似感知交互
+const onWindowBlur = () => {
+  iframeInteracted.value = true
+}
+onMounted(() => window.addEventListener('blur', onWindowBlur))
+onBeforeUnmount(() => window.removeEventListener('blur', onWindowBlur))
 
 const navigateToTargetRoute = async () => {
   const route = targetRoute.value
@@ -159,17 +167,17 @@ const runSilentSave = async () => {
     void navigateToTargetRoute()
     return
   }
+  if (!iframeInteracted.value) {
+    // 用户从未点击过 iframe 内部 → 判定未进入编辑，无内容可保存 → 不发保存直接放行
+    allowLeave.value = true
+    void navigateToTargetRoute()
+    return
+  }
 
   saving.value = true
-  // 保存等待超过 2s 时提示进度，避免用户无反馈干等
-  const toastTimer = setTimeout(() => {
-    triggerNotification({
-      type: ToastNotificationType.Loading,
-      title: '正在保存更改…'
-    })
-  }, 2000)
   try {
-    await wdpSave(frame, { timeout: 20000 })
+    // 超时仅 1s：避免 VPN/网络慢时等待回执阻塞跳转，未等到回执视为放弃保存（静默放行）
+    await wdpSave(frame, { timeout: 1000 })
     // 保存成功（编辑器已保存完整场景），放行
     allowLeave.value = true
     void navigateToTargetRoute()
@@ -188,7 +196,6 @@ const runSilentSave = async () => {
       showSaveDialog.value = true
     }
   } finally {
-    clearTimeout(toastTimer)
     saving.value = false
   }
 }
