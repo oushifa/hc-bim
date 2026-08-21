@@ -124,16 +124,19 @@ const navigateToTargetRoute = async () => {
   }
 }
 
+/** 放弃更改并离开 */
+const leaveWithoutSave = () => {
+  showSaveDialog.value = false
+  allowLeave.value = true
+  void navigateToTargetRoute()
+}
+
 const saveDialogButtons = computed<LayoutDialogButton[]>(() => [
   {
     text: '放弃更改',
     props: { color: 'outline' },
     disabled: saving.value,
-    onClick: () => {
-      showSaveDialog.value = false
-      allowLeave.value = true
-      void navigateToTargetRoute()
-    }
+    onClick: leaveWithoutSave
   },
   {
     text: '重试',
@@ -200,7 +203,7 @@ onBeforeRouteLeave((to, _from, next) => {
     next(false)
     return
   }
-  // 首次离开：静默探测保存（不弹窗），按回执结果放行或弹窗
+  // 离开：静默自动保存（不弹确认框），按回执结果放行或弹失败弹窗
   void runSilentSave()
   next(false)
 })
