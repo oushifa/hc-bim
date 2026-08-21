@@ -248,7 +248,27 @@
           </div>
         </template>
 
-        <div class="flex-1 flex justify-end">
+        <div class="flex-1 flex justify-end items-center gap-2">
+          <!-- 上传中：按钮左侧独立的 8 点阵 loading（颜色与按钮一致 #00b4b6）
+              每个点循环「淡色小号 → 深色大号 → 淡色小号」，相位依次错开 3s/8，呈顺时针依次点亮效果 -->
+          <svg
+            v-if="uploadingTwinModel"
+            class="w-5 h-5 text-[#00b4b6] cursor-pointer"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+            title="查看上传进度"
+            @click.stop="openUploadTasksModal"
+          >
+            <circle class="twin-dot" cx="20" cy="12" r="1.4" fill="currentColor" opacity="0.35" style="animation-delay: -2.625s" />
+            <circle class="twin-dot" cx="17.66" cy="17.66" r="1.4" fill="currentColor" opacity="0.35" style="animation-delay: -2.25s" />
+            <circle class="twin-dot" cx="12" cy="20" r="1.4" fill="currentColor" opacity="0.35" style="animation-delay: -1.875s" />
+            <circle class="twin-dot" cx="6.34" cy="17.66" r="1.4" fill="currentColor" opacity="0.35" style="animation-delay: -1.5s" />
+            <circle class="twin-dot" cx="4" cy="12" r="1.4" fill="currentColor" opacity="0.35" style="animation-delay: -1.125s" />
+            <circle class="twin-dot" cx="6.34" cy="6.34" r="1.4" fill="currentColor" opacity="0.35" style="animation-delay: -0.75s" />
+            <circle class="twin-dot" cx="12" cy="4" r="1.4" fill="currentColor" opacity="0.35" style="animation-delay: -0.375s" />
+            <circle class="twin-dot" cx="17.66" cy="6.34" r="1.4" fill="currentColor" opacity="0.35" style="animation-delay: 0s" />
+          </svg>
           <button
             v-if="activeTab === 'user' && hasModelOp('canUpload')"
             type="button"
@@ -256,11 +276,7 @@
             :disabled="uploadingTwinModel"
             @click="openUploadFilePicker"
           >
-            {{
-              uploadingTwinModel
-                ? uploadButtonText
-                : '上传模型'
-            }}
+            上传模型
           </button>
         </div>
       </div>
@@ -1066,6 +1082,161 @@
       </Transition>
     </div>
   </Transition>
+
+  <!-- 上传进度 Modal（点击上传按钮左侧 loading icon 打开） -->
+  <Transition
+    enter-active-class="transition-all duration-200"
+    enter-from-class="opacity-0"
+    enter-to-class="opacity-100"
+    leave-active-class="transition-all duration-150"
+    leave-from-class="opacity-100"
+    leave-to-class="opacity-0"
+  >
+    <div
+      v-if="uploadTasksModalVisible"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
+      @click.self="closeUploadTasksModal"
+    >
+      <Transition
+        enter-active-class="transition-all duration-200"
+        enter-from-class="opacity-0 scale-95"
+        enter-to-class="opacity-100 scale-100"
+        leave-active-class="transition-all duration-150"
+        leave-from-class="opacity-100 scale-100"
+        leave-to-class="opacity-0 scale-95"
+      >
+        <div
+          v-if="uploadTasksModalVisible"
+          class="bg-white rounded-[16px] shadow-2xl w-[960px] max-w-[90vw] max-h-[90vh] overflow-hidden flex flex-col"
+        >
+          <!-- Header -->
+          <div
+            class="flex items-center justify-between px-6 py-4 border-b border-gray-100"
+          >
+            <h3 class="text-base font-semibold text-gray-800">上传进度</h3>
+            <button
+              class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              @click="closeUploadTasksModal"
+            >
+              <XMarkIcon class="w-5 h-5" />
+            </button>
+          </div>
+
+          <!-- Body -->
+          <div class="flex-1 overflow-auto px-6 py-4">
+            <!-- Tabs（参考用户模型/官方模型 tab 样式） -->
+            <div class="flex items-center space-x-1 border-b border-gray-100 mb-4">
+              <button
+                class="px-4 py-2 text-sm font-medium transition-colors relative"
+                :class="
+                  uploadTasksTab === 'uploading'
+                    ? 'text-[#00b4b6]'
+                    : 'text-gray-500 hover:text-gray-700'
+                "
+                @click="uploadTasksTab = 'uploading'"
+              >
+                正在上传
+                <div
+                  v-if="uploadTasksTab === 'uploading'"
+                  class="absolute bottom-[-1px] left-0 w-full h-0.5 bg-[#00b4b6] rounded-t-full"
+                />
+              </button>
+              <button
+                class="px-4 py-2 text-sm font-medium transition-colors relative"
+                :class="
+                  uploadTasksTab === 'converting'
+                    ? 'text-[#00b4b6]'
+                    : 'text-gray-500 hover:text-gray-700'
+                "
+                @click="uploadTasksTab = 'converting'"
+              >
+                正在转换
+                <div
+                  v-if="uploadTasksTab === 'converting'"
+                  class="absolute bottom-[-1px] left-0 w-full h-0.5 bg-[#00b4b6] rounded-t-full"
+                />
+              </button>
+            </div>
+
+            <!-- 正在上传列表：模型名称 / 原始格式 / 文件大小 / 状态 -->
+            <table v-if="uploadTasksTab === 'uploading'" class="w-full text-left border-collapse">
+              <thead class="bg-[#f8f9fa] sticky top-0 z-10">
+                <tr class="border-b border-gray-100 text-sm text-gray-600 font-medium">
+                  <th class="py-3 px-4">模型名称</th>
+                  <th class="py-3 px-4">原始格式</th>
+                  <th class="py-3 px-4">文件大小</th>
+                  <th class="py-3 px-4">状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="task in uploadingTasks"
+                  :key="task.id"
+                  class="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                >
+                  <td class="py-3 px-4 text-sm text-gray-800">{{ task.modelName }}</td>
+                  <td class="py-3 px-4 text-sm text-gray-600">{{ task.rawFormat }}</td>
+                  <td class="py-3 px-4 text-sm text-gray-600">{{ task.fileSize }}</td>
+                  <td
+                    class="py-3 px-4 text-sm"
+                    :class="task.status === '上传失败' ? 'text-red-500' : 'text-[#00b4b6]'"
+                  >
+                    {{ task.status }}
+                  </td>
+                </tr>
+                <tr v-if="uploadingTasks.length === 0">
+                  <td colspan="4" class="py-16 text-center text-gray-400 text-sm">
+                    暂无正在上传的任务
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <!-- 正在转换列表：模型名称 / 原始格式 / 转换状态 / 进度 -->
+            <table v-else class="w-full text-left border-collapse">
+              <thead class="bg-[#f8f9fa] sticky top-0 z-10">
+                <tr class="border-b border-gray-100 text-sm text-gray-600 font-medium">
+                  <th class="py-3 px-4">模型名称</th>
+                  <th class="py-3 px-4">原始格式</th>
+                  <th class="py-3 px-4">转换状态</th>
+                  <th class="py-3 px-4">进度</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="task in convertingTasks"
+                  :key="task.id"
+                  class="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                >
+                  <td class="py-3 px-4 text-sm text-gray-800">
+                    {{ task.modelName }} | TaskID:{{ task.id }}
+                  </td>
+                  <td class="py-3 px-4 text-sm text-gray-600">{{ task.rawFormat }}</td>
+                  <td class="py-3 px-4 text-sm text-gray-600">{{ task.convertStatus }}</td>
+                  <td class="py-3 px-4 text-sm text-gray-600">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          class="h-full bg-[#00b4b6] rounded-full transition-all"
+                          :style="{ width: task.progress + '%' }"
+                        />
+                      </div>
+                      <span class="text-xs text-gray-500 whitespace-nowrap">{{ task.progress }}%</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="convertingTasks.length === 0">
+                  <td colspan="4" class="py-16 text-center text-gray-400 text-sm">
+                    暂无正在转换的任务
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Transition>
+    </div>
+  </Transition>
 </template>
 
 <script setup lang="ts">
@@ -1106,6 +1277,132 @@ const dtpFetch = $dtpFetch as <T = unknown>(
 const uploadFileInput = ref<HTMLInputElement | null>(null)
 const uploadingTwinModel = ref(false)
 const uploadProgress = ref<number | null>(null)
+
+// ---- 上传进度弹窗（点击上传按钮左侧 loading icon 打开）----
+/** 正在上传列表项：模型名称 / 原始格式 / 文件大小 / 状态（进度与状态由前端自行维护） */
+type UploadingTask = {
+  id: string
+  modelName: string
+  rawFormat: string
+  fileSize: string
+  status: string
+}
+/** 正在转换列表项：模型名称 / 原始格式 / 转换状态 / 进度（轮询 /v1/daas/pipeline/task/{taskId}） */
+type ConvertingTask = {
+  id: string
+  modelName: string
+  rawFormat: string
+  convertStatus: string
+  progress: number
+}
+
+const uploadTasksModalVisible = ref(false)
+const uploadTasksTab = ref<'uploading' | 'converting'>('uploading')
+const uploadingTasks = ref<UploadingTask[]>([])
+const convertingTasks = ref<ConvertingTask[]>([])
+
+const openUploadTasksModal = () => {
+  uploadTasksTab.value = 'uploading'
+  uploadTasksModalVisible.value = true
+}
+const closeUploadTasksModal = () => {
+  uploadTasksModalVisible.value = false
+}
+
+// ---- 正在上传：前端自控进度与状态 ----
+/** 上传开始时加入列表，返回任务 id 供完成/失败时移除 */
+const addUploadingTask = (file: File): string => {
+  const id = 'up-' + Date.now() + '-' + Math.random().toString(36).slice(2)
+  uploadingTasks.value.push({
+    id,
+    modelName: getFileBaseName(file.name),
+    rawFormat: (getFileExtension(file.name) || '未知').toUpperCase(),
+    fileSize: formatFileSize(file.size),
+    status: '上传中'
+  })
+  return id
+}
+const removeUploadingTask = (id: string) => {
+  uploadingTasks.value = uploadingTasks.value.filter((task) => task.id !== id)
+}
+
+// ---- 正在转换：轮询 GET /v1/daas/pipeline/task/{taskId} ----
+/** 转换状态 → 中文文案（1.md 协议） */
+const CONVERT_STATUS_TEXT: Record<string, string> = {
+  QUEUING: '排队中',
+  RUNNING: '正在转换',
+  SUCCEEDED: '转换成功',
+  FAILED: '转换失败',
+  STOPPED: '已停止'
+}
+/** 到达终态后停止轮询 */
+const CONVERT_TERMINAL_STATUSES = ['SUCCEEDED', 'FAILED', 'STOPPED']
+
+type PipelineTaskResult = {
+  taskId?: string
+  assetId?: string
+  assetName?: string
+  technicsVersion?: string
+  totalStage?: number
+  currentStage?: number
+  originalAssetExt?: string
+  status?: string
+}
+
+const convertingPollTimers = new Map<string, ReturnType<typeof setInterval>>()
+
+const queryPipelineTask = async (taskId: string): Promise<PipelineTaskResult | null> => {
+  const data = (await dtpFetch(`/v1/daas/pipeline/task/${taskId}`, {
+    method: 'GET'
+  })) as { result?: PipelineTaskResult }
+  return data?.result ?? null
+}
+
+/** 刷新单个转换任务；返回是否已到达终态（停止轮询） */
+const refreshConvertingTask = async (taskId: string): Promise<boolean> => {
+  const result = await queryPipelineTask(taskId).catch(() => null)
+  if (!result) return false
+
+  const index = convertingTasks.value.findIndex((task) => task.id === taskId)
+  if (index === -1) return true
+
+  const totalStage = result.totalStage ?? 0
+  convertingTasks.value[index] = {
+    ...convertingTasks.value[index],
+    convertStatus: CONVERT_STATUS_TEXT[result.status ?? ''] ?? result.status ?? '未知',
+    progress:
+      totalStage > 0 ? Math.round(((result.currentStage ?? 0) / totalStage) * 100) : 0
+  }
+  return CONVERT_TERMINAL_STATUSES.includes(result.status ?? '')
+}
+
+/** 转换任务加入列表并开始轮询（3s 间隔）；taskId 由触发模型转换的接口返回 */
+const addConvertingTask = async (
+  taskId: string,
+  modelName: string,
+  rawFormat: string
+) => {
+  if (convertingTasks.value.some((task) => task.id === taskId)) return
+  convertingTasks.value.push({
+    id: taskId,
+    modelName,
+    rawFormat,
+    convertStatus: '排队中',
+    progress: 0
+  })
+
+  const stopPolling = () => {
+    clearInterval(timer)
+    convertingPollTimers.delete(taskId)
+  }
+  const timer = setInterval(async () => {
+    if (await refreshConvertingTask(taskId)) stopPolling()
+  }, 3000)
+  convertingPollTimers.set(taskId, timer)
+
+  // 加入后立即查询一次
+  if (await refreshConvertingTask(taskId)) stopPolling()
+}
 const syncRefreshProjectIdSet = ref<Set<string>>(new Set())
 
 const LIGHT_MODEL_EXTENSIONS = new Set(['ifc', 'rvt'])
@@ -1116,14 +1413,6 @@ const DTP_TARGET_NON_LAST_CHUNK_SIZE = 9 * 1024 * 1024
 const syncRefreshProjectIds = computed(() =>
   Array.from(syncRefreshProjectIdSet.value).filter((id) => !!id)
 )
-
-const uploadButtonText = computed(() => {
-  if (!uploadingTwinModel.value) return '上传模型'
-  if (typeof uploadProgress.value === 'number') {
-    return `上传中 ${Math.round(uploadProgress.value)}%`
-  }
-  return '上传中'
-})
 
 const getFileExtension = (fileName: string) => {
   const match = fileName.toLowerCase().match(/\.([^.]+)$/)
@@ -1329,6 +1618,34 @@ const uploadTwinModelDirectly = async (file: File) => {
     throw new Error('孪生模型上传完成，但未返回模型标识')
   }
 
+  // 上传完成后触发模型转换（1.md：POST /v1/asset/model/transform），taskId 用于轮询转换进度
+  const modelName = getFileBaseName(file.name)
+  const rawFormat = (getFileExtension(file.name) || '未知').toUpperCase()
+  const transformResponse = (await dtpFetch('/v1/asset/model/transform', {
+    method: 'POST',
+    body: {
+      assetId: result.assetId,
+      assetName: result.assetName || modelName,
+      apiVersion: '2.3.0' // apiVersion 暂时固定
+    }
+  })) as {
+    success?: boolean
+    code?: number
+    msg?: string
+    results?: { taskId?: string }
+  }
+
+  const taskId = transformResponse?.results?.taskId
+  if (taskId) {
+    await addConvertingTask(taskId, modelName, rawFormat)
+  } else {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '模型转换触发失败',
+      description: transformResponse?.msg || '未返回转换任务 ID'
+    })
+  }
+
   triggerNotification({
     type: ToastNotificationType.Success,
     title: '模型上传成功',
@@ -1364,6 +1681,7 @@ const uploadTwinModelThroughLightModelFlow = async (file: File) => {
 const handleTwinFileUpload = async (file: File) => {
   uploadingTwinModel.value = true
   uploadProgress.value = 0
+  const uploadingTaskId = addUploadingTask(file)
 
   try {
     if (isLightModelFile(file.name)) {
@@ -1372,10 +1690,14 @@ const handleTwinFileUpload = async (file: File) => {
       await uploadTwinModelDirectly(file)
     }
 
+    // 上传完成，从「正在上传」列表移除
+    // （Direct 流程已在 uploadTwinModelDirectly 内触发转换并加入「正在转换」；LightModel 流程走 speckle 上传，暂不触发 DTP 转换）
+    removeUploadingTask(uploadingTaskId)
     await fetchUserModels()
     scheduleRefreshUserModels()
     scheduleRefreshUserModelsBurst()
   } catch (error) {
+    removeUploadingTask(uploadingTaskId)
     triggerNotification({
       type: ToastNotificationType.Danger,
       title: '模型上传失败',
@@ -2087,6 +2409,9 @@ onUnmounted(() => {
     clearTimeout(refreshUserModelsTimer)
   }
   refreshUserModelsBurstTimers.forEach((timer) => clearTimeout(timer))
+  // 清理转换任务轮询定时器
+  convertingPollTimers.forEach((timer) => clearInterval(timer))
+  convertingPollTimers.clear()
 })
 
 const activeTab = ref<'user' | 'official'>('user')
@@ -2363,5 +2688,28 @@ const selectPageSize = async (size: number) => {
 .fade-down-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+/* 上传 loading 点阵：每点循环「淡色小号 → 深色大号 → 淡色小号」，
+   渐变窗口占半周期（约 4 个点同时在变化），相位依次错开 3s/8，
+   形成顺时针扫过的「亮波」，旋转感更明显 */
+.twin-dot {
+  animation: twin-dot-pulse 3s linear infinite;
+}
+@keyframes twin-dot-pulse {
+  0%,
+  25% {
+    opacity: 0.35;
+    r: 1.4px;
+  }
+  50% {
+    opacity: 1;
+    r: 2.3px;
+  }
+  75%,
+  100% {
+    opacity: 0.35;
+    r: 1.4px;
+  }
 }
 </style>
