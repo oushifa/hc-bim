@@ -249,15 +249,16 @@
         </template>
 
         <div class="flex-1 flex justify-end items-center gap-2">
-          <!-- 上传中：按钮左侧独立的 8 点阵 loading（颜色与按钮一致 #00b4b6）
-              每个点循环「淡色小号 → 深色大号 → 淡色小号」，相位依次错开 3s/8，呈顺时针依次点亮效果 -->
+          <!-- 上传/转换中：按钮左侧独立的 8 点阵 loading（颜色与按钮一致 #00b4b6）
+              上传或 DTP 模型转换完成前持续显示；每个点循环「淡色小号 → 深色大号 → 淡色小号」，
+              相位依次错开 3s/8，呈顺时针依次点亮效果 -->
           <svg
-            v-if="uploadingTwinModel"
+            v-if="uploadingTwinModel || hasActiveConvertingTask"
             class="w-5 h-5 text-[#00b4b6] cursor-pointer"
             viewBox="0 0 24 24"
             fill="none"
             aria-hidden="true"
-            title="查看上传进度"
+            title="查看上传/转换进度"
             @click.stop="openUploadTasksModal"
           >
             <circle class="twin-dot" cx="20" cy="12" r="1.4" fill="currentColor" opacity="0.35" style="animation-delay: -2.625s" />
@@ -1294,6 +1295,8 @@ type ConvertingTask = {
   rawFormat: string
   convertStatus: string
   progress: number
+  /** 转换任务原始状态（QUEUING/RUNNING/SUCCEEDED/FAILED/STOPPED），用于判断是否到达终态 */
+  status: string
 }
 
 const uploadTasksModalVisible = ref(false)
@@ -1369,6 +1372,7 @@ const refreshConvertingTask = async (taskId: string): Promise<boolean> => {
   const totalStage = result.totalStage ?? 0
   convertingTasks.value[index] = {
     ...convertingTasks.value[index],
+    status: result.status ?? convertingTasks.value[index].status,
     convertStatus: CONVERT_STATUS_TEXT[result.status ?? ''] ?? result.status ?? '未知',
     progress:
       totalStage > 0 ? Math.round(((result.currentStage ?? 0) / totalStage) * 100) : 0
@@ -1388,7 +1392,8 @@ const addConvertingTask = async (
     modelName,
     rawFormat,
     convertStatus: '排队中',
-    progress: 0
+    progress: 0,
+    status: 'QUEUING'
   })
 
   const stopPolling = () => {
@@ -1403,6 +1408,11 @@ const addConvertingTask = async (
   // 加入后立即查询一次
   if (await refreshConvertingTask(taskId)) stopPolling()
 }
+
+/** 是否存在进行中的转换任务（未到达终态），用于控制上传按钮左侧 loading icon 显隐 */
+const hasActiveConvertingTask = computed(() =>
+  convertingTasks.value.some((task) => !CONVERT_TERMINAL_STATUSES.includes(task.status))
+)
 const syncRefreshProjectIdSet = ref<Set<string>>(new Set())
 
 const LIGHT_MODEL_EXTENSIONS = new Set(['ifc', 'rvt'])
