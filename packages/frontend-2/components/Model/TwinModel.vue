@@ -1409,9 +1409,9 @@ const addConvertingTask = async (
   if (await refreshConvertingTask(taskId)) stopPolling()
 }
 
-/** 是否存在进行中的转换任务（未到达终态），用于控制上传按钮左侧 loading icon 显隐 */
+/** 是否存在尚未转换成功的任务（含排队中/转换中/失败/停止），用于控制上传按钮左侧 loading icon 显隐 */
 const hasActiveConvertingTask = computed(() =>
-  convertingTasks.value.some((task) => !CONVERT_TERMINAL_STATUSES.includes(task.status))
+  convertingTasks.value.some((task) => task.status !== 'SUCCEEDED')
 )
 const syncRefreshProjectIdSet = ref<Set<string>>(new Set())
 
