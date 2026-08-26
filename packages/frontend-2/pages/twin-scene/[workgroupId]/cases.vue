@@ -16,7 +16,6 @@
         title="团队案例"
         frameborder="0"
         allowfullscreen
-        @load="onIframeLoad"
       />
       <div
         v-else-if="loadError"
@@ -34,9 +33,23 @@
       :hide-closer="saving"
       :prevent-close-on-click-outside="saving"
     >
-      <template #header>保存失败</template>
+      <template #header>未保存的更改</template>
       <div class="space-y-4">
-        <p>自动保存失败：{{ saveErrorMessage }}。是否重试保存或放弃更改？</p>
+        <p>您正在编辑案例，是否保存更改？</p>
+      </div>
+    </LayoutDialog>
+
+    <LayoutDialog
+      v-model:open="showSaveFailedDialog"
+      max-width="sm"
+      :buttons="saveFailedDialogButtons"
+      :hide-closer="saving"
+      :prevent-close-on-click-outside="saving"
+    >
+      <template #header>{{ saveFailedTitle }}</template>
+      <div class="space-y-4">
+        <p>保存过程中出现问题，请重试或放弃本次修改。</p>
+        <p class="text-body-sm text-foreground-2">{{ saveFailedMessage }}</p>
       </div>
     </LayoutDialog>
   </div>
@@ -53,8 +66,11 @@ import { LayoutDialog, type LayoutDialogButton } from '@speckle/ui-components'
 import {
   wdpSave,
   WdpSaveError,
-  WdpSaveErrorCode
+  WdpSaveErrorCode,
+  WDP_EDITOR_SCENE_LOADED,
+  WDP_EDITOR_SCENE_UNLOADED
 } from '~~/composables/useWdpEditorSave'
+import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 
 definePageMeta({
   middleware: ['auth', 'permission']
@@ -88,37 +104,28 @@ useHead({
   title: '团队案例'
 })
 
-// ---- 离开前自动保存（WDP postMessage 协议）----
-// 离开时先判断用户是否与 iframe 交互过（点击过内部才可能进入编辑）：
-// - 从未交互 → 判定未进入编辑，直接放行（不发保存、不等回执）
-// - 已交互 → 静默发送保存通知，按回执决定行为：
-//   - iframe 未加载完成 / editor not ready（未进入编辑）/ 保存超时（1s）→ 静默放行
-//   - 保存成功 → 放行
-//   - 三方明确回执保存失败（success:false）→ 弹窗提供「重试 / 放弃更改」
+// ---- 离开前保存（WDP postMessage 协议）----
+// 编辑态信号来自三方场景生命周期事件（3.md 第 9 节，iframe → 父页面单向广播）：
+// - WDP_EDITOR_SCENE_LOADED：进入编辑、场景渲染完成 → 标记编辑中
+// - WDP_EDITOR_SCENE_UNLOADED：退出编辑/场景卸载 → 重置编辑状态
+// 仅编辑中离开才弹窗询问「是否保存」；未进入编辑（浏览列表 / VPN 不可达错误页）
+// 时直接放行，不发保存、零打扰。
 
 const router = useRouter()
+const { triggerNotification, dismiss } = useGlobalToast()
 
 const iframeRef = ref<HTMLIFrameElement | null>(null)
 const targetRoute = ref<RouteLocationRaw | undefined>(undefined)
 const showSaveDialog = ref(false)
+const showSaveFailedDialog = ref(false)
 const saving = ref(false)
 const allowLeave = ref(false)
-const saveErrorMessage = ref('')
-/** iframe 是否已完成加载（VPN/网络慢时页面加载耗时长，未加载完成前保存消息会丢失） */
-const iframeLoaded = ref(false)
-/** 用户是否曾与 iframe 交互（点击其内部会使父窗口失焦）——从未交互视为未进入编辑 */
-const iframeInteracted = ref(false)
-
-const onIframeLoad = () => {
-  iframeLoaded.value = true
-}
-
-// 用户点击 iframe 内部时焦点从父窗口移入 iframe，父窗口触发 blur；以此近似感知交互
-const onWindowBlur = () => {
-  iframeInteracted.value = true
-}
-onMounted(() => window.addEventListener('blur', onWindowBlur))
-onBeforeUnmount(() => window.removeEventListener('blur', onWindowBlur))
+/** 三方生命周期事件：是否正在编辑案例（SCENE_LOADED 置 true，SCENE_UNLOADED 置 false） */
+const isEditing = ref(false)
+/** 保存失败弹窗中展示的原因描述 */
+const saveFailedMessage = ref('')
+/** 保存失败弹窗标题（失败 / 超时区分展示） */
+const saveFailedTitle = ref('保存失败')
 
 const navigateToTargetRoute = async () => {
   const route = targetRoute.value
@@ -132,43 +139,56 @@ const navigateToTargetRoute = async () => {
   }
 }
 
-/** 放弃更改并离开 */
+/** 弹窗中选择「不保存」/失败后选择放弃：直接离开 */
 const leaveWithoutSave = () => {
   showSaveDialog.value = false
+  showSaveFailedDialog.value = false
   allowLeave.value = true
   void navigateToTargetRoute()
 }
 
 const saveDialogButtons = computed<LayoutDialogButton[]>(() => [
   {
-    text: '放弃更改',
+    text: '不保存',
+    props: { color: 'outline' },
+    disabled: saving.value,
+    onClick: leaveWithoutSave
+  },
+  {
+    text: '保存',
+    props: { submit: true, loading: saving.value },
+    disabled: saving.value,
+    onClick: saveAndLeave
+  }
+])
+
+const saveFailedDialogButtons = computed<LayoutDialogButton[]>(() => [
+  {
+    text: '不保存',
     props: { color: 'outline' },
     disabled: saving.value,
     onClick: leaveWithoutSave
   },
   {
     text: '重试',
-    props: { submit: true },
+    props: { submit: true, loading: saving.value },
     disabled: saving.value,
-    onClick: () => {
-      showSaveDialog.value = false
-      void runSilentSave()
-    }
+    onClick: retrySave
   }
 ])
 
-/** 静默发送保存通知：保存成功、未进入编辑（editor not ready）或超时均直接放行，仅三方明确回执失败时弹窗 */
-const runSilentSave = async () => {
+/** 失败弹窗中点「重试」：再次发起保存（弹窗保持打开，展示保存中状态） */
+const retrySave = () => {
+  void saveAndLeave()
+}
+
+/** 弹窗中选择「保存」/失败后「重试」：发送保存通知，成功提示后放行；失败/超时弹窗展示原因 */
+const saveAndLeave = async () => {
   const frame = iframeRef.value?.contentWindow
-  if (!frame || !iframeLoaded.value) {
-    // 编辑器不存在或 iframe 尚未加载完成（VPN/网络慢时常见，此时编辑器不可能就绪，
-    // 且 postMessage 发送到未加载完成的窗口会丢失）→ 等同未进入编辑，直接放行
-    allowLeave.value = true
-    void navigateToTargetRoute()
-    return
-  }
-  if (!iframeInteracted.value) {
-    // 用户从未点击过 iframe 内部 → 判定未进入编辑，无内容可保存 → 不发保存直接放行
+  if (!frame) {
+    // 编辑器不存在（异常兜底）→ 无内容可保存，直接放行
+    showSaveDialog.value = false
+    showSaveFailedDialog.value = false
     allowLeave.value = true
     void navigateToTargetRoute()
     return
@@ -176,29 +196,68 @@ const runSilentSave = async () => {
 
   saving.value = true
   try {
-    // 超时仅 1s：避免 VPN/网络慢时等待回执阻塞跳转，未等到回执视为放弃保存（静默放行）
-    await wdpSave(frame, { timeout: 1000 })
-    // 保存成功（编辑器已保存完整场景），放行
+    await wdpSave(frame, { timeout: 10000 })
+    // 保存成功 → 关闭弹窗，提示「保存成功」1s 后消失，再放行跳转
+    dismiss()
+    showSaveDialog.value = false
+    showSaveFailedDialog.value = false
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '保存成功'
+    })
+    setTimeout(dismiss, 1000)
     allowLeave.value = true
     void navigateToTargetRoute()
   } catch (error) {
     if (
       error instanceof WdpSaveError &&
-      (error.code === WdpSaveErrorCode.EDITOR_NOT_READY ||
-        error.code === WdpSaveErrorCode.TIMEOUT)
+      error.code === WdpSaveErrorCode.EDITOR_NOT_READY
     ) {
-      // 编辑器未就绪（用户未进入编辑）或保存超时 → 无需打扰用户，静默放行
+      // 编辑器未就绪（无内容可保存）→ 不打扰用户，静默放行
+      dismiss()
+      showSaveDialog.value = false
+      showSaveFailedDialog.value = false
       allowLeave.value = true
       void navigateToTargetRoute()
     } else {
-      // 三方明确回执保存失败 → 弹窗让用户选择重试或放弃
-      saveErrorMessage.value = error instanceof Error ? error.message : 'WDP 保存失败'
-      showSaveDialog.value = true
+      // 保存超时或三方明确回执失败 → 弹窗展示原因，可重试或放弃
+      const isTimeout =
+        error instanceof WdpSaveError && error.code === WdpSaveErrorCode.TIMEOUT
+      dismiss()
+      showSaveDialog.value = false
+      saveFailedTitle.value = isTimeout ? '保存超时' : '保存失败'
+      saveFailedMessage.value = isTimeout
+        ? '保存超时，请重试'
+        : error instanceof Error
+        ? error.message
+        : 'WDP 保存失败'
+      showSaveFailedDialog.value = true
     }
   } finally {
     saving.value = false
   }
 }
+
+// 监听三方场景生命周期事件（iframe → 父页面，3.md 第 9 节）
+const onWdpMessage = (e: MessageEvent) => {
+  const targetOrigin = getDtpUIOrigin()
+  if (targetOrigin && e.origin !== targetOrigin) return
+  if (e.source !== iframeRef.value?.contentWindow) return
+  const data = (e.data ?? {}) as { type?: string }
+  if (data.type === WDP_EDITOR_SCENE_LOADED) {
+    isEditing.value = true
+  } else if (data.type === WDP_EDITOR_SCENE_UNLOADED) {
+    isEditing.value = false
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('message', onWdpMessage)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('message', onWdpMessage)
+})
 
 onBeforeRouteLeave((to, _from, next) => {
   if (allowLeave.value) {
@@ -206,12 +265,17 @@ onBeforeRouteLeave((to, _from, next) => {
     return
   }
   targetRoute.value = to
-  if (showSaveDialog.value || saving.value) {
+  if (!isEditing.value) {
+    // 未进入编辑案例（仅浏览列表 / 三方不可达错误页）→ 无需保存，直接放行
+    next()
+    return
+  }
+  if (saving.value || showSaveDialog.value || showSaveFailedDialog.value) {
     next(false)
     return
   }
-  // 离开：静默自动保存（不弹确认框），按回执结果放行或弹失败弹窗
-  void runSilentSave()
+  // 编辑中离开 → 弹窗询问是否保存
+  showSaveDialog.value = true
   next(false)
 })
 </script>

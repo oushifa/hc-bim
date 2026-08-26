@@ -32,7 +32,11 @@ export function useGlobalToastManager() {
   watch(
     stateNotification,
     (newVal) => {
-      if (!newVal) return
+      if (!newVal) {
+        // 外部主动 dismiss（如短时提示到期关闭）→ 同步关闭渲染中的 toast
+        dismiss()
+        return
+      }
       if (import.meta.server) {
         currentNotification.value = newVal
         return
@@ -75,7 +79,15 @@ export function useGlobalToast() {
     }
   }
 
-  return { triggerNotification }
+  /**
+   * Immediately dismiss the current toast (clears the global toast state).
+   * The renderer (ToastManager) will sync and close the visible toast.
+   */
+  const dismiss = () => {
+    stateNotification.value = undefined
+  }
+
+  return { triggerNotification, dismiss }
 }
 
 export { ToastNotificationType }

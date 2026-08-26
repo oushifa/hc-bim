@@ -5,6 +5,14 @@ export const WDP_EDITOR_SAVE = 'WDP_EDITOR_SAVE'
 /** WDP 编辑器保存结果回执消息类型（iframe → 外部网站） */
 export const WDP_EDITOR_SAVE_RESULT = 'WDP_EDITOR_SAVE_RESULT'
 
+// ---- 场景生命周期事件（iframe → 外部网站，单向广播，3.md 第 9 节）----
+/** 编辑器场景首次渲染完成（进入编辑）——每个场景只发一次 */
+export const WDP_EDITOR_SCENE_LOADED = 'WDP_EDITOR_SCENE_LOADED'
+/** 编辑器微服务被卸载（离开编辑/切换项目）——仅在发送过 SCENE_LOADED 后触发 */
+export const WDP_EDITOR_SCENE_UNLOADED = 'WDP_EDITOR_SCENE_UNLOADED'
+/** 云渲染 WebRTC 断链 / 云渲染服务异常停止 */
+export const WDP_EDITOR_SCENE_DISCONNECTED = 'WDP_EDITOR_SCENE_DISCONNECTED'
+
 /** WDP 保存成功后的回执数据 */
 export type WdpSaveResult = {
   type: typeof WDP_EDITOR_SAVE_RESULT
