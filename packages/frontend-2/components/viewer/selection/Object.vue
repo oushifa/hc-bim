@@ -43,7 +43,7 @@
         >
           <span>自定义属性</span>
           <div class="flex items-center gap-1">
-            <!-- <FormButton
+            <FormButton
               v-if="props.root"
               v-tippy="'下载同步 treeJson'"
               size="sm"
@@ -52,7 +52,7 @@
               hide-text
               name="downloadCustomAttributeTreeJson"
               @click.stop="emit('debug-custom-attribute')"
-            /> -->
+            />
             <FormButton
               v-if="props.root"
               v-tippy="'添加自定义属性'"

@@ -1415,7 +1415,7 @@ const hasActiveConvertingTask = computed(() =>
 )
 const syncRefreshProjectIdSet = ref<Set<string>>(new Set())
 
-const LIGHT_MODEL_EXTENSIONS = new Set(['ifc', 'rvt'])
+const LIGHT_MODEL_EXTENSIONS = new Set(['ifc', 'rvt', 'skp', 'nwd', 'nwc'])
 const DTP_MIN_NON_LAST_CHUNK_SIZE = 8 * 1024 * 1024
 const DTP_MAX_NON_LAST_CHUNK_SIZE = 10 * 1024 * 1024
 const DTP_TARGET_NON_LAST_CHUNK_SIZE = 9 * 1024 * 1024

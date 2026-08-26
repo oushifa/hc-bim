@@ -882,9 +882,9 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
 const getModelRuntimeStatusDescription = (model: ModelListItem) => {
   const pendingUpload = model.raw.pendingImportedVersions?.[0]
   const isRvtFile =
-    pendingUpload?.fileType?.toLowerCase() === 'rvt' ||
-    /\.rvt$/i.test(pendingUpload?.fileName || '') ||
-    /\.rvt$/i.test(model.name || '')
+    ['rvt', 'skp', 'nwd', 'nwc'].includes(pendingUpload?.fileType?.toLowerCase() || '') ||
+    /\.(rvt|skp|nwd|nwc)$/i.test(pendingUpload?.fileName || '') ||
+    /\.(rvt|skp|nwd|nwc)$/i.test(model.name || '')
   if (!isRvtFile) return null
 
   const convertedStatus = pendingUpload?.convertedStatus

@@ -88,7 +88,7 @@ type CreateUploadTaskResponse = {
 
 const FINAL_STATUSES: WorkbenchUploadSyncTaskStatus[] = ['succeeded', 'failed']
 const CLIENT_UPLOAD_ONLY_STATUSES: WorkbenchUploadSyncTaskStatus[] = ['waiting_upload']
-const RVT_FILE_NAME_RE = /\.rvt$/i
+const RVT_FILE_NAME_RE = /\.(rvt|skp|nwd|nwc)$/i
 
 export type WorkbenchModelSyncRuntimeProgress = {
   percent: number

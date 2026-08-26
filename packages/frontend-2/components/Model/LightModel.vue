@@ -11,7 +11,7 @@
       type="file"
       class="hidden"
       aria-label="选择要上传到模型库的模型文件"
-      accept=".ifc,.rvt"
+      accept=".ifc,.rvt,.skp,.nwd,.nwc"
       @change="onModelLibraryFileSelected"
     />
     <input
@@ -19,7 +19,7 @@
       type="file"
       class="hidden"
       aria-label="选择要上传的新版本文件"
-      accept=".ifc,.rvt"
+      accept=".ifc,.rvt,.skp,.nwd,.nwc"
       @change="onVersionFileSelected"
     />
     <div
@@ -1058,9 +1058,9 @@ const getModelRuntimeStatus = (model: Model) => {
 
 const getModelRuntimeStatusDescription = (model: Model) => {
   const isRvtFile =
-    model.latestUpload?.fileType?.toLowerCase() === 'rvt' ||
-    /\.rvt$/i.test(model.latestUpload?.fileName || '') ||
-    /\.rvt$/i.test(model.title || '')
+    ['rvt', 'skp', 'nwd', 'nwc'].includes(model.latestUpload?.fileType?.toLowerCase() || '') ||
+    /\.(rvt|skp|nwd|nwc)$/i.test(model.latestUpload?.fileName || '') ||
+    /\.(rvt|skp|nwd|nwc)$/i.test(model.title || '')
   if (!isRvtFile) return null
 
   const convertedStatus = model.latestUpload?.convertedStatus
