@@ -41,7 +41,9 @@
             class="flex-1"
             @click="switchMode(RoamingMode.Point)"
           >
-            <span class="text-body-2xs px-2 py-1 flex items-center justify-center gap-1">
+            <span
+              class="text-body-2xs px-2 py-1 flex items-center justify-center gap-1"
+            >
               <MapPin class="w-3.5 h-3.5" />
               <span>选点漫游</span>
             </span>
@@ -51,7 +53,9 @@
             class="flex-1"
             @click="switchMode(RoamingMode.View)"
           >
-            <span class="text-body-2xs px-2 py-1 flex items-center justify-center gap-1">
+            <span
+              class="text-body-2xs px-2 py-1 flex items-center justify-center gap-1"
+            >
               <Camera class="w-3.5 h-3.5" />
               <span>视角漫游</span>
             </span>
@@ -168,7 +172,9 @@
                 <span
                   class="font-medium truncate"
                   :class="[
-                    selectedPointIndex === idx ? 'text-primary font-bold' : 'text-foreground'
+                    selectedPointIndex === idx
+                      ? 'text-primary font-bold'
+                      : 'text-foreground'
                   ]"
                 >
                   {{ point.name || `点位 ${idx + 1}` }}
@@ -265,7 +271,9 @@
     </div>
 
     <!-- 底部操作区 -->
-    <div class="p-3 border-t border-outline-3 flex items-center justify-between gap-2 shrink-0">
+    <div
+      class="p-3 border-t border-outline-3 flex items-center justify-between gap-2 shrink-0"
+    >
       <FormButton
         size="sm"
         color="outline"
@@ -277,9 +285,7 @@
       </FormButton>
 
       <div class="flex items-center gap-2">
-        <FormButton size="sm" color="subtle" @click="$emit('close')">
-          取消
-        </FormButton>
+        <FormButton size="sm" color="subtle" @click="$emit('close')">取消</FormButton>
         <FormButton
           size="sm"
           color="primary"
@@ -323,7 +329,9 @@ import { useRoamingAnchoredState } from '~/lib/viewer/composables/roaming/useRoa
 const props = defineProps<{
   routeData?: RoamingRoute | null
   isEdit?: boolean
-  controller: ReturnType<typeof import('~/lib/viewer/composables/roaming/useRoamingController').useRoamingController>
+  controller: ReturnType<
+    typeof import('~/lib/viewer/composables/roaming/useRoamingController').useRoamingController
+  >
 }>()
 
 const emit = defineEmits<{
@@ -343,11 +351,8 @@ const {
   visualizer
 } = props.controller
 
-const {
-  setActiveRoute,
-  setSelectedPointIndex,
-  registerPointSelectCallback
-} = useRoamingAnchoredState()
+const { setActiveRoute, setSelectedPointIndex, registerPointSelectCallback } =
+  useRoamingAnchoredState()
 
 const selectedPointIndex = ref<number | null>(null)
 
@@ -361,9 +366,14 @@ const form = reactive<{
 }>({
   name:
     props.routeData?.name ||
-    `漫游路线 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`,
+    `漫游路线 ${new Date().toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })}`,
   mode: props.routeData?.mode || RoamingMode.Point,
-  points: props.routeData?.points ? JSON.parse(JSON.stringify(props.routeData.points)) : [],
+  points: props.routeData?.points
+    ? JSON.parse(JSON.stringify(props.routeData.points))
+    : [],
   loop: props.routeData?.loop ?? false,
   speed: props.routeData?.speed ?? 1.0,
   eyeHeight: props.routeData?.eyeHeight ?? 1.6
@@ -430,7 +440,8 @@ const onPreviewPoint = (point: RoamingPoint) => {
 const removePoint = (idx: number) => {
   form.points.splice(idx, 1)
   if (selectedPointIndex.value === idx) {
-    selectedPointIndex.value = form.points.length > 0 ? Math.min(idx, form.points.length - 1) : null
+    selectedPointIndex.value =
+      form.points.length > 0 ? Math.min(idx, form.points.length - 1) : null
   } else if (selectedPointIndex.value !== null && selectedPointIndex.value > idx) {
     selectedPointIndex.value--
   }

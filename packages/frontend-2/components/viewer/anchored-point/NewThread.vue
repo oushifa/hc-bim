@@ -91,6 +91,7 @@ import {
   isValidCommentContentInput,
   convertCommentEditorValueToInput
 } from '~~/lib/viewer/helpers/comments'
+import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useThreadUtilities, useSelectionUtilities } from '~~/lib/viewer/composables/ui'
 import { useEmbed } from '~/lib/viewer/composables/setup/embed'
 import { useServerFileUploadLimit } from '~~/lib/common/composables/serverInfo'
@@ -165,6 +166,8 @@ const onThreadClick = () => {
   })
 }
 
+const mp = useMixpanel()
+
 const onSubmit = (comment?: CommentEditorValue) => {
   comment ||= comment || commentValue.value
   if (!comment?.doc) return
@@ -195,6 +198,7 @@ const onSubmit = (comment?: CommentEditorValue) => {
       pauseAutomaticUpdates.value = false
     })
 
+  mp.track('Comment Action', { type: 'action', name: 'create' })
   // Marking all uploads as in use to prevent cleanup
   comment.attachments?.forEach((a) => {
     a.inUse = true
@@ -203,6 +207,7 @@ const onSubmit = (comment?: CommentEditorValue) => {
 
 const trackAttachAndOpenFilePicker = () => {
   uploadZone.value?.triggerPicker()
+  mp.track('Comment Action', { type: 'action', name: 'attach' })
 }
 
 const shouldShowThreadBubble = computed(() => {

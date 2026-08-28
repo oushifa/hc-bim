@@ -45,6 +45,7 @@
 <script setup lang="ts">
 import type { Nullable } from '@speckle/shared'
 import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
+import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useIsTypingUpdateEmitter } from '~~/lib/viewer/composables/commentBubbles'
 import type { CommentBubbleModel } from '~~/lib/viewer/composables/commentBubbles'
 import { useSubmitReply } from '~~/lib/viewer/composables/commentManagement'
@@ -93,8 +94,10 @@ const onFilesSelected = (payload: { files: UploadableFileItem[] }) => {
   editor.value?.onFilesSelected(payload)
 }
 
+const mp = useMixpanel()
 const trackAttachAndOpenFilePicker = () => {
   uploadZone.value?.triggerPicker()
+  mp.track('Comment Action', { type: 'action', name: 'attach' })
 }
 
 const onSubmit = async () => {

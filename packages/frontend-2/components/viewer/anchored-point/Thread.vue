@@ -203,6 +203,7 @@ import { useActiveUser } from '~~/lib/auth/composables/activeUser'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { getLinkToThread } from '~~/lib/viewer/helpers/comments'
 import { useDisableGlobalTextSelection } from '~~/lib/common/composables/window'
+import { useMixpanel } from '~~/lib/core/composables/mp'
 import { useThreadUtilities } from '~~/lib/viewer/composables/ui'
 import { useEmbed } from '~/lib/viewer/composables/setup/embed'
 import { graphql } from '~/lib/common/generated/gql'
@@ -307,6 +308,8 @@ const initialDragPosition = computed(() => {
   }
 })
 
+const mp = useMixpanel()
+
 const isDragged = ref(false)
 const { x, y, isDragging, position } = useDraggable(threadContainer, {
   stopPropagation: true,
@@ -331,6 +334,7 @@ const { x, y, isDragging, position } = useDraggable(threadContainer, {
     if (!isDragged.value) position.value = { x: 0, y: 0 }
 
     isDragged.value = true
+    mp.track('Comment Action', { type: 'action', name: 'drag' })
   }
 })
 
@@ -429,6 +433,12 @@ const changeExpanded = async (newVal: boolean) => {
   }
 
   emit('update:expanded', newVal)
+  mp.track('Comment Action', {
+    type: 'action',
+    name: 'toggle',
+    status: newVal,
+    source: 'bubble'
+  })
 }
 
 const toggleCommentResolvedStatus = async () => {
@@ -447,6 +457,11 @@ const toggleCommentResolvedStatus = async () => {
     archived: !props.modelValue.archived
   })
 
+  mp.track('Comment Action', {
+    type: 'action',
+    name: 'archive',
+    status: props.modelValue.archived
+  })
   triggerNotification({
     title: `问题 ${props.modelValue.archived ? '已重新打开。' : '已解决。'}`,
     type: ToastNotificationType.Info
@@ -455,6 +470,7 @@ const toggleCommentResolvedStatus = async () => {
 
 const onNewReply = () => {
   justCreatedReply.value = true
+  mp.track('Comment Action', { type: 'action', name: 'reply' })
 }
 
 const onCommentMounted = () => {
@@ -486,6 +502,8 @@ const onCopyLink = async () => {
     })
     throw e
   }
+
+  mp.track('Comment Action', { type: 'action', name: 'share' })
 
   triggerNotification({
     type: ToastNotificationType.Info,

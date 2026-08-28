@@ -20,7 +20,9 @@
     </template>
 
     <!-- 漫游列表内容区 -->
-    <div class="flex flex-col flex-1 min-h-0 overflow-y-auto simple-scrollbar p-2 gap-2">
+    <div
+      class="flex flex-col flex-1 min-h-0 overflow-y-auto simple-scrollbar p-2 gap-2"
+    >
       <!-- 空状态 -->
       <div
         v-if="routes.length === 0"
@@ -37,7 +39,12 @@
             创建漫游路线，支持选点漫游与视角关键帧漫游
           </span>
         </div>
-        <FormButton size="sm" color="primary" :icon-left="Plus" @click="openCreatePanel">
+        <FormButton
+          size="sm"
+          color="primary"
+          :icon-left="Plus"
+          @click="openCreatePanel"
+        >
           新建漫游
         </FormButton>
       </div>
@@ -111,10 +118,7 @@ import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
 import { useSelectionUtilities } from '~/lib/viewer/composables/ui'
 import { useRoamingStorage } from '~/lib/viewer/composables/roaming/useRoamingStorage'
 import { useRoamingController } from '~/lib/viewer/composables/roaming/useRoamingController'
-import type {
-  RoamingRoute,
-  RoamingPoint
-} from '~/lib/viewer/composables/roaming/types'
+import type { RoamingRoute, RoamingPoint } from '~/lib/viewer/composables/roaming/types'
 
 defineEmits<{
   (e: 'close'): void

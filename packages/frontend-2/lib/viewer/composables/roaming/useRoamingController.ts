@@ -167,10 +167,7 @@ export const useRoamingController = () => {
   }
 
   // 2. 捕获当前视角关键帧
-  const captureCurrentView = (
-    name?: string,
-    duration = 3
-  ): RoamingPoint | null => {
+  const captureCurrentView = (name?: string, duration = 3): RoamingPoint | null => {
     try {
       const cameraController = instance.getExtension(CameraController)
       const pos = cameraController.getPosition()
@@ -179,8 +176,16 @@ export const useRoamingController = () => {
       return {
         id: `view_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         name: name || `视角关键帧`,
-        position: [Number(pos.x.toFixed(3)), Number(pos.y.toFixed(3)), Number(pos.z.toFixed(3))],
-        target: [Number(tgt.x.toFixed(3)), Number(tgt.y.toFixed(3)), Number(tgt.z.toFixed(3))],
+        position: [
+          Number(pos.x.toFixed(3)),
+          Number(pos.y.toFixed(3)),
+          Number(pos.z.toFixed(3))
+        ],
+        target: [
+          Number(tgt.x.toFixed(3)),
+          Number(tgt.y.toFixed(3)),
+          Number(tgt.z.toFixed(3))
+        ],
         duration,
         easing: EasingType.EaseInOut
       }
@@ -251,7 +256,8 @@ export const useRoamingController = () => {
       routeSegments.push({
         startPoint: points[i - 1],
         endPoint: endPt,
-        nextPoint: i + 1 < points.length ? points[i + 1] : route.loop ? points[0] : undefined,
+        nextPoint:
+          i + 1 < points.length ? points[i + 1] : route.loop ? points[0] : undefined,
         startDuration: currentSum,
         duration: dur,
         easing: endPt.easing || EasingType.EaseInOut,
@@ -292,7 +298,10 @@ export const useRoamingController = () => {
     // 阶段 1：飞入过渡阶段（平滑从当前相机视角飞至第一个漫游视角）
     if (isFlyingIn.value) {
       flyInAccumulatedTime += delta
-      const flyProgress = Math.min(1, flyInAccumulatedTime / Math.max(0.01, flyInDuration))
+      const flyProgress = Math.min(
+        1,
+        flyInAccumulatedTime / Math.max(0.01, flyInDuration)
+      )
       const flyT = calculateEasing(flyProgress, EasingType.EaseInOut)
 
       const curPos = flyInStartPos.clone().lerp(flyInEndPos, flyT)
@@ -495,7 +504,10 @@ export const useRoamingController = () => {
     if (distanceToStart > 0.5) {
       isFlyingIn.value = true
       flyInAccumulatedTime = 0
-      flyInDuration = Math.min(1.2, Math.max(0.7, Math.log10(distanceToStart + 1) * 0.45))
+      flyInDuration = Math.min(
+        1.2,
+        Math.max(0.7, Math.log10(distanceToStart + 1) * 0.45)
+      )
       flyInStartPos = currentCamPos
       flyInStartTarget = currentCamTarget
       flyInEndPos = targetPos

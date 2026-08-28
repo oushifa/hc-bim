@@ -71,7 +71,10 @@ export const useRoamingApi = () => {
   }
 
   // 删除漫游路线
-  const deleteRoamingRoute = async (projectId: string, routeId: string): Promise<void> => {
+  const deleteRoamingRoute = async (
+    projectId: string,
+    routeId: string
+  ): Promise<void> => {
     await request(`/api/v1/projects/${projectId}/roaming/routes/${routeId}`, {
       method: 'DELETE'
     })

@@ -103,14 +103,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import {
-  ChevronRight,
-  ChevronDown,
-  Play,
-  Pause,
-  Pencil,
-  Trash2
-} from 'lucide-vue-next'
+import { ChevronRight, ChevronDown, Play, Pause, Pencil, Trash2 } from 'lucide-vue-next'
 import { FormButton } from '@speckle/ui-components'
 import type { RoamingRoute, RoamingPoint } from '~/lib/viewer/composables/roaming/types'
 import { RoamingMode, EasingTypeLabels } from '~/lib/viewer/composables/roaming/types'

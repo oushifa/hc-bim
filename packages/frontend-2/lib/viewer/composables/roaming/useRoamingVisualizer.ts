@@ -75,7 +75,10 @@ export const useRoamingVisualizer = (viewerProvider: () => IViewer | undefined) 
         const size = viewer.World.worldBox.getSize(new Vector3())
         const maxSize = Math.max(size.x, size.y, size.z)
         if (maxSize > 0) {
-          baseScale = maxSize > 500 ? maxSize * 0.003 : Math.min(0.28, Math.max(0.1, maxSize * 0.004))
+          baseScale =
+            maxSize > 500
+              ? maxSize * 0.003
+              : Math.min(0.28, Math.max(0.1, maxSize * 0.004))
         }
       }
     } catch {
