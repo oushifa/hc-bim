@@ -22,7 +22,9 @@ export function useGlobalToastManager() {
 
   const dismiss = () => {
     currentNotification.value = undefined
-    stateNotification.value = undefined
+    if (stateNotification.value !== undefined) {
+      stateNotification.value = undefined
+    }
   }
 
   const { start, stop } = useTimeoutFn(() => {
@@ -33,8 +35,8 @@ export function useGlobalToastManager() {
     stateNotification,
     (newVal) => {
       if (!newVal) {
-        // 外部主动 dismiss（如短时提示到期关闭）→ 同步关闭渲染中的 toast
-        dismiss()
+        currentNotification.value = undefined
+        stop()
         return
       }
       if (import.meta.server) {
@@ -43,9 +45,7 @@ export function useGlobalToastManager() {
       }
 
       // First dismiss old notification, then set a new one on next tick
-      // this is so that the old one actually disappears from the screen for the user,
-      // instead of just having its contents replaced
-      dismiss()
+      currentNotification.value = undefined
 
       nextTick(() => {
         currentNotification.value = newVal
@@ -84,7 +84,9 @@ export function useGlobalToast() {
    * The renderer (ToastManager) will sync and close the visible toast.
    */
   const dismiss = () => {
-    stateNotification.value = undefined
+    if (stateNotification.value !== undefined) {
+      stateNotification.value = undefined
+    }
   }
 
   return { triggerNotification, dismiss }
