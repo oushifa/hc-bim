@@ -1,57 +1,48 @@
 <template>
-  <ViewerControlsButtonToggle
-    v-tippy="'Free orbit'"
-    flat
-    :active="!localViewerSettings.turntableMode"
-    secondary
-    @click="toggleTurntableMode()"
-  >
-    <IconFreeOrbit class="h-5 w-5" />
-  </ViewerControlsButtonToggle>
+  <ViewerLayoutPanel>
+    <div class="flex flex-col gap-3 p-3">
+      <div class="flex flex-col gap-1">
+        <FormRange
+          v-model="ghostOpacity"
+          name="ghostOpacity"
+          label="非隔离对象透明度"
+          :min="0"
+          :max="1"
+          :step="0.05"
+        />
+        <div class="flex justify-end text-body-2xs text-foreground-2">
+          当前值：{{ ghostOpacityPercent }}
+        </div>
+      </div>
+
+      <div class="h-px bg-outline-3" />
+
+      <div class="flex items-center justify-between">
+        <span class="text-body-2xs font-medium text-foreground">背景颜色</span>
+        <div class="flex items-center gap-2">
+          <label class="flex items-center cursor-pointer" for="viewer-bg-color">
+            <span class="sr-only">背景颜色选择器</span>
+            <input
+              id="viewer-bg-color"
+              v-model="backgroundColor"
+              class="h-7 w-8 cursor-pointer rounded border border-outline-3 bg-foundation p-0.5"
+              type="color"
+            />
+          </label>
+          <div class="flex items-center rounded border border-outline-3 px-2 py-1 bg-foundation">
+            <span class="font-mono text-body-2xs text-foreground">
+              {{ backgroundColor.toUpperCase() }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ViewerLayoutPanel>
 </template>
 
 <script setup lang="ts">
-import { useSynchronizedCookie } from '~~/lib/common/composables/reactiveCookie'
-import { useInjectedViewer } from '~~/lib/viewer/composables/setup'
-import { CameraController } from '@speckle/viewer'
+import { FormRange } from '@speckle/ui-components'
+import { useViewerDisplaySettings } from '~/lib/viewer/composables/setup/displaySettings'
 
-type ViewerUserSettings = {
-  turntableMode: boolean
-}
-
-const localViewerSettings = useSynchronizedCookie<ViewerUserSettings>(
-  `localViewerSettings`,
-  {
-    default: () => {
-      return { turntableMode: false }
-    }
-  }
-)
-
-const { instance } = useInjectedViewer()
-
-const setViewerCameraHandlerControlsMaxPolarAngle = (angle: number) => {
-  const extension = instance.getExtension(CameraController)
-  if (extension) extension.options = { maximumPolarAngle: angle }
-}
-
-const toggleTurntableMode = () => {
-  localViewerSettings.value = {
-    ...localViewerSettings.value,
-    turntableMode: !localViewerSettings.value.turntableMode
-  }
-  if (localViewerSettings.value.turntableMode) {
-    setViewerCameraHandlerControlsMaxPolarAngle(Math.PI / 2)
-  } else {
-    setViewerCameraHandlerControlsMaxPolarAngle(Math.PI)
-  }
-}
-
-onMounted(() => {
-  if (localViewerSettings.value.turntableMode) {
-    setViewerCameraHandlerControlsMaxPolarAngle(Math.PI / 2)
-  } else {
-    setViewerCameraHandlerControlsMaxPolarAngle(Math.PI)
-  }
-})
+const { ghostOpacity, ghostOpacityPercent, backgroundColor } = useViewerDisplaySettings()
 </script>

@@ -11,7 +11,7 @@
       type="file"
       class="hidden"
       aria-label="选择要上传到模型库的模型文件"
-      accept=".ifc,.rvt,.skp,.nwd,.nwc"
+      accept=".ifc,.rvt,.skp,.nwd,.nwc,.IFC,.RVT,.SKP,.NWD,.NWC"
       @change="onModelLibraryFileSelected"
     />
     <input
@@ -19,7 +19,7 @@
       type="file"
       class="hidden"
       aria-label="选择要上传的新版本文件"
-      accept=".ifc,.rvt,.skp,.nwd,.nwc"
+      accept=".ifc,.rvt,.skp,.nwd,.nwc,.IFC,.RVT,.SKP,.NWD,.NWC"
       @change="onVersionFileSelected"
     />
     <div

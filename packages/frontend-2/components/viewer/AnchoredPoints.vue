@@ -34,6 +34,18 @@
       @login="showLoginDialog = true"
     />
 
+    <!-- Roaming waypoints bubbles (评论气泡同款图钉) -->
+    <ViewerAnchoredPointRoaming
+      v-for="item in roamingPointItems"
+      :key="item.id"
+      :index="item.index"
+      :is-selected="selectedPointIndex === item.index"
+      :is-occluded="item.isOccluded"
+      :style="item.style"
+      class="z-[14]"
+      @click="triggerPointSelect(item.index)"
+    />
+
     <ViewerContextMenu v-model:open="contextMenuOpen" :parent-el="parentEl" />
 
     <div v-if="!isEmbedEnabled">
@@ -151,6 +163,11 @@ import { useThreadUtilities } from '~~/lib/viewer/composables/ui'
 import { useFilterUtilities } from '~/lib/viewer/composables/filtering/filtering'
 import { TailwindBreakpoints } from '~~/lib/common/helpers/tailwind'
 import { useBreakpoints } from '@vueuse/core'
+import { useRoamingAnchoredState } from '~/lib/viewer/composables/roaming/useRoamingAnchoredState'
+import { RoamingMode } from '~/lib/viewer/composables/roaming/types'
+import { Vector3 } from 'three'
+import { useViewerAnchoredPoints } from '~~/lib/viewer/composables/anchorPoints'
+import type { CSSProperties } from 'vue'
 
 const emit = defineEmits<{
   forceClosePanels: []
@@ -172,6 +189,59 @@ const breakpoints = useBreakpoints(TailwindBreakpoints)
 const isMobile = breakpoints.smaller('sm')
 
 const { isEnabled: isEmbedEnabled } = useEmbed()
+
+// 漫游点位气泡 (Anchored Roaming Points)
+const { activeRoute, selectedPointIndex, triggerPointSelect } = useRoamingAnchoredState()
+
+interface RoamingPointItem extends Record<string, unknown> {
+  id: string
+  index: number
+  position: [number, number, number]
+  eyeHeight?: number
+  isOccluded: boolean
+  style: Partial<CSSProperties>
+  location: Vector3
+}
+
+const roamingPointItems = ref<RoamingPointItem[]>([])
+
+watch(
+  () => [activeRoute.value, activeRoute.value?.points],
+  () => {
+    if (!activeRoute.value || !activeRoute.value.points || activeRoute.value.points.length === 0) {
+      roamingPointItems.value = []
+      return
+    }
+    const isPointMode = activeRoute.value.mode === RoamingMode.Point
+    const eyeH = isPointMode ? activeRoute.value.eyeHeight ?? 1.6 : 0
+    roamingPointItems.value = activeRoute.value.points.map((p, idx) => {
+      const loc = new Vector3(p.position[0], p.position[1], p.position[2] + eyeH)
+      return {
+        id: p.id,
+        index: idx,
+        position: p.position,
+        eyeHeight: eyeH,
+        isOccluded: false,
+        style: {},
+        location: loc
+      }
+    })
+  },
+  { immediate: true, deep: true }
+)
+
+useViewerAnchoredPoints({
+  parentEl,
+  points: roamingPointItems,
+  pointLocationGetter: (item) => item.location,
+  updatePositionCallback: (item, result) => {
+    item.isOccluded = result.isOccluded
+    item.style = {
+      ...item.style,
+      ...result.style
+    }
+  }
+})
 
 const followers = computed(() => {
   if (!isLoggedIn.value) return []

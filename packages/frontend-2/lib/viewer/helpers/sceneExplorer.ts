@@ -39,7 +39,6 @@ export enum ModelsSubView {
 export type ActivePanel =
   | 'none'
   | 'models'
-  | 'displaySettings'
   | 'discussions'
   | 'explorer'
   | 'automate'
@@ -48,3 +47,4 @@ export type ActivePanel =
   | 'savedViews'
   | 'catalog'
   | 'alignments'
+  | 'roaming'

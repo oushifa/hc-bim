@@ -49,6 +49,7 @@
         <ViewerExplodeMenu v-show="activePanel === 'explode'" />
         <ViewerViewModesMenu v-show="activePanel === 'viewModes'" />
         <ViewerLightControlsMenu v-show="activePanel === 'lightControls'" />
+        <ViewerSettingsMenu v-show="activePanel === 'displaySettings'" />
       </div>
     </ViewerLayoutPanel>
   </aside>
@@ -67,8 +68,9 @@ import { useInjectedViewerState } from '~~/lib/viewer/composables/setup'
 import { onKeyStroke, useBreakpoints } from '@vueuse/core'
 import { useEmbed } from '~/lib/viewer/composables/setup/embed'
 import { TailwindBreakpoints } from '~~/lib/common/helpers/tailwind'
-import { Ruler, Scissors, Sun, Layers2, Glasses } from 'lucide-vue-next'
+import { Ruler, Scissors, Sun, Layers2, Glasses, SlidersHorizontal } from 'lucide-vue-next'
 import { useOnViewerLoadComplete } from '~/lib/viewer/composables/viewer'
+import { useViewerDisplaySettings } from '~/lib/viewer/composables/setup/displaySettings'
 
 enum ActivePanel {
   none = 'none',
@@ -76,7 +78,8 @@ enum ActivePanel {
   sectionBox = 'sectionBox',
   explode = 'explode',
   viewModes = 'viewModes',
-  lightControls = 'lightControls'
+  lightControls = 'lightControls',
+  displaySettings = 'displaySettings'
 }
 
 const emit = defineEmits<{
@@ -101,6 +104,7 @@ const {
   ui: { explodeFactor }
 } = useInjectedViewerState()
 const { getTooltipProps } = useSmartTooltipDelay()
+const { hasCustomDisplaySettings, resetDisplaySettings } = useViewerDisplaySettings()
 
 const hasExplode = computed(() => explodeFactor.value > 0)
 const hasNonDefaultViewMode = computed(() => currentViewMode.value !== ViewMode.DEFAULT)
@@ -149,13 +153,21 @@ const panels = shallowRef({
       format: 'separate'
     }),
     extraClasses: 'hidden md:flex'
+  },
+  [ActivePanel.displaySettings]: {
+    id: ActivePanel.displaySettings,
+    name: '显示设置',
+    icon: SlidersHorizontal,
+    tooltip: '显示设置',
+    extraClasses: 'hidden md:flex'
   }
 })
 
 const showResetButton = computed(() => {
   return (
     activePanel.value === ActivePanel.explode ||
-    activePanel.value === ActivePanel.sectionBox
+    activePanel.value === ActivePanel.sectionBox ||
+    activePanel.value === ActivePanel.displaySettings
   )
 })
 
@@ -169,6 +181,8 @@ const shouldShowDot = (panelId: ActivePanel) => {
       return hasExplode.value
     case ActivePanel.viewModes:
       return hasNonDefaultViewMode.value
+    case ActivePanel.displaySettings:
+      return hasCustomDisplaySettings.value
     default:
       return false
   }
@@ -231,6 +245,13 @@ const toggleLightControls = () => {
       : ActivePanel.lightControls
 }
 
+const toggleDisplaySettings = () => {
+  activePanel.value =
+    activePanel.value === ActivePanel.displaySettings
+      ? ActivePanel.none
+      : ActivePanel.displaySettings
+}
+
 const onActivePanelClose = () => {
   if (activePanel.value === ActivePanel.sectionBox) {
     closeSectionBox()
@@ -248,6 +269,9 @@ const onReset = () => {
   if (activePanel.value === ActivePanel.sectionBox) {
     resetSectionBoxCompletely()
     activePanel.value = ActivePanel.none
+  }
+  if (activePanel.value === ActivePanel.displaySettings) {
+    resetDisplaySettings()
   }
 }
 

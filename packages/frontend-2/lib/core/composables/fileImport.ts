@@ -263,11 +263,12 @@ export const useFileImportBaseSettings = () => {
   const isNextGenFileImporterEnabled = useIsNextGenFileImporterEnabled()
   const isRhinoFileImportEnabled = useIsRhinoFileImporterEnabled()
 
-  const legacyFileImportService = '.ifc,.obj,.stl,.rvt,.skp,.nwd,.nwc,.dxf'
-  const nextGenBackgroundJobs = `.ifc,.rvt,.skp,.nwd,.nwc,.dxf,${
+  const legacyFileImportService =
+    '.ifc,.obj,.stl,.rvt,.skp,.nwd,.nwc,.dxf,.IFC,.OBJ,.STL,.RVT,.SKP,.NWD,.NWC,.DXF'
+  const nextGenBackgroundJobs = `.ifc,.rvt,.skp,.nwd,.nwc,.dxf,.IFC,.RVT,.SKP,.NWD,.NWC,.DXF,${
     isRhinoFileImportEnabled.value
       ? [...rhinoImporterSupportedFileExtensions]
-          .map((ext: string) => `.${ext}`)
+          .map((ext: string) => `.${ext},.${ext.toUpperCase()}`)
           .join(',')
       : ''
   }`

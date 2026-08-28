@@ -40,16 +40,6 @@
         />
         <ViewerControlsButtonToggle
           v-tippy="
-            getTooltipProps('显示设置', {
-              placement: 'right'
-            })
-          "
-          :active="activePanel === 'displaySettings'"
-          :icon="SlidersHorizontal"
-          @click="toggleActivePanel('displaySettings')"
-        />
-        <ViewerControlsButtonToggle
-          v-tippy="
             getTooltipProps(
               getShortcutDisplayText(shortcuts.ToggleDiscussions, {
                 format: 'separate'
@@ -112,6 +102,18 @@
           @click="toggleActivePanel('alignments')"
         ></ViewerControlsButtonToggle>
 
+        <!-- roaming -->
+        <ViewerControlsButtonToggle
+          v-tippy="
+            getTooltipProps('漫游', {
+              placement: 'right'
+            })
+          "
+          :active="activePanel === 'roaming'"
+          :icon="Footprints"
+          @click="toggleActivePanel('roaming')"
+        ></ViewerControlsButtonToggle>
+
         <ViewerControlsButtonToggle
           v-if="allAutomationRuns.length !== 0"
           v-tippy="{
@@ -152,7 +154,6 @@
           v-if="activePanel === 'models'"
           v-model:sub-view="modelsSubView"
         />
-        <ViewerSettingsPanel v-if="activePanel === 'displaySettings'" />
         <ViewerFiltersPanel v-if="activePanel === 'filters'" />
         <ViewerCommentsPanel
           v-if="resourceItems.length !== 0 && activePanel === 'discussions'"
@@ -165,6 +166,10 @@
         <ViewerDataviewerPanel v-if="activePanel === 'devMode'" />
         <ViewerCatalogPanel v-if="activePanel === 'catalog'"></ViewerCatalogPanel>
         <ViewerAlignmentsPanel v-if="activePanel === 'alignments'" />
+        <ViewerRoamingPanel
+          v-if="activePanel === 'roaming'"
+          @close="activePanel = 'none'"
+        />
         <KeepAlive>
           <ViewerSavedViewsPanel
             v-if="isSavedViewsEnabled && activePanel === 'savedViews'"
@@ -229,11 +234,11 @@ import {
   Camera,
   Box,
   ListFilter,
-  SlidersHorizontal,
   MessageSquareText,
   ArrowLeft,
   ListTree,
-  BetweenVerticalStart
+  BetweenVerticalStart,
+  Footprints
 } from 'lucide-vue-next'
 import { useViewerPanelsUtilities } from '~/lib/viewer/composables/setup/panels'
 import type { ActivePanel } from '~/lib/viewer/helpers/sceneExplorer'
