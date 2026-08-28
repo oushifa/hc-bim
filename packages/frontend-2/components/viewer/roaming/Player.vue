@@ -4,10 +4,16 @@
   >
     <!-- 顶部状态栏：路线名称、当前点位、时间 -->
     <div class="flex items-center justify-between text-body-2xs">
-      <div class="flex items-center gap-1.5 font-medium text-foreground truncate">
+      <div
+        class="flex items-center gap-1.5 font-medium text-foreground truncate"
+      >
         <span
           class="w-2 h-2 rounded-full"
-          :class="isPlaying && !isPaused ? 'bg-success animate-pulse' : 'bg-outline-2'"
+          :class="
+            isPlaying && !isPaused
+              ? 'bg-success animate-pulse'
+              : 'bg-outline-2'
+          "
         />
         <span class="truncate">{{ route.name }}</span>
       </div>
@@ -89,10 +95,7 @@
               type="button"
               class="px-3 py-1 text-left text-body-3xs hover:bg-primary/10 text-foreground font-mono"
               :class="playbackSpeed === spd ? 'text-primary font-bold' : ''"
-              @click="
-                $emit('set-speed', spd)
-                showSpeedMenu = false
-              "
+              @click="onSelectSpeed(spd)"
             >
               {{ spd }}x
             </button>
@@ -152,6 +155,11 @@ const formatTime = (sec: number) => {
 const onProgressInput = (event: Event) => {
   const val = Number((event.target as HTMLInputElement).value)
   emit('set-progress', val)
+}
+
+const onSelectSpeed = (spd: number) => {
+  emit('set-speed', spd)
+  showSpeedMenu.value = false
 }
 
 const onPlayOrResume = () => {
