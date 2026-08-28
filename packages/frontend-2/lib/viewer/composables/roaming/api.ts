@@ -6,12 +6,17 @@ export const useRoamingApi = () => {
   const apiOrigin = useApiOrigin()
 
   const request = async <T>(path: string, options?: Parameters<typeof $fetch>[1]) => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...((options?.headers as Record<string, string>) || {})
+    }
+    if (authCookie.value) {
+      headers['Authorization'] = `Bearer ${authCookie.value}`
+    }
+
     return await $fetch<T>(`${apiOrigin}${path}`, {
       ...options,
-      headers: {
-        ...(options?.headers || {}),
-        ...(authCookie.value ? { Authorization: `Bearer ${authCookie.value}` } : {})
-      }
+      headers
     })
   }
 

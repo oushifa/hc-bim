@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { Vector3, Vector2, Raycaster } from 'three'
-import { CameraController } from '@speckle/viewer'
+import { CameraController, ViewerEvent, type SelectionEvent } from '@speckle/viewer'
 import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
 import type { RoamingRoute, RoamingPoint } from './types'
 import { RoamingMode, EasingType } from './types'
@@ -17,6 +17,7 @@ export const useRoamingController = () => {
   const isPicking = ref(false)
   const isPlaying = ref(false)
   const isPaused = ref(false)
+  const isFlyingIn = ref(false)
   const currentRoute = ref<RoamingRoute | null>(null)
   const currentPointIndex = ref(0)
   const currentTime = ref(0)
@@ -28,6 +29,15 @@ export const useRoamingController = () => {
   let animationFrameId: number | null = null
   let lastTimestamp = 0
   let pickingHandler: ((e: PointerEvent | MouseEvent) => void) | null = null
+  let viewerClickHandler: ((e: SelectionEvent | null) => void) | null = null
+
+  // 飞入过渡动画状态
+  let flyInAccumulatedTime = 0
+  let flyInDuration = 0
+  let flyInStartPos = new Vector3()
+  let flyInStartTarget = new Vector3()
+  let flyInEndPos = new Vector3()
+  let flyInEndTarget = new Vector3()
 
   // 缓动函数映射
   const calculateEasing = (t: number, easing: EasingType): number => {
@@ -58,15 +68,37 @@ export const useRoamingController = () => {
     if (canvas) canvas.style.cursor = 'crosshair'
 
     let pointerDownPos = { x: 0, y: 0 }
+    let lastPickTimestamp = 0
+
+    const handlePickResult = (pt: { x: number; y: number; z: number }) => {
+      const now = Date.now()
+      if (now - lastPickTimestamp < 300) return
+      lastPickTimestamp = now
+      onPointPicked([
+        Number(pt.x.toFixed(3)),
+        Number(pt.y.toFixed(3)),
+        Number(pt.z.toFixed(3))
+      ])
+    }
 
     const onPointerDown = (event: MouseEvent | PointerEvent) => {
       pointerDownPos = { x: event.clientX, y: event.clientY }
     }
 
+    // 监听 Speckle 原生 ObjectClicked 事件
+    viewerClickHandler = (event: SelectionEvent | null) => {
+      if (!isPicking.value || !event || !event.hits || event.hits.length === 0) return
+      const pt = event.hits[0].point
+      if (pt) {
+        handlePickResult(pt)
+      }
+    }
+    instance.on(ViewerEvent.ObjectClicked, viewerClickHandler)
+
+    // 同时监听 pointerup 提供查询/射线拾取保底
     pickingHandler = (event: MouseEvent | PointerEvent) => {
       if (!isPicking.value) return
 
-      // 防止拖动相机旋转误判为点击选点
       const dist = Math.hypot(
         event.clientX - pointerDownPos.x,
         event.clientY - pointerDownPos.y
@@ -78,23 +110,17 @@ export const useRoamingController = () => {
         const x = event.clientX - bounds.left
         const y = event.clientY - bounds.top
 
-        // 方案 1：使用 Speckle Viewer 标准的 Pick 查询
         const hits = instance.query<import('@speckle/viewer').IntersectionQuery>({
           point: new Vector3(x, y, 0),
           operation: 'Pick'
         })
 
         if (hits && hits.objects && hits.objects.length > 0 && hits.objects[0].point) {
-          const pt = hits.objects[0].point
-          onPointPicked([
-            Number(pt.x.toFixed(3)),
-            Number(pt.y.toFixed(3)),
-            Number(pt.z.toFixed(3))
-          ])
+          handlePickResult(hits.objects[0].point)
           return
         }
 
-        // 方案 2：直接使用 Three.js 射线拾取保底
+        // Three.js 射线拾取保底
         const renderer = instance.getRenderer()
         const camera = renderer.renderingCamera
         if (camera) {
@@ -107,12 +133,7 @@ export const useRoamingController = () => {
             (i) => i.point && i.object.layers.mask !== 16
           )
           if (validHit && validHit.point) {
-            const pt = validHit.point
-            onPointPicked([
-              Number(pt.x.toFixed(3)),
-              Number(pt.y.toFixed(3)),
-              Number(pt.z.toFixed(3))
-            ])
+            handlePickResult(validHit.point)
           }
         }
       } catch (e) {
@@ -133,6 +154,11 @@ export const useRoamingController = () => {
     const canvas = instance.getCanvas()
     container.style.cursor = 'default'
     if (canvas) canvas.style.cursor = 'default'
+
+    if (viewerClickHandler) {
+      instance.removeListener(ViewerEvent.ObjectClicked, viewerClickHandler)
+      viewerClickHandler = null
+    }
 
     if (pickingHandler) {
       container.removeEventListener('pointerup', pickingHandler)
@@ -168,7 +194,8 @@ export const useRoamingController = () => {
   const previewPoint = (
     point: RoamingPoint,
     mode: RoamingMode,
-    eyeHeight = 1.6
+    eyeHeight = 1.6,
+    transition = true
   ) => {
     try {
       const cameraController = instance.getExtension(CameraController)
@@ -192,7 +219,8 @@ export const useRoamingController = () => {
         tgt = new Vector3(point.target[0], point.target[1], point.target[2])
       }
 
-      cameraController.setCameraView({ position: pos, target: tgt }, false)
+      cameraController.setCameraView({ position: pos, target: tgt }, transition)
+      cameraController.updateCameraPlanes()
       instance.requestRender()
     } catch (e) {
       console.error('Failed to preview point:', e)
@@ -259,6 +287,36 @@ export const useRoamingController = () => {
     const delta = ((timestamp - lastTimestamp) / 1000) * playbackSpeed.value
     lastTimestamp = timestamp
 
+    const cameraController = instance.getExtension(CameraController)
+
+    // 阶段 1：飞入过渡阶段（平滑从当前相机视角飞至第一个漫游视角）
+    if (isFlyingIn.value) {
+      flyInAccumulatedTime += delta
+      const flyProgress = Math.min(1, flyInAccumulatedTime / Math.max(0.01, flyInDuration))
+      const flyT = calculateEasing(flyProgress, EasingType.EaseInOut)
+
+      const curPos = flyInStartPos.clone().lerp(flyInEndPos, flyT)
+      const curTarget = flyInStartTarget.clone().lerp(flyInEndTarget, flyT)
+
+      try {
+        cameraController.setCameraView({ position: curPos, target: curTarget }, false)
+        cameraController.updateCameraPlanes()
+        visualizer.renderRoute(currentRoute.value, 0, curPos)
+        instance.requestRender()
+      } catch (e) {
+        console.error('Camera fly-in error:', e)
+      }
+
+      if (flyProgress >= 1) {
+        isFlyingIn.value = false
+        lastTimestamp = performance.now()
+      }
+
+      animationFrameId = requestAnimationFrame(animationLoop)
+      return
+    }
+
+    // 阶段 2：正式漫游路线播放
     accumulatedTime += delta
     currentTime.value = accumulatedTime
 
@@ -365,10 +423,10 @@ export const useRoamingController = () => {
         curTarget = startTarget.clone().lerp(endTarget, easedT)
       }
 
-      // 更新相机位置与朝向
+      // 更新相机位置与朝向，并刷新相机裁剪面与场景重绘
       try {
-        const cameraController = instance.getExtension(CameraController)
         cameraController.setCameraView({ position: curPos, target: curTarget }, false)
+        cameraController.updateCameraPlanes()
         visualizer.renderRoute(currentRoute.value, curSegment.pointIndex, curPos)
         instance.requestRender()
       } catch (e) {
@@ -399,14 +457,53 @@ export const useRoamingController = () => {
       accumulatedTime = 0
     }
 
-    // 播放前先将相机直接瞬移到起始点位
-    try {
-      const firstPt = route.points[startPointIdx > 0 ? startPointIdx : 0]
-      previewPoint(firstPt, route.mode, route.eyeHeight)
-      const cameraController = instance.getExtension(CameraController)
-      cameraController.enabled = false // 漫游播放过程中锁定手动旋转
-    } catch (e) {
-      console.error(e)
+    const cameraController = instance.getExtension(CameraController)
+    cameraController.disableRotations()
+
+    // 计算起始目标姿态
+    const firstPt = route.points[startPointIdx > 0 ? startPointIdx : 0]
+    const isPointMode = route.mode === RoamingMode.Point
+    const eyeH = isPointMode ? route.eyeHeight ?? 1.6 : 0
+
+    const targetPos = new Vector3(
+      firstPt.position[0],
+      firstPt.position[1],
+      firstPt.position[2] + eyeH
+    )
+
+    let targetTgt: Vector3
+    if (isPointMode) {
+      const nextPt =
+        route.points[startPointIdx > 0 ? startPointIdx + 1 : 1] || route.points[0]
+      const dir = new Vector3(
+        nextPt.position[0] - firstPt.position[0],
+        nextPt.position[1] - firstPt.position[1],
+        nextPt.position[2] - firstPt.position[2]
+      ).normalize()
+      if (dir.lengthSq() < 1e-4) dir.set(1, 0, 0)
+      targetTgt = targetPos.clone().add(dir.multiplyScalar(10))
+    } else {
+      targetTgt = new Vector3(firstPt.target[0], firstPt.target[1], firstPt.target[2])
+    }
+
+    // 获取当前相机姿态
+    const currentCamPos = cameraController.getPosition().clone()
+    const currentCamTarget = cameraController.getTarget().clone()
+    const distanceToStart = currentCamPos.distanceTo(targetPos)
+
+    // 若当前相机离漫游起始点较远，启动快速平滑飞入动画（0.8s ~ 1.2s）
+    if (distanceToStart > 0.5) {
+      isFlyingIn.value = true
+      flyInAccumulatedTime = 0
+      flyInDuration = Math.min(1.2, Math.max(0.7, Math.log10(distanceToStart + 1) * 0.45))
+      flyInStartPos = currentCamPos
+      flyInStartTarget = currentCamTarget
+      flyInEndPos = targetPos
+      flyInEndTarget = targetTgt
+    } else {
+      isFlyingIn.value = false
+      cameraController.setCameraView({ position: targetPos, target: targetTgt }, false)
+      cameraController.updateCameraPlanes()
     }
 
     isPlaying.value = true
@@ -435,6 +532,7 @@ export const useRoamingController = () => {
   const stop = () => {
     isPlaying.value = false
     isPaused.value = false
+    isFlyingIn.value = false
     accumulatedTime = 0
     currentTime.value = 0
     progress.value = 0
@@ -447,8 +545,10 @@ export const useRoamingController = () => {
 
     try {
       const cameraController = instance.getExtension(CameraController)
-      cameraController.enabled = true
+      cameraController.enableRotations()
+      cameraController.updateCameraPlanes()
       visualizer.renderRoute(currentRoute.value)
+      instance.requestRender()
     } catch (e) {
       console.error(e)
     }
@@ -456,6 +556,7 @@ export const useRoamingController = () => {
 
   const setProgress = (targetProgress: number) => {
     if (!currentRoute.value || totalTime.value <= 0) return
+    isFlyingIn.value = false
     const targetTime = Math.max(0, Math.min(1, targetProgress)) * totalTime.value
     accumulatedTime = targetTime
     currentTime.value = targetTime
@@ -492,6 +593,7 @@ export const useRoamingController = () => {
     isPicking,
     isPlaying,
     isPaused,
+    isFlyingIn,
     currentRoute,
     currentPointIndex,
     currentTime,
