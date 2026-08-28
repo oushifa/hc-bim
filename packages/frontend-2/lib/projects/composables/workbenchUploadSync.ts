@@ -359,6 +359,19 @@ export const useWorkbenchUploadSync = () => {
     Object.values(taskMap.value).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   )
 
+  const latestTaskByModelKey = computed(() => {
+    const map: Record<string, WorkbenchUploadSyncTask> = {}
+    for (const task of tasks.value) {
+      if (!task.modelId) continue
+      const key = buildSyncingModelKey(task.projectId, task.modelId)
+      const existing = map[key]
+      if (!existing || task.updatedAt.localeCompare(existing.updatedAt) > 0) {
+        map[key] = task
+      }
+    }
+    return map
+  })
+
   const tasksSignature = computed(() =>
     tasks.value
       .map(
@@ -368,22 +381,28 @@ export const useWorkbenchUploadSync = () => {
       .join('|')
   )
 
+  const RUNNING_STATUSES: WorkbenchUploadSyncTaskStatus[] = [
+    'speckle_converting',
+    'syncing_dtp_model',
+    'syncing_external_ids',
+    'triggering_model_transform',
+    'polling_model_transform'
+  ]
+
+  const isTaskRunning = (
+    task: Pick<WorkbenchUploadSyncTask, 'status'> | null | undefined
+  ) => {
+    if (!task) return false
+    return RUNNING_STATUSES.includes(task.status)
+  }
+
   const canResumeServerExecution = (
     task: Pick<WorkbenchUploadSyncTask, 'status' | 'retriable'>
   ) =>
-    (task.status === 'failed' && task.retriable) ||
-    (!FINAL_STATUSES.includes(task.status) &&
-      !CLIENT_UPLOAD_ONLY_STATUSES.includes(task.status))
+    (task.status === 'failed' && task.retriable) || isTaskRunning(task)
 
   const getLatestTask = (params: { projectId: string; modelId: string }) =>
-    tasks.value
-      .filter(
-        (task) =>
-          task.modelId &&
-          buildSyncingModelKey(task.projectId, task.modelId) ===
-            buildSyncingModelKey(params.projectId, params.modelId)
-      )
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] || null
+    latestTaskByModelKey.value[buildSyncingModelKey(params.projectId, params.modelId)] || null
 
   const getModelRuntimeProgress = (params: {
     projectId: string
@@ -630,6 +649,47 @@ export const useWorkbenchUploadSync = () => {
       params.modelIds.map((modelId) => buildSyncingModelKey(params.projectId, modelId))
     )
 
+    const isTaskIdentical = (
+      a: WorkbenchUploadSyncTask | undefined,
+      b: WorkbenchUploadSyncTask
+    ) => {
+      if (!a) return false
+      return (
+        a.id === b.id &&
+        a.status === b.status &&
+        a.progressPercent === b.progressPercent &&
+        a.progressPhase === b.progressPhase &&
+        a.progressMessage === b.progressMessage &&
+        a.error === b.error &&
+        a.retryCount === b.retryCount &&
+        a.retriable === b.retriable &&
+        a.updatedAt === b.updatedAt
+      )
+    }
+
+    let hasDiff = false
+    const existingTargetTasks = Object.values(taskMap.value).filter(
+      (task) => task.modelId && targetKeys.has(buildSyncingModelKey(task.projectId, task.modelId))
+    )
+
+    const incomingMappedTasks = params.serverTasks
+      .map(mapServerTask)
+      .filter((task) => task.status !== 'succeeded')
+
+    if (existingTargetTasks.length !== incomingMappedTasks.length) {
+      hasDiff = true
+    } else {
+      for (const nextTask of incomingMappedTasks) {
+        const currentTask = taskMap.value[nextTask.id]
+        if (!isTaskIdentical(currentTask, nextTask)) {
+          hasDiff = true
+          break
+        }
+      }
+    }
+
+    if (!hasDiff) return
+
     const nextMap = Object.fromEntries(
       Object.entries(taskMap.value).filter(([, task]) => {
         if (!task.modelId) return true
@@ -637,9 +697,7 @@ export const useWorkbenchUploadSync = () => {
       })
     )
 
-    for (const serverTask of params.serverTasks) {
-      const mappedTask = mapServerTask(serverTask)
-      if (mappedTask.status === 'succeeded') continue
+    for (const mappedTask of incomingMappedTasks) {
       nextMap[mappedTask.id] = mappedTask
     }
 
@@ -802,24 +860,53 @@ export const useWorkbenchUploadSync = () => {
 
   const activeTaskPoller = useScopedState(
     'workbenchUploadSyncTaskPoller',
-    () => ref<ReturnType<typeof setInterval> | null>(null)
+    () => ref<ReturnType<typeof setTimeout> | null>(null)
   )
+  let isPolling = false
   let currentVisibleTargets: VisibleTaskTarget[] = []
+
+  const stopPolling = () => {
+    if (activeTaskPoller.value) {
+      clearTimeout(activeTaskPoller.value)
+      activeTaskPoller.value = null
+    }
+  }
 
   const startPollingIfNeeded = () => {
     if (import.meta.server) return
-    const hasActiveTask = tasks.value.some((task) => canResumeServerExecution(task))
+    const hasRunningTask = tasks.value.some((task) => isTaskRunning(task))
 
-    if (hasActiveTask) {
-      if (activeTaskPoller.value) return
-      activeTaskPoller.value = setInterval(() => {
-        if (!currentVisibleTargets.length) return
-        void syncVisibleTasks(currentVisibleTargets)
-      }, 2000)
-    } else if (activeTaskPoller.value) {
-      clearInterval(activeTaskPoller.value)
-      activeTaskPoller.value = null
+    if (!hasRunningTask || !currentVisibleTargets.length) {
+      stopPolling()
+      return
     }
+
+    if (activeTaskPoller.value) return
+
+    const scheduleNextPoll = () => {
+      activeTaskPoller.value = setTimeout(async () => {
+        activeTaskPoller.value = null
+        if (isPolling) return
+
+        const stillHasRunningTask = tasks.value.some((task) => isTaskRunning(task))
+        if (!stillHasRunningTask || !currentVisibleTargets.length) {
+          return
+        }
+
+        isPolling = true
+        try {
+          await syncVisibleTasks(currentVisibleTargets)
+        } finally {
+          isPolling = false
+          const shouldContinue = tasks.value.some((task) => isTaskRunning(task))
+          if (shouldContinue && currentVisibleTargets.length) {
+            scheduleNextPoll()
+          }
+        }
+      }, 2500)
+    }
+
+    scheduleNextPoll()
   }
 
   const syncVisibleTasks = async (targets: VisibleTaskTarget[]) => {
@@ -896,6 +983,7 @@ export const useWorkbenchUploadSync = () => {
   }
 
   onScopeDispose(() => {
+    stopPolling()
     cleanupVisibleTaskSubscriptions()
   })
 
@@ -939,14 +1027,10 @@ export const useWorkbenchUploadSync = () => {
     }
   }
 
-  const isModelSyncing = (params: { projectId: string; modelId: string }) =>
-    tasks.value.some(
-      (task) =>
-        task.modelId &&
-        buildSyncingModelKey(task.projectId, task.modelId) ===
-          buildSyncingModelKey(params.projectId, params.modelId) &&
-        canResumeServerExecution(task)
-    )
+  const isModelSyncing = (params: { projectId: string; modelId: string }) => {
+    const latest = getLatestTask(params)
+    return isTaskRunning(latest)
+  }
 
   const setModelSyncing = (_params: {
     projectId: string

@@ -814,24 +814,17 @@ const getModelNameFromFile = (fileName: string) => {
 }
 
 const shouldSubscribeProjectUpdates = (model: Model) => {
-  if (
-    isModelSyncing({
-      projectId: model.projectId,
-      modelId: model.id
-    })
-  ) {
-    return true
-  }
-
   if (model.latestUpload?.id && !model.latestUpload.uploadComplete) {
     return true
   }
 
-  return [
-    FileUploadConvertedStatus.Queued,
-    FileUploadConvertedStatus.Converting,
-    FileUploadConvertedStatus.Completed
-  ].includes(model.latestUpload?.convertedStatus as FileUploadConvertedStatus)
+  const convertedStatus = model.latestUpload
+    ?.convertedStatus as FileUploadConvertedStatus | undefined
+
+  return (
+    convertedStatus === FileUploadConvertedStatus.Queued ||
+    convertedStatus === FileUploadConvertedStatus.Converting
+  )
 }
 
 const subscribedProjectIds = computed(() => {
