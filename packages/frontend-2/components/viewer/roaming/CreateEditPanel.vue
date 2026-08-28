@@ -22,7 +22,7 @@
     <div class="flex-1 overflow-y-auto simple-scrollbar p-3 flex flex-col gap-3">
       <!-- 1. 路线名称 -->
       <div class="flex flex-col gap-1">
-        <label class="text-body-2xs font-medium text-foreground">路线名称</label>
+        <div class="text-body-2xs font-medium text-foreground">路线名称</div>
         <FormTextInput
           v-model="form.name"
           name="routeName"
@@ -34,7 +34,7 @@
 
       <!-- 2. 漫游模式选择 -->
       <div class="flex flex-col gap-1.5">
-        <label class="text-body-2xs font-medium text-foreground">漫游模式</label>
+        <div class="text-body-2xs font-medium text-foreground">漫游模式</div>
         <ViewerButtonGroup class="w-full">
           <ViewerButtonGroupButton
             :is-active="form.mode === RoamingMode.Point"
@@ -95,6 +95,7 @@
               step="0.1"
               min="0"
               max="10"
+              aria-label="人眼视高偏置"
               class="w-16 h-6 px-1.5 text-body-3xs text-right rounded border border-outline-3 bg-foundation text-foreground focus:outline-none focus:border-primary"
             />
             <span class="text-body-3xs text-foreground-2">米</span>
@@ -108,7 +109,7 @@
         class="flex flex-col gap-2 p-2.5 rounded-lg bg-foundation-2 border border-outline-3"
       >
         <div class="flex items-center justify-between">
-          <span class="text-body-2xs font-medium text-foreground">捕获关键帧视角</span>
+          <span class="text-body-2xs font-medium text-foreground">当前视角保存</span>
           <FormButton
             size="sm"
             color="primary"
@@ -118,13 +119,36 @@
             保存当前视角
           </FormButton>
         </div>
-        <p class="text-body-3xs text-foreground-2">
-          调整 3D 场景到满意视角后，点击上方按钮添加为关键帧。
-        </p>
+        <div class="text-body-3xs text-foreground-2">
+          调整 3D 视图到满意的视角后，点击按钮将当前视角保存为漫游关键帧
+        </div>
       </div>
 
-      <!-- 5. 点位列表 -->
-      <div class="flex flex-col gap-1.5 flex-1 min-h-[140px]">
+      <!-- 5. 漫游参数全局设置 -->
+      <div
+        class="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-foundation-2 border border-outline-3"
+      >
+        <div class="flex items-center justify-between">
+          <span class="text-body-3xs text-foreground-2">循环播放</span>
+          <CommonSwitch v-model="form.loop" />
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-body-3xs text-foreground-2">默认倍速</span>
+          <select
+            v-model.number="form.speed"
+            aria-label="默认漫游倍速"
+            class="h-6 px-1 rounded border border-outline-3 bg-foundation text-foreground focus:outline-none focus:border-primary text-body-3xs"
+          >
+            <option :value="0.5">0.5x</option>
+            <option :value="1.0">1.0x</option>
+            <option :value="1.5">1.5x</option>
+            <option :value="2.0">2.0x</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 6. 点位列表 -->
+      <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between">
           <span class="text-body-2xs font-medium text-foreground">
             点位列表 ({{ form.points.length }})
@@ -148,6 +172,8 @@
           <div
             v-for="(point, idx) in form.points"
             :key="point.id"
+            role="button"
+            tabindex="0"
             class="flex flex-col p-2.5 rounded-lg border transition cursor-pointer gap-1.5 text-body-3xs select-none"
             :class="[
               selectedPointIndex === idx
@@ -155,6 +181,8 @@
                 : 'border-outline-3 bg-foundation-2 hover:border-outline-2'
             ]"
             @click="selectPoint(idx)"
+            @keydown.enter="selectPoint(idx)"
+            @keydown.space.prevent="selectPoint(idx)"
           >
             <!-- 点位行头部：序号、名称、操作 -->
             <div class="flex items-center justify-between">
@@ -245,6 +273,7 @@
                   step="0.5"
                   min="0.2"
                   max="60"
+                  aria-label="点位用时"
                   class="w-full h-6 px-1.5 rounded border border-outline-3 bg-foundation text-foreground focus:outline-none focus:border-primary text-body-3xs"
                 />
                 <span class="text-foreground-2 shrink-0">秒</span>
@@ -253,6 +282,7 @@
                 <span class="text-foreground-2 shrink-0">曲线:</span>
                 <select
                   v-model="point.easing"
+                  aria-label="点位缓动曲线"
                   class="w-full h-6 px-1 rounded border border-outline-3 bg-foundation text-foreground focus:outline-none focus:border-primary text-body-3xs"
                 >
                   <option

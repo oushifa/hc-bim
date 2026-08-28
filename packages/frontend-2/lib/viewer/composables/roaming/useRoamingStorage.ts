@@ -6,6 +6,7 @@ import { useRoamingApi } from './api'
 const STORAGE_PREFIX = 'speckle_roaming_routes_'
 
 export const useRoamingStorage = () => {
+  const logger = useLogger()
   const state = useInjectedViewerState()
   const projectId = computed(() => state.projectId.value)
   const api = useRoamingApi()
@@ -28,7 +29,7 @@ export const useRoamingStorage = () => {
         routes.value = JSON.parse(raw)
       }
     } catch (e) {
-      console.error('Failed to load roaming routes from localStorage cache:', e)
+      logger.error('Failed to load roaming routes from localStorage cache:', e)
     }
 
     try {
@@ -36,7 +37,7 @@ export const useRoamingStorage = () => {
       routes.value = serverRoutes
       localStorage.setItem(storageKey.value, JSON.stringify(serverRoutes))
     } catch (e) {
-      console.warn('Failed to load roaming routes from server, using local cache:', e)
+      logger.warn('Failed to load roaming routes from server, using local cache:', e)
     } finally {
       isLoading.value = false
       isLoaded.value = true
@@ -54,7 +55,7 @@ export const useRoamingStorage = () => {
       localStorage.setItem(storageKey.value, JSON.stringify(routes.value))
       return created
     } catch (e) {
-      console.error('Failed to create roaming route on server, fallback local:', e)
+      logger.error('Failed to create roaming route on server, fallback local:', e)
       // 本地兜底
       const localRoute: RoamingRoute = {
         ...routeData,
@@ -83,7 +84,7 @@ export const useRoamingStorage = () => {
       localStorage.setItem(storageKey.value, JSON.stringify(routes.value))
       return updated
     } catch (e) {
-      console.error('Failed to update roaming route on server, fallback local:', e)
+      logger.error('Failed to update roaming route on server, fallback local:', e)
       const idx = routes.value.findIndex((r) => r.id === id)
       if (idx !== -1) {
         routes.value[idx] = {
@@ -104,7 +105,7 @@ export const useRoamingStorage = () => {
     try {
       await api.deleteRoamingRoute(projectId.value, id)
     } catch (e) {
-      console.error('Failed to delete roaming route on server:', e)
+      logger.error('Failed to delete roaming route on server:', e)
     }
 
     const idx = routes.value.findIndex((r) => r.id === id)

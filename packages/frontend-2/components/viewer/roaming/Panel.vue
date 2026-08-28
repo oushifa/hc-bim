@@ -242,13 +242,15 @@ const handlePreviewPoint = (
   visualizer.renderRoute(route, pointIdx)
 }
 
+const logger = useLogger()
+
 onMounted(() => {
   try {
     const selection = instance.getExtension(SelectionExtension)
     selection.enabled = false
     clearSelection()
   } catch (e) {
-    console.error(e)
+    logger.error('Failed to disable selection:', e)
   }
 })
 
@@ -257,7 +259,7 @@ onUnmounted(() => {
     const selection = instance.getExtension(SelectionExtension)
     selection.enabled = true
   } catch (e) {
-    console.error(e)
+    logger.error('Failed to restore selection:', e)
   }
   visualizer.clear()
 })

@@ -1,12 +1,14 @@
 import { ref } from 'vue'
 import { Vector3, Vector2, Raycaster } from 'three'
-import { CameraController, ViewerEvent, type SelectionEvent } from '@speckle/viewer'
+import { CameraController, ViewerEvent } from '@speckle/viewer'
+import type { SelectionEvent } from '@speckle/viewer'
 import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
 import type { RoamingRoute, RoamingPoint } from './types'
 import { RoamingMode, EasingType } from './types'
 import { useRoamingVisualizer } from './useRoamingVisualizer'
 
 export const useRoamingController = () => {
+  const logger = useLogger()
   const {
     viewer: { instance }
   } = useInjectedViewerState()
@@ -137,7 +139,7 @@ export const useRoamingController = () => {
           }
         }
       } catch (e) {
-        console.error('Roaming pick point error:', e)
+        logger.error('Roaming pick point error:', e)
       }
     }
 
@@ -190,7 +192,7 @@ export const useRoamingController = () => {
         easing: EasingType.EaseInOut
       }
     } catch (e) {
-      console.error('Failed to capture view:', e)
+      logger.error('Failed to capture view:', e)
       return null
     }
   }
@@ -228,7 +230,7 @@ export const useRoamingController = () => {
       cameraController.updateCameraPlanes()
       instance.requestRender()
     } catch (e) {
-      console.error('Failed to preview point:', e)
+      logger.error('Failed to preview point:', e)
     }
   }
 
@@ -313,7 +315,7 @@ export const useRoamingController = () => {
         visualizer.renderRoute(currentRoute.value, 0, curPos)
         instance.requestRender()
       } catch (e) {
-        console.error('Camera fly-in error:', e)
+        logger.error('Camera fly-in error:', e)
       }
 
       if (flyProgress >= 1) {
@@ -386,7 +388,7 @@ export const useRoamingController = () => {
         // 视线朝向向量：当前段朝向
         const dirCurrent = endPos.clone().sub(startPos).normalize()
 
-        let headingDir = dirCurrent.clone()
+        const headingDir = dirCurrent.clone()
         // 临近段终点（后 30% 进程）且存在下一拐弯点时，平滑插值转弯
         if (curSegment.nextPoint && easedT > 0.7) {
           const nextPos = new Vector3(
@@ -439,7 +441,7 @@ export const useRoamingController = () => {
         visualizer.renderRoute(currentRoute.value, curSegment.pointIndex, curPos)
         instance.requestRender()
       } catch (e) {
-        console.error('Camera update error in roaming loop:', e)
+        logger.error('Camera update error in roaming loop:', e)
       }
     }
 
@@ -448,7 +450,7 @@ export const useRoamingController = () => {
 
   const playRoute = (route: RoamingRoute, startPointIdx = 0) => {
     if (!route || !route.points || route.points.length < 2) {
-      console.warn('Cannot play route with less than 2 points')
+      logger.warn('Cannot play route with less than 2 points')
       return
     }
 
@@ -562,7 +564,7 @@ export const useRoamingController = () => {
       visualizer.renderRoute(currentRoute.value)
       instance.requestRender()
     } catch (e) {
-      console.error(e)
+      logger.error('Failed to stop roaming:', e)
     }
   }
 

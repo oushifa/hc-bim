@@ -1,49 +1,28 @@
 import { ref } from 'vue'
-import type { CSSProperties } from 'vue'
-import { Vector3 } from 'three'
-import type { RoamingRoute, RoamingPoint } from './types'
+import type { RoamingPoint } from './types'
 
-export interface AnchoredRoamingPointItem {
-  point: RoamingPoint
-  index: number
-  isSelected: boolean
-  location: Vector3
-  isOccluded: boolean
-  style: Partial<CSSProperties>
-}
-
-// 共享的当前正在编辑或查看的漫游路线与选中点位
-const activeRoute = ref<RoamingRoute | null>(null)
-const selectedPointIndex = ref<number | null>(null)
-const onPointSelectCallbacks = new Set<(index: number) => void>()
+const activeRoamingPoints = ref<RoamingPoint[]>([])
+const selectedRoamingPointIndex = ref<number | null>(null)
 
 export const useRoamingAnchoredState = () => {
-  const setActiveRoute = (route: RoamingRoute | null) => {
-    activeRoute.value = route
+  const setPoints = (points: RoamingPoint[]) => {
+    activeRoamingPoints.value = points
   }
 
-  const setSelectedPointIndex = (idx: number | null) => {
-    selectedPointIndex.value = idx
+  const selectPointIndex = (idx: number | null) => {
+    selectedRoamingPointIndex.value = idx
   }
 
-  const registerPointSelectCallback = (cb: (index: number) => void) => {
-    onPointSelectCallbacks.add(cb)
-    return () => {
-      onPointSelectCallbacks.delete(cb)
-    }
-  }
-
-  const triggerPointSelect = (index: number) => {
-    selectedPointIndex.value = index
-    onPointSelectCallbacks.forEach((cb) => cb(index))
+  const clear = () => {
+    activeRoamingPoints.value = []
+    selectedRoamingPointIndex.value = null
   }
 
   return {
-    activeRoute,
-    selectedPointIndex,
-    setActiveRoute,
-    setSelectedPointIndex,
-    registerPointSelectCallback,
-    triggerPointSelect
+    activeRoamingPoints,
+    selectedRoamingPointIndex,
+    setPoints,
+    selectPointIndex,
+    clear
   }
 }

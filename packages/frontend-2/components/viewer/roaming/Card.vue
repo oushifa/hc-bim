@@ -5,8 +5,12 @@
   >
     <!-- 卡片头部信息与操作栏 -->
     <div
+      role="button"
+      tabindex="0"
       class="flex items-center justify-between p-2.5 bg-foundation cursor-pointer select-none"
       @click="isExpanded = !isExpanded"
+      @keydown.enter="isExpanded = !isExpanded"
+      @keydown.space.prevent="isExpanded = !isExpanded"
     >
       <div class="flex items-center gap-2 min-w-0">
         <component
@@ -79,8 +83,12 @@
       <div
         v-for="(point, idx) in route.points"
         :key="point.id"
+        role="button"
+        tabindex="0"
         class="flex items-center justify-between px-2 py-1 rounded text-body-3xs bg-foundation hover:bg-foundation-3 transition cursor-pointer"
         @click="$emit('preview-point', route, point, idx)"
+        @keydown.enter="$emit('preview-point', route, point, idx)"
+        @keydown.space.prevent="$emit('preview-point', route, point, idx)"
       >
         <div class="flex items-center gap-1.5 text-foreground truncate">
           <span
@@ -110,8 +118,8 @@ import { RoamingMode, EasingTypeLabels } from '~/lib/viewer/composables/roaming/
 
 const props = defineProps<{
   route: RoamingRoute
-  isCurrentPlaying?: boolean
-  isPaused?: boolean
+  isCurrentPlaying: boolean
+  isPaused: boolean
 }>()
 
 const emit = defineEmits<{
@@ -120,18 +128,12 @@ const emit = defineEmits<{
   (e: 'resume'): void
   (e: 'edit', route: RoamingRoute): void
   (e: 'delete', route: RoamingRoute): void
-  (
-    e: 'preview-point',
-    route: RoamingRoute,
-    point: RoamingPoint,
-    pointIndex: number
-  ): void
+  (e: 'preview-point', route: RoamingRoute, point: RoamingPoint, idx: number): void
 }>()
 
 const isExpanded = ref(false)
 
 const totalDuration = computed(() => {
-  if (!props.route.points) return 0
   const sum = props.route.points.reduce((acc, p) => acc + (p.duration || 3), 0)
   return Number(sum.toFixed(1))
 })

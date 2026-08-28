@@ -29,6 +29,7 @@
         max="1"
         step="0.001"
         :value="progress"
+        aria-label="漫游进度调节"
         class="w-full h-1.5 bg-outline-3 rounded-lg appearance-none cursor-pointer accent-primary"
         @input="onProgressInput"
       />
@@ -66,45 +67,54 @@
           class="!h-7 !w-7"
           @click="$emit('stop')"
         />
-
-        <!-- 循环播放切换 -->
-        <FormButton
-          size="sm"
-          color="subtle"
-          :icon-left="Repeat"
-          hide-text
-          :class="[
-            isLoop
-              ? '!text-primary !bg-primary-muted font-bold'
-              : 'text-foreground-2 hover:text-foreground',
-            '!h-7 !w-7'
-          ]"
-          @click="$emit('toggle-loop')"
-        />
       </div>
 
-      <!-- 倍速切换 -->
-      <div class="flex items-center gap-1">
-        <button
-          v-for="spd in speedOptions"
-          :key="spd"
-          type="button"
-          class="px-1.5 py-0.5 text-body-3xs rounded font-medium transition"
-          :class="[
-            playbackSpeed === spd
-              ? 'bg-primary text-foreground-on-primary font-bold'
-              : 'text-foreground-2 hover:text-foreground hover:bg-foundation-2'
-          ]"
-          @click="$emit('set-speed', spd)"
-        >
-          {{ spd }}x
-        </button>
+      <div class="flex items-center gap-1.5">
+        <!-- 倍速选择 -->
+        <div class="relative">
+          <button
+            type="button"
+            class="h-7 px-2 text-body-3xs font-mono rounded border border-outline-3 bg-foundation hover:bg-foundation-2 text-foreground flex items-center gap-0.5"
+            @click="showSpeedMenu = !showSpeedMenu"
+          >
+            {{ playbackSpeed }}x
+          </button>
+          <div
+            v-if="showSpeedMenu"
+            class="absolute bottom-8 right-0 bg-foundation border border-outline-3 rounded-lg shadow-lg py-1 z-50 flex flex-col min-w-[70px]"
+          >
+            <button
+              v-for="spd in [0.5, 1.0, 1.5, 2.0, 3.0]"
+              :key="spd"
+              type="button"
+              class="px-3 py-1 text-left text-body-3xs hover:bg-primary/10 text-foreground font-mono"
+              :class="playbackSpeed === spd ? 'text-primary font-bold' : ''"
+              @click="
+                $emit('set-speed', spd)
+                showSpeedMenu = false
+              "
+            >
+              {{ spd }}x
+            </button>
+          </div>
+        </div>
+
+        <!-- 循环模式切换 -->
+        <FormButton
+          size="sm"
+          :color="isLoop ? 'primary' : 'subtle'"
+          :icon-left="Repeat"
+          hide-text
+          class="!h-7 !w-7"
+          @click="$emit('toggle-loop')"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { Play, Pause, Square, Repeat } from 'lucide-vue-next'
 import { FormButton } from '@speckle/ui-components'
 import type { RoamingRoute } from '~/lib/viewer/composables/roaming/types'
@@ -122,33 +132,33 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'play'): void
+  (e: 'play', route: RoamingRoute): void
   (e: 'pause'): void
   (e: 'resume'): void
   (e: 'stop'): void
   (e: 'set-progress', val: number): void
-  (e: 'set-speed', spd: number): void
+  (e: 'set-speed', speed: number): void
   (e: 'toggle-loop'): void
 }>()
 
-const speedOptions = [0.5, 1.0, 1.5, 2.0]
+const showSpeedMenu = ref(false)
 
-const formatTime = (seconds: number) => {
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
+const formatTime = (sec: number) => {
+  const s = Math.floor(sec % 60)
+  const m = Math.floor(sec / 60)
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
 }
 
-const onPlayOrResume = () => {
-  if (props.isPaused) {
-    emit('resume')
-  } else {
-    emit('play')
-  }
+const onProgressInput = (event: Event) => {
+  const val = Number((event.target as HTMLInputElement).value)
+  emit('set-progress', val)
 }
 
-const onProgressInput = (e: Event) => {
-  const val = parseFloat((e.target as HTMLInputElement).value)
-  emit('set-progress', val)
+const onPlayOrResume = () => {
+  if (props.isPlaying && props.isPaused) {
+    emit('resume')
+  } else {
+    emit('play', props.route)
+  }
 }
 </script>
