@@ -191,7 +191,8 @@ const isMobile = breakpoints.smaller('sm')
 const { isEnabled: isEmbedEnabled } = useEmbed()
 
 // 漫游点位气泡 (Anchored Roaming Points)
-const { activeRoute, selectedPointIndex, triggerPointSelect } = useRoamingAnchoredState()
+const { activeRoute, selectedPointIndex, triggerPointSelect } =
+  useRoamingAnchoredState()
 
 interface RoamingPointItem extends Record<string, unknown> {
   id: string
@@ -208,20 +209,22 @@ const roamingPointItems = ref<RoamingPointItem[]>([])
 watch(
   () => [activeRoute.value, activeRoute.value?.points],
   () => {
-    if (!activeRoute.value || !activeRoute.value.points || activeRoute.value.points.length === 0) {
+    if (
+      !activeRoute.value ||
+      !activeRoute.value.points ||
+      activeRoute.value.points.length === 0
+    ) {
       roamingPointItems.value = []
       return
     }
-    const isPointMode = activeRoute.value.mode === RoamingMode.Point
-    const eyeH = isPointMode ? activeRoute.value.eyeHeight ?? 1.6 : 0
     roamingPointItems.value = activeRoute.value.points.map(
       (p: RoamingPoint, idx: number) => {
-        const loc = new Vector3(p.position[0], p.position[1], p.position[2] + eyeH)
+        const loc = new Vector3(p.position[0], p.position[1], p.position[2])
         return {
           id: p.id,
           index: idx,
           position: p.position,
-          eyeHeight: eyeH,
+          eyeHeight: 0,
           isOccluded: false,
           style: {},
           location: loc

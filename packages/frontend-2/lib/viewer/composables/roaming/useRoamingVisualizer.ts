@@ -86,13 +86,11 @@ export const useRoamingVisualizer = (viewerProvider: () => IViewer | undefined) 
     }
 
     const points = route.points
-    const isPointMode = route.mode === RoamingMode.Point
-    const eyeH = isPointMode ? route.eyeHeight ?? 1.6 : 0
 
     const linePoints: Vector3[] = []
 
     points.forEach((pt) => {
-      const pos = new Vector3(pt.position[0], pt.position[1], pt.position[2] + eyeH)
+      const pos = new Vector3(pt.position[0], pt.position[1], pt.position[2])
       linePoints.push(pos)
     })
 

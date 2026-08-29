@@ -181,7 +181,7 @@
       <!-- Panel Extension - Portal target for additional content -->
       <div
         id="panel-extension"
-        class="absolute z-50 left-[calc(100dvw-16rem)] sm:left-72 max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] top-12 bg-foundation rounded-lg overflow-hidden"
+        class="absolute z-50 left-[calc(100dvw-16rem)] sm:left-72 max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] top-12 bg-foundation rounded-lg overflow-hidden flex flex-col"
         :style="`left: ${panelExtensionLeft} !important; width: ${panelExtensionWidth}px;`"
       >
         <!-- Resize handle for panel extension -->
@@ -190,7 +190,10 @@
           class="absolute h-full max-h-[calc(100dvh-9rem)] md:max-h-[calc(100dvh-7rem)] w-4 transition border-r hover:border-r-[2px] border-outline-2 hover:border-[#00b4b6] hidden lg:flex items-center cursor-ew-resize z-30 right-0"
           @mousedown="startPanelExtensionResizing"
         />
-        <PortalTarget name="panel-extension"></PortalTarget>
+        <PortalTarget
+          name="panel-extension"
+          class="h-full flex flex-col min-h-0 flex-1 overflow-hidden"
+        ></PortalTarget>
       </div>
     </aside>
 
