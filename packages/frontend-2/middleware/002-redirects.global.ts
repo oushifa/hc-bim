@@ -61,7 +61,7 @@ const streamBranchPageRgx =
   /^\/streams\/([a-zA-Z0-9-_]+)\/branches\/([a-zA-Z0-9-_%]+)\/?/
 
 const streamPageRgx = /^\/streams\/([a-zA-Z0-9-_]+)\/?/
-const adminPageRgx = /^\/admin\/?/
+const adminPageRgx = /^\/admin\/?$/
 
 /**
  * Setting up all kinds of redirects (e.g. for FE1 backwards compatibility)
@@ -280,6 +280,10 @@ export default defineParallelizedNuxtRouteMiddleware(async (to) => {
   const [, streamId] = path.match(streamPageRgx) || []
   if (streamId) {
     return navigateTo(projectRoute(streamId))
+  }
+
+  if (path.startsWith('/admin/model-conversion')) {
+    return
   }
 
   if (adminPageRgx.test(path)) {

@@ -44,6 +44,7 @@ export type WorkbenchUploadSyncTask = {
   progressPercent: number | null
   progressPhase: string | null
   progressMessage: string | null
+  queuePosition: number | null
   error: string | null
   errorCode: string | null
   retriable: boolean
@@ -66,6 +67,7 @@ type ServerModelSyncTask = {
   progressPercent: number | null
   progressPhase: string | null
   progressMessage: string | null
+  queuePosition?: number | null
   seedId: string | null
   assetId: string | null
   assetName: string | null
@@ -88,7 +90,7 @@ type CreateUploadTaskResponse = {
 
 const FINAL_STATUSES: WorkbenchUploadSyncTaskStatus[] = ['succeeded', 'failed']
 const CLIENT_UPLOAD_ONLY_STATUSES: WorkbenchUploadSyncTaskStatus[] = ['waiting_upload']
-const RVT_FILE_NAME_RE = /\.(rvt|skp|nwd|nwc)$/i
+const RVT_FILE_NAME_RE = /\.(rvt|nwd|nwc)$/i
 
 export type WorkbenchModelSyncRuntimeProgress = {
   percent: number
@@ -295,9 +297,23 @@ export const mapProgressPhaseToDescription = (
       return '已接收转码任务'
     case 'opening':
       return '正在打开 RVT 模型'
+    case 'opening_ifc':
+      return '正在打开 IFC 模型'
+    case 'preprocessing_geometry':
+      return '正在预处理模型几何'
+    case 'converting_objects':
+      return '正在转换模型对象'
+    case 'reading_skp':
+      return '正在读取 SketchUp 模型数据'
+    case 'organizing_layers':
+      return '正在组织模型图层结构'
     case 'converting':
     case 'converting_model':
       return '正在转换模型构件'
+    case 'uploading_model_object':
+    case 'uploading_speckle_object':
+      return '正在上传转换模型数据'
+    case 'creating_version':
     case 'uploading_version':
       return '正在生成模型版本'
     case 'completed':
@@ -305,7 +321,7 @@ export const mapProgressPhaseToDescription = (
     case 'failed':
       return '转换失败'
     default:
-      return phase
+      return phase.replace(/speckle[_-]?/gi, '')
   }
 }
 
@@ -327,6 +343,7 @@ const mapServerTask = (task: ServerModelSyncTask): WorkbenchUploadSyncTask => ({
   progressPercent: clampProgressPercent(task.progressPercent),
   progressPhase: task.progressPhase,
   progressMessage: task.progressMessage,
+  queuePosition: typeof task.queuePosition === 'number' ? task.queuePosition : null,
   error: task.error,
   errorCode: task.errorCode,
   retriable: task.retriable,
@@ -398,11 +415,12 @@ export const useWorkbenchUploadSync = () => {
 
   const canResumeServerExecution = (
     task: Pick<WorkbenchUploadSyncTask, 'status' | 'retriable'>
-  ) =>
-    (task.status === 'failed' && task.retriable) || isTaskRunning(task)
+  ) => (task.status === 'failed' && task.retriable) || isTaskRunning(task)
 
   const getLatestTask = (params: { projectId: string; modelId: string }) =>
-    latestTaskByModelKey.value[buildSyncingModelKey(params.projectId, params.modelId)] || null
+    latestTaskByModelKey.value[
+      buildSyncingModelKey(params.projectId, params.modelId)
+    ] || null
 
   const getModelRuntimeProgress = (params: {
     projectId: string
@@ -453,8 +471,21 @@ export const useWorkbenchUploadSync = () => {
   }): string | null => {
     const task = getLatestTask(params)
     if (!task) return null
+    if (typeof task.queuePosition === 'number' && task.queuePosition > 0) {
+      return `排队中，当前处于队列第 ${task.queuePosition} 位`
+    }
     if (task.progressMessage?.trim()) return task.progressMessage.trim()
     return mapProgressPhaseToDescription(task.progressPhase)
+  }
+
+  const getModelQueuePosition = (params: {
+    projectId: string
+    modelId: string
+  }): number | null => {
+    const task = getLatestTask(params)
+    return typeof task?.queuePosition === 'number' && task.queuePosition > 0
+      ? task.queuePosition
+      : null
   }
 
   const activeProjectIds = computed(() => {
@@ -669,7 +700,9 @@ export const useWorkbenchUploadSync = () => {
 
     let hasDiff = false
     const existingTargetTasks = Object.values(taskMap.value).filter(
-      (task) => task.modelId && targetKeys.has(buildSyncingModelKey(task.projectId, task.modelId))
+      (task) =>
+        task.modelId &&
+        targetKeys.has(buildSyncingModelKey(task.projectId, task.modelId))
     )
 
     const incomingMappedTasks = params.serverTasks
@@ -858,9 +891,8 @@ export const useWorkbenchUploadSync = () => {
     })
   }
 
-  const activeTaskPoller = useScopedState(
-    'workbenchUploadSyncTaskPoller',
-    () => ref<ReturnType<typeof setTimeout> | null>(null)
+  const activeTaskPoller = useScopedState('workbenchUploadSyncTaskPoller', () =>
+    ref<ReturnType<typeof setTimeout> | null>(null)
   )
   let isPolling = false
   let currentVisibleTargets: VisibleTaskTarget[] = []
@@ -1047,6 +1079,7 @@ export const useWorkbenchUploadSync = () => {
     getLatestTask,
     getModelRuntimeProgress,
     getModelRuntimeProgressMessage,
+    getModelQueuePosition,
     uploadModelFile,
     retryTask,
     executeTask: retryTask,

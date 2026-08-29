@@ -64,6 +64,22 @@
     </div>
 
     <div
+      v-if="isBatchModelUploading"
+      class="shrink-0 px-4 py-2 bg-white/80 backdrop-blur-md border-b border-gray-100"
+    >
+      <div class="flex items-center justify-between text-xs text-gray-600">
+        <span>{{ batchModelUploadStatusText }}</span>
+        <span>{{ batchModelUploadProgress }}%</span>
+      </div>
+      <div class="mt-1 h-2 w-full rounded bg-gray-200 overflow-hidden">
+        <div
+          class="h-full bg-[#00b4b6] transition-all"
+          :style="{ width: `${batchModelUploadProgress}%` }"
+        />
+      </div>
+    </div>
+
+    <div
       v-if="activeTab === 'drawings' && isDrawingUploading"
       class="shrink-0 px-4 py-2 bg-white/80 backdrop-blur-md border-b border-gray-100"
     >
@@ -259,13 +275,22 @@
                     </h3>
                     <div
                       v-if="shouldShowProgressBar(getModelRuntimeStatus(model))"
-                      class="mt-1 w-56"
+                      class="mt-1 flex items-center gap-2 max-w-full flex-wrap"
                     >
-                      <CommonModelRuntimeProgressBar
-                        :status="getModelRuntimeStatus(model)"
-                        :progress="getModelRuntimeProgress(model)"
-                        :progress-phase="getModelRuntimeProgressPhase(model)"
-                      />
+                      <div class="w-56 shrink-0">
+                        <CommonModelRuntimeProgressBar
+                          :status="getModelRuntimeStatus(model)"
+                          :progress="getModelRuntimeProgress(model)"
+                          :progress-phase="getModelRuntimeProgressPhase(model)"
+                        />
+                      </div>
+                      <span
+                        v-if="getModelRuntimeStatusDescription(model)"
+                        class="text-xs text-gray-400 truncate max-w-full"
+                        :title="getModelRuntimeStatusDescription(model) || ''"
+                      >
+                        {{ getModelRuntimeStatusDescription(model) }}
+                      </span>
                     </div>
                   </div>
                   <button class="text-gray-400 hover:text-gray-600 p-1 shrink-0">
@@ -359,13 +384,22 @@
                           </span>
                           <div
                             v-if="shouldShowProgressBar(getModelRuntimeStatus(model))"
-                            class="mt-1 w-56"
+                            class="mt-1 flex items-center gap-2 max-w-full flex-wrap"
                           >
-                            <CommonModelRuntimeProgressBar
-                              :status="getModelRuntimeStatus(model)"
-                              :progress="getModelRuntimeProgress(model)"
-                              :progress-phase="getModelRuntimeProgressPhase(model)"
-                            />
+                            <div class="w-56 shrink-0">
+                              <CommonModelRuntimeProgressBar
+                                :status="getModelRuntimeStatus(model)"
+                                :progress="getModelRuntimeProgress(model)"
+                                :progress-phase="getModelRuntimeProgressPhase(model)"
+                              />
+                            </div>
+                            <span
+                              v-if="getModelRuntimeStatusDescription(model)"
+                              class="text-xs text-gray-400 truncate max-w-full"
+                              :title="getModelRuntimeStatusDescription(model) || ''"
+                            >
+                              {{ getModelRuntimeStatusDescription(model) }}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -447,14 +481,55 @@
       @close="showImportModal = false"
       @import="handleImport"
     />
-    <ProjectCardImportFileArea
-      v-if="uploadProject"
-      ref="uploadAreaRef"
-      :project="uploadProject"
-      :skip-dtp-model-sync="true"
+    <label for="workbench-model-upload" class="sr-only">批量上传模型</label>
+    <input
+      id="workbench-model-upload"
+      ref="batchModelFileInputRef"
+      type="file"
+      :accept="modelAccept"
+      multiple
       class="hidden"
-      @uploading="onModelUploading"
+      @change="onBatchModelFilesPicked"
     />
+    <CommonConfirmDialog
+      v-model:open="showBatchUploadConfirm"
+      title="批量上传模型"
+      confirm-text="确认上传"
+      cancel-text="取消"
+      :loading="isBatchModelUploading"
+      :confirm-disabled="isBatchModelUploading || !pendingUploadFiles.length"
+      @confirm="startBatchModelUpload"
+    >
+      <div
+        class="flex flex-col gap-3 text-sm text-gray-700 max-h-[360px] overflow-y-auto"
+      >
+        <p>
+          已选择
+          <span class="font-semibold text-[#00b4b6]">
+            {{ pendingUploadFiles.length }}
+          </span>
+          个模型文件，将上传至目录
+          <span class="font-medium text-[#333]">「{{ activeDirName }}」</span>
+          并自动创建模型，确认开始上传吗？
+        </p>
+        <div
+          class="border border-gray-100 rounded-lg divide-y divide-gray-100 bg-gray-50/50 p-2 text-xs"
+        >
+          <div
+            v-for="(file, idx) in pendingUploadFiles"
+            :key="idx"
+            class="py-1.5 flex items-center justify-between gap-2"
+          >
+            <span class="truncate text-gray-800 font-medium" :title="file.name">
+              {{ file.name }}
+            </span>
+            <span class="shrink-0 text-gray-400">
+              {{ prettyFileSize(file.size) }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </CommonConfirmDialog>
     <ProjectCardImportFileArea
       v-if="uploadProject && selectedVersionUploadModel"
       ref="versionUploadAreaRef"
@@ -658,6 +733,9 @@ import {
 } from '~~/lib/projects/composables/workbenchUploadSync'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { ensureError, Roles } from '@speckle/shared'
+import { prettyFileSize } from '@speckle/ui-components'
+import { sanitizeModelName } from '~~/lib/projects/helpers/models'
+import { useFileImportBaseSettings } from '~~/lib/core/composables/fileImport'
 import type { ModelLibraryListItem } from '~/lib/projects/composables/modelLibrary'
 import { useApiOrigin } from '~~/composables/env'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
@@ -731,7 +809,6 @@ const infiniteLoaderId = ref('')
 const loadCacheBuster = ref(0)
 const isModelUploading = ref(false)
 const activeModelUpload = ref<ActiveModelUpload | null>(null)
-const uploadAreaRef = ref<null | { triggerPicker: () => void }>(null)
 const versionUploadAreaRef = ref<null | { triggerPicker: () => void }>(null)
 const selectedVersionUploadModel = ref<ModelListItem | null>(null)
 const showDeleteModelConfirm = ref(false)
@@ -742,6 +819,14 @@ const isDrawingUploading = ref(false)
 const drawingUploadProgress = ref(0)
 const drawingFileInputRef = ref<HTMLInputElement | null>(null)
 const drawingsApi = useWorkbenchDrawingsApi()
+const { maxSizeInBytes, accept: modelAccept } = useFileImportBaseSettings()
+
+const batchModelFileInputRef = ref<HTMLInputElement | null>(null)
+const pendingUploadFiles = ref<File[]>([])
+const showBatchUploadConfirm = ref(false)
+const isBatchModelUploading = ref(false)
+const batchModelUploadProgress = ref(0)
+const batchModelUploadStatusText = ref('')
 
 const {
   getLatestTask,
@@ -750,7 +835,8 @@ const {
   syncVisibleTasks,
   cleanupVisibleTaskSubscriptions,
   getModelRuntimeProgress: getTaskRuntimeProgress,
-  getModelRuntimeProgressMessage
+  getModelRuntimeProgressMessage,
+  uploadModelFile
 } = useWorkbenchUploadSync()
 
 const downloadsDialogOpen = ref(false)
@@ -833,7 +919,7 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
   const latestTask = getLatestModelTask(model)
   const isOrphanPendingUpload =
     !!pendingUpload &&
-    !pendingUpload.convertedCommitId &&
+    !(pendingUpload as { convertedCommitId?: string | null })?.convertedCommitId &&
     !isModelSyncing({ projectId: props.projectId, modelId: model.id }) &&
     activeModelUpload.value?.model?.id !== model.id &&
     (hasVersion || !latestTask || latestTask.status === 'succeeded')
@@ -854,10 +940,6 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
     return '暂无模型'
   }
 
-  if (model.raw.lastVersion?.items?.[0]?.seedId?.trim()) {
-    return '已同步'
-  }
-
   const latestUploadStatus = latestUpload?.convertedStatus
   if (latestUploadStatus === FileUploadConvertedStatus.Error) {
     return '转换失败'
@@ -872,6 +954,14 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
     return '同步中'
   }
 
+  if (latestTask && ['failed'].includes(latestTask.status)) {
+    return '待同步'
+  }
+
+  if (model.raw.lastVersion?.items?.[0]?.seedId?.trim()) {
+    return '已同步'
+  }
+
   if (latestTask && ['speckle_converting', 'failed'].includes(latestTask.status)) {
     return '待同步'
   }
@@ -881,11 +971,15 @@ const getModelRuntimeStatus = (model: ModelListItem) => {
 
 const getModelRuntimeStatusDescription = (model: ModelListItem) => {
   const pendingUpload = model.raw.pendingImportedVersions?.[0]
-  const isRvtFile =
-    ['rvt', 'skp', 'nwd', 'nwc'].includes(pendingUpload?.fileType?.toLowerCase() || '') ||
-    /\.(rvt|skp|nwd|nwc)$/i.test(pendingUpload?.fileName || '') ||
-    /\.(rvt|skp|nwd|nwc)$/i.test(model.name || '')
-  if (!isRvtFile) return null
+  const fileType =
+    pendingUpload?.fileType?.toLowerCase() ||
+    model.name.split('.').pop()?.toLowerCase() ||
+    ''
+  const isSupportedFile =
+    ['rvt', 'nwd', 'nwc', 'ifc', 'dxf', 'skp'].includes(fileType) ||
+    /\.(rvt|nwd|nwc|ifc|dxf|skp)$/i.test(pendingUpload?.fileName || '') ||
+    /\.(rvt|nwd|nwc|ifc|dxf|skp)$/i.test(model.name || '')
+  if (!isSupportedFile) return null
 
   const convertedStatus = pendingUpload?.convertedStatus
   const latestTask = getLatestModelTask(model)
@@ -902,7 +996,8 @@ const getModelRuntimeStatusDescription = (model: ModelListItem) => {
   })
   if (message?.trim()) return message.trim()
 
-  if (pendingUpload?.progressMessage?.trim()) return pendingUpload.progressMessage.trim()
+  if (pendingUpload?.progressMessage?.trim())
+    return pendingUpload.progressMessage.trim()
 
   const phaseDescription = mapProgressPhaseToDescription(pendingUpload?.progressPhase)
   if (phaseDescription) return phaseDescription
@@ -981,8 +1076,221 @@ const canDeleteModel = (model: ModelListItem) => {
   )
 }
 
+const allowedModelExts = computed(() =>
+  modelAccept.value
+    .split(',')
+    .map((ext) => ext.trim().toLowerCase())
+    .filter(Boolean)
+)
+
+const getFileExtension = (fileName: string) => {
+  const lastDot = fileName.lastIndexOf('.')
+  return lastDot !== -1 ? fileName.slice(lastDot).toLowerCase() : ''
+}
+
 const triggerUploadPicker = () => {
-  uploadAreaRef.value?.triggerPicker()
+  if (isBatchModelUploading.value) {
+    triggerNotification({
+      type: ToastNotificationType.Info,
+      title: '正在上传中',
+      description: '已有模型正在上传中，请稍候'
+    })
+    return
+  }
+  batchModelFileInputRef.value?.click()
+}
+
+const onBatchModelFilesPicked = (e: Event) => {
+  const input = e.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ''
+  if (!files.length) return
+
+  const validFiles: File[] = []
+  const invalidFiles: string[] = []
+  const oversizedFiles: string[] = []
+
+  for (const file of files) {
+    const ext = getFileExtension(file.name)
+    if (!allowedModelExts.value.includes(ext)) {
+      invalidFiles.push(file.name)
+      continue
+    }
+    if (file.size > maxSizeInBytes.value) {
+      oversizedFiles.push(file.name)
+      continue
+    }
+    validFiles.push(file)
+  }
+
+  if (invalidFiles.length) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '存在不支持的文件格式',
+      description: `以下文件格式不受支持：${invalidFiles.join('、')}`
+    })
+  }
+
+  if (oversizedFiles.length) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '存在超出大小限制的文件',
+      description: `以下文件超过 ${prettyFileSize(
+        maxSizeInBytes.value
+      )}：${oversizedFiles.join('、')}`
+    })
+  }
+
+  if (!validFiles.length) return
+
+  pendingUploadFiles.value = validFiles
+  showBatchUploadConfirm.value = true
+}
+
+const startBatchModelUpload = async () => {
+  const filesToUpload = [...pendingUploadFiles.value]
+  showBatchUploadConfirm.value = false
+  if (!filesToUpload.length || isBatchModelUploading.value) return
+
+  isBatchModelUploading.value = true
+  batchModelUploadProgress.value = 0
+
+  const total = filesToUpload.length
+  let completedCount = 0
+  let successCount = 0
+  const failedNames: string[] = []
+  const targetFolderId = activeDir.value === ROOT_ID ? null : activeDir.value
+
+  const fileProgressMap = new Map<string, number>()
+  filesToUpload.forEach((f, idx) => fileProgressMap.set(`${f.name}-${idx}`, 0))
+
+  const updateOverallProgress = () => {
+    let sum = 0
+    fileProgressMap.forEach((pct) => {
+      sum += pct
+    })
+    batchModelUploadProgress.value = Math.min(99, Math.round(sum / total))
+  }
+
+  batchModelUploadStatusText.value = `模型批量上传中 (0/${total})`
+
+  const CONCURRENCY = 2
+  let currentIndex = 0
+
+  const uploadSingleFile = async (file: File, fileIndex: number) => {
+    const fileKey = `${file.name}-${fileIndex}`
+    const modelName = file.name.replace(/\.[^/.]+$/, '').trim() || file.name
+
+    try {
+      // 1. 创建模型
+      const createModelRes = await apollo.mutate<{
+        modelMutations?: {
+          create?: {
+            id: string
+            name: string
+          } | null
+        }
+      }>({
+        mutation: createImportedModelMutation,
+        variables: {
+          input: {
+            projectId: props.projectId,
+            name: sanitizeModelName(modelName)
+          }
+        }
+      })
+
+      const createdModelId = createModelRes.data?.modelMutations?.create?.id
+      if (!createdModelId) {
+        throw new Error(`创建模型 ${modelName} 失败`)
+      }
+
+      // 2. 如果当前在子目录下，关联到目录
+      if (targetFolderId) {
+        await apollo.mutate({
+          mutation: addModelToFolderMutation,
+          variables: {
+            input: {
+              projectId: props.projectId,
+              folderId: targetFolderId,
+              modelId: createdModelId
+            }
+          }
+        })
+      }
+
+      // 3. 上传模型文件 (REST)
+      await uploadModelFile({
+        projectId: props.projectId,
+        modelId: createdModelId,
+        file,
+        onProgress: (percentage) => {
+          fileProgressMap.set(fileKey, percentage)
+          updateOverallProgress()
+        }
+      })
+
+      fileProgressMap.set(fileKey, 100)
+      updateOverallProgress()
+      successCount++
+    } catch (err) {
+      logger.error(`上传模型 ${file.name} 失败:`, err)
+      failedNames.push(file.name)
+      fileProgressMap.set(fileKey, 100)
+      updateOverallProgress()
+    } finally {
+      completedCount++
+      batchModelUploadStatusText.value = `模型批量上传中 (${completedCount}/${total})`
+    }
+  }
+
+  const workers: Promise<void>[] = []
+  const workerCount = Math.min(CONCURRENCY, filesToUpload.length)
+  for (let i = 0; i < workerCount; i++) {
+    workers.push(
+      (async () => {
+        while (currentIndex < filesToUpload.length) {
+          const index = currentIndex++
+          await uploadSingleFile(filesToUpload[index], index)
+        }
+      })()
+    )
+  }
+
+  try {
+    await Promise.all(workers)
+    batchModelUploadProgress.value = 100
+
+    if (failedNames.length === 0) {
+      triggerNotification({
+        type: ToastNotificationType.Success,
+        title: '批量上传完成',
+        description: `成功上传 ${successCount} 个模型`
+      })
+    } else if (successCount > 0) {
+      triggerNotification({
+        type: ToastNotificationType.Warning,
+        title: '批量上传部分完成',
+        description: `成功 ${successCount} 个，失败 ${
+          failedNames.length
+        } 个（${failedNames.join('、')}）`
+      })
+    } else {
+      triggerNotification({
+        type: ToastNotificationType.Danger,
+        title: '批量上传失败',
+        description: `所有文件均上传失败（${failedNames.join('、')}）`
+      })
+    }
+
+    loadCacheBuster.value++
+    await Promise.all([loadFolders(), refreshModels()])
+  } finally {
+    isBatchModelUploading.value = false
+    batchModelUploadProgress.value = 0
+    batchModelUploadStatusText.value = ''
+    pendingUploadFiles.value = []
+  }
 }
 
 const triggerDrawingUpload = () => {
