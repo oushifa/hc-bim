@@ -10,7 +10,6 @@ import {
 } from 'three'
 import { type IViewer, ObjectLayers, UpdateFlags } from '@speckle/viewer'
 import type { RoamingRoute } from './types'
-import { RoamingMode } from './types'
 
 // Speckle 渲染管道中 Overlay 层对应的 layer ID 是 4
 const OVERLAY_LAYER = ObjectLayers.OVERLAY ?? 4

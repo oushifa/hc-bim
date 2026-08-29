@@ -164,7 +164,6 @@ import { useFilterUtilities } from '~/lib/viewer/composables/filtering/filtering
 import { TailwindBreakpoints } from '~~/lib/common/helpers/tailwind'
 import { useBreakpoints } from '@vueuse/core'
 import { useRoamingAnchoredState } from '~/lib/viewer/composables/roaming/useRoamingAnchoredState'
-import { RoamingMode } from '~/lib/viewer/composables/roaming/types'
 import { Vector3 } from 'three'
 import { useViewerAnchoredPoints } from '~~/lib/viewer/composables/anchorPoints'
 import type { CSSProperties } from 'vue'
