@@ -7,7 +7,7 @@
       class="h-10 pl-4 pr-3 flex items-center justify-between border-b border-outline-3 shrink-0"
     >
       <div class="text-body-xs text-foreground font-medium flex items-center gap-1.5">
-        <Footprints class="w-4 h-4 text-success" />
+        <Footprints class="w-4 h-4 text-[#00b4b6]" />
         <span>{{ isEdit ? '编辑漫游路线' : '新建漫游路线' }}</span>
       </div>
       <FormButton
@@ -77,7 +77,7 @@
           <FormButton
             size="sm"
             :color="isPicking ? 'danger' : 'primary'"
-            :class="!isPicking ? '!bg-success !text-white focus-visible:!border-success' : ''"
+            :class="!isPicking ? '!bg-[#e6f7f8] !text-[#00b4b6] focus-visible:!border-[#00b4b6]' : ''"
             :icon-left="isPicking ? Square : MousePointerClick"
             @click="togglePicking"
           >
@@ -86,9 +86,9 @@
         </div>
         <div
           v-if="isPicking"
-          class="p-2 rounded bg-success-lightest text-success text-body-3xs flex items-center gap-1.5 animate-pulse"
+          class="p-2 rounded bg-[#e6f7f8] text-[#00b4b6] text-body-3xs flex items-center gap-1.5 animate-pulse"
         >
-          <span class="w-2 h-2 rounded-full bg-success" />
+          <span class="w-2 h-2 rounded-full bg-[#00b4b6]" />
           <span>正在选点中：请直接在 3D 模型表面点击添加路径点</span>
         </div>
         <div class="flex items-center justify-between pt-1">
@@ -101,7 +101,7 @@
               min="0"
               max="10"
               aria-label="人眼视高偏置"
-              class="w-16 h-6 px-1.5 text-body-3xs text-right rounded border border-outline-3 bg-foundation text-foreground focus:outline-none focus:border-success"
+              class="w-16 h-6 px-1.5 text-body-3xs text-right rounded border border-outline-3 bg-foundation text-foreground focus:outline-none focus:border-[#00b4b6]"
             />
             <span class="text-body-3xs text-foreground-2">米</span>
           </div>
@@ -118,7 +118,7 @@
           <FormButton
             size="sm"
             color="primary"
-            class="!bg-success !text-white focus-visible:!border-success"
+            class="!bg-[#e6f7f8] !text-[#00b4b6] focus-visible:!border-[#00b4b6]"
             :icon-left="Camera"
             @click="onCaptureView"
           >
@@ -192,7 +192,7 @@
             class="flex flex-col p-2.5 rounded-lg border transition cursor-pointer gap-1.5 text-body-3xs select-none"
             :class="[
               selectedPointIndex === idx
-                ? 'border-success ring-2 ring-success/40 bg-success/10 shadow-sm'
+                ? 'border-[#00b4b6] ring-2 ring-[#00b4b6]/40 bg-[#00b4b6]/10 shadow-sm'
                 : 'border-outline-3 bg-foundation-2 hover:border-outline-2'
             ]"
             @click="selectPoint(idx)"
@@ -207,7 +207,7 @@
                   :class="[
                     selectedPointIndex === idx
                       ? 'bg-danger text-foreground-on-primary ring-2 ring-warning'
-                      : 'bg-success text-foreground-on-primary'
+                      : 'bg-[#00b4b6] text-foreground-on-primary'
                   ]"
                 >
                   {{ idx + 1 }}
@@ -216,7 +216,7 @@
                   class="font-medium truncate"
                   :class="[
                     selectedPointIndex === idx
-                      ? 'text-success font-bold'
+                      ? 'text-[#00b4b6] font-bold'
                       : 'text-foreground'
                   ]"
                 >
@@ -289,7 +289,7 @@
                   min="0.2"
                   max="60"
                   aria-label="点位用时"
-                  class="w-full h-6 px-1.5 rounded border border-outline-3 bg-foundation text-foreground focus:outline-none focus:border-success text-body-3xs"
+                  class="w-full h-6 px-1.5 rounded border border-outline-3 bg-foundation text-foreground focus:outline-none focus:border-[#00b4b6] text-body-3xs"
                 />
                 <span class="text-foreground-2 shrink-0">秒</span>
               </div>
@@ -346,7 +346,7 @@
         <FormButton
           size="sm"
           color="primary"
-          class="!bg-success !text-white focus-visible:!border-success"
+          class="!bg-[#e6f7f8] !text-[#00b4b6] focus-visible:!border-[#00b4b6]"
           :icon-left="Check"
           :disabled="!form.name.trim() || form.points.length === 0"
           @click="onSave"
@@ -383,6 +383,7 @@ import {
   EasingTypeLabels
 } from '~/lib/viewer/composables/roaming/types'
 import { useRoamingAnchoredState } from '~/lib/viewer/composables/roaming/useRoamingAnchoredState'
+import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
 
 const props = defineProps<{
   routeData?: RoamingRoute | null
@@ -411,6 +412,8 @@ const {
 
 const { setActiveRoute, setSelectedPointIndex, registerPointSelectCallback } =
   useRoamingAnchoredState()
+
+const { projectId } = useInjectedViewerState()
 
 const selectedPointIndex = ref<number | null>(null)
 
@@ -541,6 +544,7 @@ const movePoint = (idx: number, delta: number) => {
 const updateVisualizer = () => {
   const previewRoute: RoamingRoute = {
     id: 'preview',
+    projectId: projectId.value || '',
     name: form.name,
     mode: form.mode,
     points: form.points,
@@ -562,6 +566,7 @@ const onTrialPlay = () => {
   } else {
     const previewRoute: RoamingRoute = {
       id: 'preview',
+      projectId: projectId.value || '',
       name: form.name,
       mode: form.mode,
       points: form.points,
@@ -582,6 +587,7 @@ const onSave = () => {
   setActiveRoute(null)
   setSelectedPointIndex(null)
   emit('save', {
+    projectId: projectId.value || '',
     name: form.name.trim(),
     mode: form.mode,
     points: form.points,

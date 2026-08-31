@@ -1,7 +1,7 @@
 <template>
   <div
     class="flex flex-col border border-outline-3 rounded-lg overflow-hidden bg-foundation transition shadow-sm hover:border-outline-2"
-    :class="[isCurrentPlaying ? 'ring-1 ring-success border-success' : '']"
+    :class="[isCurrentPlaying ? 'ring-1 ring-[#00b4b6] border-[#00b4b6]' : '']"
   >
     <!-- 卡片头部信息与操作栏 -->
     <div
@@ -26,7 +26,7 @@
               class="px-1.5 py-0.5 text-body-3xs rounded text-foreground-2 shrink-0 font-normal"
               :class="
                 route.mode === RoamingMode.Point
-                  ? 'bg-success-lightest text-success dark:text-success-lighter'
+                  ? 'bg-[#e6f7f8] text-[#00b4b6]'
                   : 'bg-purple-500/10 text-purple-500 dark:text-purple-400'
               "
             >
@@ -47,7 +47,7 @@
         <FormButton
           size="sm"
           :color="isCurrentPlaying && !isPaused ? 'primary' : 'subtle'"
-          :class="isCurrentPlaying && !isPaused ? '!bg-success !text-white focus-visible:!border-success' : ''"
+          :class="isCurrentPlaying && !isPaused ? '!bg-[#e6f7f8] !text-[#00b4b6] focus-visible:!border-[#00b4b6]' : ''"
           :icon-left="isCurrentPlaying && !isPaused ? Pause : Play"
           hide-text
           class="!h-7 !w-7"

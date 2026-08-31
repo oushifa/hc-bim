@@ -29,7 +29,7 @@
         class="flex flex-col items-center justify-center p-8 text-center gap-3 my-auto select-none"
       >
         <div
-          class="w-12 h-12 rounded-full bg-success-lightest flex items-center justify-center text-success"
+          class="w-12 h-12 rounded-full bg-[#e6f7f8] flex items-center justify-center text-[#00b4b6]"
         >
           <Footprints class="w-6 h-6" />
         </div>
@@ -42,7 +42,7 @@
         <FormButton
           size="sm"
           color="primary"
-          class="!bg-success !text-white focus-visible:!border-success"
+          class="!bg-[#e6f7f8] !text-[#00b4b6] focus-visible:!border-[#00b4b6]"
           :icon-left="Plus"
           @click="openCreatePanel"
         >
