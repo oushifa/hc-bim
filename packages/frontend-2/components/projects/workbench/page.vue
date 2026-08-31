@@ -267,7 +267,7 @@
                           v-if="shouldShowRetryAction(model)"
                           type="button"
                           class="inline-flex cursor-pointer items-center rounded-full border border-[#bfecee] bg-[#e6f7f8] px-2 py-0.5 text-[11px] font-medium leading-none text-[#00b4b6] transition-colors hover:bg-[#00b4b6] hover:text-white"
-                          @click.stop="retryModelSync(model)"
+                          @click.stop="onRetryModelClicked(model)"
                         >
                           重试
                         </button>
@@ -376,7 +376,7 @@
                                 v-if="shouldShowRetryAction(model)"
                                 type="button"
                                 class="inline-flex cursor-pointer items-center rounded-full border border-[#bfecee] bg-[#e6f7f8] px-2 py-0.5 text-[11px] font-medium leading-none text-[#00b4b6] transition-colors hover:bg-[#00b4b6] hover:text-white"
-                                @click.stop="retryModelSync(model)"
+                                @click.stop="onRetryModelClicked(model)"
                               >
                                 重试
                               </button>
@@ -528,6 +528,26 @@
             </span>
           </div>
         </div>
+      </div>
+    </CommonConfirmDialog>
+    <!-- 模型重试转换二次确认弹窗 -->
+    <CommonConfirmDialog
+      v-model:open="showRetryConfirm"
+      title="重新转换模型确认"
+      confirm-text="确认重试"
+      cancel-text="取消"
+      :loading="isRetryingModel"
+      @confirm="confirmRetryModel"
+    >
+      <div class="flex flex-col gap-2 text-sm text-gray-700">
+        <p>
+          确定要重新发起模型
+          <span class="font-semibold text-gray-900">
+            「{{ targetRetryModel?.name }}」
+          </span>
+          的转换吗？
+        </p>
+        <p class="text-xs text-gray-500">系统将重置失败状态并重新加入队列开始转换。</p>
       </div>
     </CommonConfirmDialog>
     <ProjectCardImportFileArea
@@ -1060,8 +1080,10 @@ const getLatestModelTask = (model: ModelListItem) =>
     modelId: model.id
   })
 
-const shouldShowRetryAction = (model: ModelListItem) =>
-  getLatestModelTask(model)?.status === 'failed'
+const shouldShowRetryAction = (model: ModelListItem) => {
+  if (getModelRuntimeStatus(model) === '转换失败') return true
+  return getLatestModelTask(model)?.status === 'failed'
+}
 
 const shouldShowProgressBar = (status: string | null) => {
   if (!status) return false
@@ -1610,18 +1632,59 @@ const loadSourceModelObjectTree = async (params: {
   return objects
 }
 
-const retryModelSync = async (model: ModelListItem) => {
-  const latestTask = getLatestModelTask(model)
-  if (!latestTask || latestTask.status !== 'failed') return
+const targetRetryModel = ref<ModelListItem | null>(null)
+const showRetryConfirm = ref(false)
+const isRetryingModel = ref(false)
+
+const onRetryModelClicked = (model: ModelListItem) => {
+  targetRetryModel.value = model
+  showRetryConfirm.value = true
+}
+
+const confirmRetryModel = async () => {
+  const model = targetRetryModel.value
+  if (!model) return
+  isRetryingModel.value = true
 
   try {
-    await retryTask(latestTask.id)
+    const latestTask = getLatestModelTask(model)
+    if (latestTask) {
+      await retryTask(latestTask.id)
+      triggerNotification({
+        type: ToastNotificationType.Success,
+        title: '已提交重试',
+        description: `模型 ${model.name} 已重新排队等待转换`
+      })
+      showRetryConfirm.value = false
+      await Promise.allSettled([refetchBaseModels(), refetchExtraModels()])
+      return
+    }
+
+    // 若无 latestTask，通过 REST 接口直接根据 projectId / modelId 发起模型任务重试或创建
+    await $fetch(
+      `${apiOrigin}/api/v1/projects/${props.projectId}/models/${model.id}/model-sync/tasks`,
+      {
+        method: 'POST',
+        headers: {
+          ...(authToken.value ? { Authorization: `Bearer ${authToken.value}` } : {})
+        }
+      }
+    )
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '已重新发起转换',
+      description: `模型 ${model.name} 已重新加入队列`
+    })
+    showRetryConfirm.value = false
+    await Promise.allSettled([refetchBaseModels(), refetchExtraModels()])
   } catch (e) {
     triggerNotification({
       type: ToastNotificationType.Danger,
       title: '重试失败',
       description: ensureError(e).message
     })
+  } finally {
+    isRetryingModel.value = false
   }
 }
 
