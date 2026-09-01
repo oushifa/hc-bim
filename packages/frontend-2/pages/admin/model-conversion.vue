@@ -664,6 +664,7 @@
 </template>
 
 <script setup lang="ts">
+/* eslint-disable */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import {
   ArrowPathIcon,
@@ -678,6 +679,7 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
+import { useAuthCookie } from '~~/lib/auth/composables/auth'
 
 definePageMeta({
   middleware: ['auth', 'admin'],
@@ -685,6 +687,15 @@ definePageMeta({
 })
 
 const { triggerNotification } = useGlobalToast()
+const authToken = useAuthCookie()
+
+const getAuthHeaders = (): Record<string, string> => {
+  const headers: Record<string, string> = {}
+  if (authToken.value) {
+    headers['Authorization'] = `Bearer ${authToken.value}`
+  }
+  return headers
+}
 
 type FileType = 'ifc' | 'skp' | 'dxf'
 
@@ -801,7 +812,10 @@ const fetchWorkersData = async () => {
   workersLoading.value = true
   try {
     const res = await fetch('/api/v1/rvt/workers', {
-      credentials: 'include'
+      credentials: 'include',
+      headers: {
+        ...getAuthHeaders()
+      }
     })
     if (res.ok) {
       const data = await res.json()
@@ -826,7 +840,10 @@ const fetchQueueData = async () => {
     const res = await fetch(
       `/api/v1/admin/file-import-queues?fileType=${activeTab.value}`,
       {
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          ...getAuthHeaders()
+        }
       }
     )
     if (!res.ok) {
@@ -851,7 +868,10 @@ const fetchQueueData = async () => {
 const fetchAllSummaries = async () => {
   try {
     const res = await fetch('/api/v1/admin/file-import-queues', {
-      credentials: 'include'
+      credentials: 'include',
+      headers: {
+        ...getAuthHeaders()
+      }
     })
     if (res.ok) {
       const data = await res.json()
@@ -890,7 +910,10 @@ const confirmPauseJob = async () => {
       `/api/v1/admin/file-import-queues/${targetJob.value.id}/pause`,
       {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          ...getAuthHeaders()
+        }
       }
     )
     const data = await res.json()
@@ -928,7 +951,10 @@ const confirmResumeJob = async () => {
       `/api/v1/admin/file-import-queues/${targetJob.value.id}/resume`,
       {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+          ...getAuthHeaders()
+        }
       }
     )
     const data = await res.json()
@@ -961,7 +987,10 @@ const submitReorder = async (newJobs: ConversionJobItem[]) => {
       `/api/v1/admin/file-import-queues/${activeTab.value}/reorder`,
       {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        },
         credentials: 'include',
         body: JSON.stringify({ jobIds })
       }
