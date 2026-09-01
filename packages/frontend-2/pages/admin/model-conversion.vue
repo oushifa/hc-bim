@@ -44,7 +44,7 @@
             type="button"
             :disabled="loading"
             class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 transition-colors disabled:opacity-50"
-            @click="fetchQueueData"
+            @click="handleRefresh"
           >
             <ArrowPathIcon
               class="size-3.5 text-slate-500"
@@ -58,6 +58,190 @@
 
     <!-- 页面主体容器 -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <!-- 转换节点 (Worker) 监控区域 -->
+      <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <div class="p-1.5 rounded-lg bg-cyan-50 text-[#00b4b6]">
+              <CpuChipIcon class="size-5" />
+            </div>
+            <h2 class="text-base font-semibold text-slate-900">
+              已注册转换节点 (Worker)
+            </h2>
+            <span
+              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold"
+              :class="[
+                workers.length > 0
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                  : 'bg-amber-50 text-amber-700 border border-amber-200/60'
+              ]"
+            >
+              <span
+                class="size-2 rounded-full"
+                :class="[
+                  workers.length > 0 ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                ]"
+              ></span>
+              {{ workers.length > 0 ? `${workers.length} 个节点在线` : '暂无节点在线' }}
+            </span>
+          </div>
+
+          <!-- 右侧折叠控制 -->
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-slate-400 hidden sm:inline">
+              负责执行 Revit (RVT) 等模型的后台转换任务
+            </span>
+            <button
+              type="button"
+              class="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1 px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-50"
+              @click="isWorkersCollapsed = !isWorkersCollapsed"
+            >
+              <span>{{ isWorkersCollapsed ? '展开详情' : '收起' }}</span>
+              <ChevronDownIcon
+                class="size-3.5 transition-transform duration-200"
+                :class="{ 'rotate-180': !isWorkersCollapsed }"
+              />
+            </button>
+          </div>
+        </div>
+
+        <!-- 折叠主体 -->
+        <div v-show="!isWorkersCollapsed" class="space-y-4">
+          <!-- 无 Worker 警告 -->
+          <div
+            v-if="workers.length === 0"
+            class="flex items-start gap-3 p-4 rounded-lg bg-amber-50/70 border border-amber-200/60 text-amber-800 text-xs leading-relaxed"
+          >
+            <ExclamationTriangleIcon class="size-4 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <p class="font-medium">当前暂无已注册的转换 Worker</p>
+              <p class="text-amber-700/80 mt-0.5">
+                若有模型转换任务提交，任务将在队列中排队等待。请确认本地或服务器上的模型转换客户端（如
+                RVT Worker 等）已正常启动并建立 WebSocket 注册连接。
+              </p>
+            </div>
+          </div>
+
+          <!-- Worker 节点列表表格 -->
+          <div v-else class="overflow-x-auto border border-slate-200 rounded-lg">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+              <thead class="bg-slate-50/80 text-slate-600">
+                <tr>
+                  <th scope="col" class="py-3 px-4 text-left font-semibold">
+                    节点标识 (Worker ID)
+                  </th>
+                  <th scope="col" class="py-3 px-4 text-left font-semibold">
+                    支持能力与版本
+                  </th>
+                  <th scope="col" class="py-3 px-4 text-left font-semibold">
+                    节点归属
+                  </th>
+                  <th scope="col" class="py-3 px-4 text-left font-semibold">
+                    注册上线时间
+                  </th>
+                  <th scope="col" class="py-3 px-4 text-left font-semibold">
+                    最近心跳
+                  </th>
+                  <th scope="col" class="py-3 px-4 text-right font-semibold w-28">
+                    状态
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 bg-white">
+                <tr
+                  v-for="w in workers"
+                  :key="w.workerId"
+                  class="hover:bg-slate-50/60 transition-colors"
+                >
+                  <!-- Worker ID -->
+                  <td class="py-3 px-4 font-mono font-medium text-slate-900">
+                    <div class="flex items-center gap-2">
+                      <span class="size-2 rounded-full bg-emerald-500 shrink-0"></span>
+                      <span class="truncate max-w-[260px]" :title="w.workerId">
+                        {{ w.workerId }}
+                      </span>
+                    </div>
+                  </td>
+
+                  <!-- Capabilities & Version -->
+                  <td class="py-3 px-4">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        v-for="cap in w.capabilities"
+                        :key="cap"
+                        class="px-2 py-0.5 rounded text-xs font-semibold bg-cyan-50 text-[#00b4b6] border border-[#00b4b6]/20 uppercase"
+                      >
+                        {{ cap }}
+                      </span>
+                      <span
+                        v-if="w.version"
+                        class="px-2 py-0.5 rounded text-xs font-mono bg-slate-100 text-slate-600"
+                      >
+                        v{{ w.version }}
+                      </span>
+                    </div>
+                  </td>
+
+                  <!-- Node Type -->
+                  <td class="py-3 px-4 text-xs text-slate-600 whitespace-nowrap">
+                    <span
+                      class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium"
+                      :class="
+                        w.isLocal
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'bg-purple-50 text-purple-700'
+                      "
+                    >
+                      {{ w.isLocal ? '本地连接' : '集群分发' }}
+                    </span>
+                    <span
+                      v-if="w.instanceId"
+                      class="text-slate-400 font-mono ml-1 text-[10px]"
+                      :title="`实例ID: ${w.instanceId}`"
+                    >
+                      ({{ w.instanceId.slice(0, 8) }})
+                    </span>
+                  </td>
+
+                  <!-- Connected At -->
+                  <td class="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">
+                    {{ formatTime(w.connectedAt) }}
+                  </td>
+
+                  <!-- Last Seen -->
+                  <td class="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">
+                    <div class="flex items-center gap-1.5">
+                      <span>{{ formatTime(w.lastSeenAt) }}</span>
+                      <span class="text-[11px] text-slate-400 font-normal">
+                        ({{ formatRelativeTime(w.lastSeenAt) }})
+                      </span>
+                    </div>
+                  </td>
+
+                  <!-- Status -->
+                  <td class="py-3 px-4 text-right whitespace-nowrap">
+                    <span
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold"
+                      :class="
+                        isWorkerActive(w)
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : 'bg-slate-100 text-slate-500'
+                      "
+                    >
+                      <span
+                        class="size-1.5 rounded-full"
+                        :class="isWorkerActive(w) ? 'bg-emerald-500' : 'bg-slate-400'"
+                      ></span>
+                      {{ isWorkerActive(w) ? '正常在线' : '心跳异常' }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- Tab 切换栏 -->
       <div class="flex border-b border-slate-200 space-x-2">
         <button
@@ -489,7 +673,9 @@ import {
   PauseCircleIcon,
   QueueListIcon,
   ChevronUpIcon,
-  ChevronDownIcon
+  ChevronDownIcon,
+  CpuChipIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/vue/24/outline'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 
@@ -538,6 +724,20 @@ const activeJob = ref<ConversionJobItem | null>(null)
 const queuedJobs = ref<ConversionJobItem[]>([])
 const pausedJobs = ref<ConversionJobItem[]>([])
 
+interface WorkerItem {
+  workerId: string
+  capabilities: string[]
+  version: string | null
+  connectedAt: string
+  lastSeenAt: string
+  instanceId?: string
+  isLocal: boolean
+}
+
+const workers = ref<WorkerItem[]>([])
+const workersLoading = ref(false)
+const isWorkersCollapsed = ref(false)
+
 const queueSummary = ref<Record<FileType, { total: number }>>({
   ifc: { total: 0 },
   skp: { total: 0 },
@@ -556,6 +756,30 @@ const switchTab = (tab: FileType) => {
   fetchQueueData()
 }
 
+const formatRelativeTime = (isoString?: string) => {
+  if (!isoString) return '-'
+  try {
+    const diff = Math.max(
+      0,
+      Math.floor((Date.now() - new Date(isoString).getTime()) / 1000)
+    )
+    if (diff < 5) return '刚刚'
+    if (diff < 60) return `${diff} 秒前`
+    const mins = Math.floor(diff / 60)
+    if (mins < 60) return `${mins} 分钟前`
+    const hours = Math.floor(mins / 60)
+    return `${hours} 小时前`
+  } catch {
+    return '-'
+  }
+}
+
+const isWorkerActive = (worker: WorkerItem) => {
+  if (!worker.lastSeenAt) return false
+  const diff = Date.now() - new Date(worker.lastSeenAt).getTime()
+  return diff <= 120 * 1000
+}
+
 const formatTime = (isoString?: string) => {
   if (!isoString) return '-'
   try {
@@ -570,6 +794,29 @@ const formatTime = (isoString?: string) => {
   } catch {
     return isoString
   }
+}
+
+// 获取已注册 Worker 列表
+const fetchWorkersData = async () => {
+  workersLoading.value = true
+  try {
+    const res = await fetch('/api/v1/rvt/workers', {
+      credentials: 'include'
+    })
+    if (res.ok) {
+      const data = await res.json()
+      workers.value = Array.isArray(data.workers) ? data.workers : []
+    }
+  } catch (err: any) {
+    console.error('Failed to fetch rvt workers:', err)
+  } finally {
+    workersLoading.value = false
+  }
+}
+
+// 统一刷新方法
+const handleRefresh = async () => {
+  await Promise.allSettled([fetchQueueData(), fetchAllSummaries(), fetchWorkersData()])
 }
 
 // 获取当前 Tab 的队列数据，同时附带更新其余格式的摘要数
@@ -768,6 +1015,7 @@ const moveJobDown = (index: number) => {
 onMounted(() => {
   fetchQueueData()
   fetchAllSummaries()
+  fetchWorkersData()
 
   pollTimer = setInterval(() => {
     if (
@@ -778,6 +1026,7 @@ onMounted(() => {
     ) {
       fetchQueueData()
       fetchAllSummaries()
+      fetchWorkersData()
     }
   }, 3000)
 })
