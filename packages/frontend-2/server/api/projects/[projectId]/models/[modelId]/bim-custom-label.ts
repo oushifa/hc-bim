@@ -152,21 +152,13 @@ const inferSourceFileType = (modelName: string): SourceFileType => {
 
 const getSyncElementIds = (
   raw: Record<string, unknown>,
-  sourceFileType: SourceFileType
+  _sourceFileType?: SourceFileType
 ): { id?: string; applicationId?: string; elementId?: string } => {
   const applicationId = pickIdString(raw.applicationId, raw.originalId, raw.originalID)
   const elementId = pickIdString(raw.elementId, raw.elementID)
 
-  if (sourceFileType === 'rvt') {
-    return {
-      id: elementId || applicationId,
-      applicationId: applicationId || undefined,
-      elementId: elementId || undefined
-    }
-  }
-
   return {
-    id: applicationId || elementId,
+    id: elementId || applicationId,
     applicationId: applicationId || undefined,
     elementId: elementId || undefined
   }
