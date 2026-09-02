@@ -106,7 +106,7 @@ useHead({
 })
 
 // ---- 离开前保存（WDP postMessage 协议）----
-// 编辑态信号来自三方场景生命周期事件（2.md，iframe → 父页面单向广播）：
+// 编辑态信号来自三方场景生命周期事件（3.md，iframe → 父页面单向广播）：
 // - WDP_EDITOR_SCENE_LOADED：进入编辑、场景渲染完成 → 标记编辑中
 // - WDP_EDITOR_SCENE_UNLOADED：退出编辑/场景卸载 → 重置编辑状态
 // 仅编辑中离开才弹窗询问「是否保存」；未进入编辑（浏览列表 / VPN 不可达错误页）
@@ -128,7 +128,7 @@ const saving = ref(false)
 const allowLeave = ref(false)
 /** 用户是否与 iframe 交互过（点击/滚动使焦点移入 iframe，父窗口触发 blur）——「可能在编辑」的兜底信号 */
 const iframeInteracted = ref(false)
-/** iframe 是否已加载完成（2.md 第 6 节：保存消息须在 iframe.onload 之后发送） */
+/** iframe 是否已加载完成（3.md 第 6 节：保存消息须在 iframe.onload 之后发送） */
 const iframeLoaded = ref(false)
 /** 三方生命周期事件：是否正在编辑案例（SCENE_LOADED 置 true，SCENE_UNLOADED 置 false） */
 const isEditing = ref(false)
@@ -192,6 +192,21 @@ const retrySave = () => {
   void saveAndLeave()
 }
 
+/** 保存失败统一处理：区分超时/明确失败，关闭保存弹窗并展示原因弹窗 */
+const showSaveFailure = (error: unknown) => {
+  const isTimeout =
+    error instanceof WdpSaveError && error.code === WdpSaveErrorCode.TIMEOUT
+  dismiss()
+  showSaveDialog.value = false
+  saveFailedTitle.value = isTimeout ? '保存超时' : '保存失败'
+  saveFailedMessage.value = isTimeout
+    ? '保存超时，请重试'
+    : error instanceof Error
+    ? error.message
+    : 'WDP 保存失败'
+  showSaveFailedDialog.value = true
+}
+
 /** 弹窗中选择「保存」/失败后「重试」：发送保存通知，成功提示后放行；失败/超时弹窗展示原因 */
 const saveAndLeave = async () => {
   const frame = iframeRef.value?.contentWindow
@@ -207,7 +222,7 @@ const saveAndLeave = async () => {
   saving.value = true
   try {
     await wdpSave(frame, { timeout: 10000 })
-    // 保存成功 → 关闭弹窗，提示「保存成功」1s 后消失，再放行跳转
+    // 保存成功 → 关闭弹窗，提示「保存成功」（默认展示时长），再放行跳转
     dismiss()
     showSaveDialog.value = false
     showSaveFailedDialog.value = false
@@ -215,7 +230,6 @@ const saveAndLeave = async () => {
       type: ToastNotificationType.Success,
       title: '保存成功'
     })
-    setTimeout(dismiss, 1000)
     allowLeave.value = true
     void navigateToTargetRoute()
   } catch (error) {
@@ -231,24 +245,14 @@ const saveAndLeave = async () => {
       void navigateToTargetRoute()
     } else {
       // 保存超时或三方明确回执失败 → 弹窗展示原因，可重试或放弃
-      const isTimeout =
-        error instanceof WdpSaveError && error.code === WdpSaveErrorCode.TIMEOUT
-      dismiss()
-      showSaveDialog.value = false
-      saveFailedTitle.value = isTimeout ? '保存超时' : '保存失败'
-      saveFailedMessage.value = isTimeout
-        ? '保存超时，请重试'
-        : error instanceof Error
-        ? error.message
-        : 'WDP 保存失败'
-      showSaveFailedDialog.value = true
+      showSaveFailure(error)
     }
   } finally {
     saving.value = false
   }
 }
 
-// 监听三方场景生命周期事件（iframe → 父页面，见 2.md）
+// 监听三方场景生命周期事件（iframe → 父页面，见 3.md）
 const onWdpMessage = (e: MessageEvent) => {
   const targetOrigin = getDtpUIOrigin()
   if (targetOrigin && e.origin !== targetOrigin) return
@@ -257,11 +261,15 @@ const onWdpMessage = (e: MessageEvent) => {
   if (data.type === WDP_EDITOR_SCENE_LOADED) {
     isEditing.value = true
   } else if (data.type === WDP_EDITOR_SCENE_UNLOADED) {
+    // 三方界面内已主动退出编辑 → 同步重置交互信号，避免离开时误触发
+    // 静默探测保存（慢链路下三方不回执将误弹「保存超时」打扰用户）
     isEditing.value = false
+    iframeInteracted.value = false
   }
 }
 
-// 用户点击/滚动 iframe 内部时焦点移入 iframe，父窗口触发 blur；以此感知交互
+// 弱信号：点击 iframe 内部时焦点移入 iframe，父窗口触发 blur，以此感知「可能在编辑」；
+// 注意切标签页/打开 DevTools 也会触发 blur（误判），由 probeSave 的静默策略兜底
 const onWindowBlur = () => {
   iframeInteracted.value = true
 }
@@ -270,21 +278,33 @@ const onIframeLoad = () => {
   iframeLoaded.value = true
 }
 
+// 编辑中刷新/关闭标签页时由浏览器弹出原生确认框（无法自定义文案）；
+// beforeunload 是最后一道提示，路由内离开仍走上面的保存弹窗流程
+const onBeforeUnload = (e: BeforeUnloadEvent) => {
+  if (!isEditing.value) return
+  e.preventDefault()
+  e.returnValue = ''
+}
+
 onMounted(() => {
   window.addEventListener('message', onWdpMessage)
   window.addEventListener('blur', onWindowBlur)
+  window.addEventListener('beforeunload', onBeforeUnload)
 })
 
 onUnmounted(() => {
   window.removeEventListener('message', onWdpMessage)
   window.removeEventListener('blur', onWindowBlur)
+  window.removeEventListener('beforeunload', onBeforeUnload)
 })
 
 /**
  * 编辑态不确定时的静默探测保存（VPN 慢链路兜底）：
  * 未收到 SCENE_LOADED 但用户与已加载完成的 iframe 交互过，离开时静默发一次保存——
  * - 成功 / editor not ready（未编辑）→ 静默放行，不打扰用户
- * - 超时 / 三方明确回执失败 → 弹「保存失败」弹窗，可重试或放弃
+ * - 超时（三方未就绪或不可达，无可保存内容）→ 静默放行；blur 是弱信号，
+ *   切标签页等也会触发误判，超时不弹窗可避免打扰从未编辑过的用户
+ * - 三方明确回执失败（编辑器就绪但保存异常）→ 弹「保存失败」弹窗，可重试或放弃
  */
 const probeSave = async (frame: Window) => {
   saving.value = true
@@ -295,20 +315,15 @@ const probeSave = async (frame: Window) => {
   } catch (error) {
     if (
       error instanceof WdpSaveError &&
-      error.code === WdpSaveErrorCode.EDITOR_NOT_READY
+      (error.code === WdpSaveErrorCode.EDITOR_NOT_READY ||
+        error.code === WdpSaveErrorCode.TIMEOUT)
     ) {
+      // 未编辑 / 三方未就绪或不可达 → 无可保存内容，静默放行
       allowLeave.value = true
       void navigateToTargetRoute()
     } else {
-      const isTimeout =
-        error instanceof WdpSaveError && error.code === WdpSaveErrorCode.TIMEOUT
-      saveFailedTitle.value = isTimeout ? '保存超时' : '保存失败'
-      saveFailedMessage.value = isTimeout
-        ? '保存超时，请重试'
-        : error instanceof Error
-        ? error.message
-        : 'WDP 保存失败'
-      showSaveFailedDialog.value = true
+      // 三方明确回执失败 → 可能有编辑内容，弹窗可重试或放弃
+      showSaveFailure(error)
     }
   } finally {
     saving.value = false
@@ -323,12 +338,13 @@ onBeforeRouteLeave((to, _from, next) => {
   targetRoute.value = to
   if (!isEditing.value) {
     // 未处于编辑态但用户与已加载的 iframe 交互过（如 VPN 慢导致 SCENE_LOADED
-    // 未到达）→ 静默探测保存兜底；未交互过或 iframe 未加载完成（2.md：onload
+    // 未到达）→ 静默探测保存兜底；未交互过或 iframe 未加载完成（3.md：onload
     // 之前发保存消息会丢失）→ 直接放行
     const frame = iframeRef.value?.contentWindow
-    if (iframeInteracted.value && iframeLoaded.value && frame && !saving.value) {
+    if (iframeInteracted.value && iframeLoaded.value && frame) {
+      // 探测保存进行中同样拦截再次离开，防止回执未到就放行导致内容未保存
       next(false)
-      void probeSave(frame)
+      if (!saving.value) void probeSave(frame)
       return
     }
     next()

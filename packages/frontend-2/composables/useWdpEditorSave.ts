@@ -5,7 +5,7 @@ export const WDP_EDITOR_SAVE = 'WDP_EDITOR_SAVE'
 /** WDP 编辑器保存结果回执消息类型（iframe → 外部网站） */
 export const WDP_EDITOR_SAVE_RESULT = 'WDP_EDITOR_SAVE_RESULT'
 
-// ---- 场景生命周期事件（iframe → 外部网站，单向广播，见 2.md）----
+// ---- 场景生命周期事件（iframe → 外部网站，单向广播，见 3.md）----
 /** 编辑器场景首次渲染完成（进入编辑）——每个场景只发一次 */
 export const WDP_EDITOR_SCENE_LOADED = 'WDP_EDITOR_SCENE_LOADED'
 /** 编辑器微服务被卸载（离开编辑/切换项目）——仅在发送过 SCENE_LOADED 后触发 */
@@ -43,13 +43,13 @@ export class WdpSaveError extends Error {
   }
 }
 
-/** 三方回执中"编辑器未就绪"的 message 值（2.md 协议约定） */
+/** 三方回执中"编辑器未就绪"的 message 值（3.md 协议约定） */
 const EDITOR_NOT_READY_MESSAGE = 'editor not ready'
 
-/** 三方回执中"预览/调试态"的 message 前缀（2.md 协议约定） */
+/** 三方回执中"预览/调试态"的 message 前缀（3.md 协议约定） */
 const PREVIEW_STATE_MESSAGE_PREFIX = 'previewState'
 
-/** 三方回执中"保存过程异常"的 message 前缀（2.md 协议约定） */
+/** 三方回执中"保存过程异常"的 message 前缀（3.md 协议约定） */
 const SAVE_EXCEPTION_MESSAGE_PREFIX = 'save exception'
 
 /** 将三方原始失败 message 映射为面向用户的中文提示（未匹配的场景保留原文） */
@@ -73,7 +73,7 @@ type WdpSaveResponse = {
 /**
  * 向 WDP 主站 iframe 发送保存通知并等待回执（Promise 封装）
  *
- * 协议（三方平台文档 2.md）：
+ * 协议（三方平台文档 3.md）：
  * - 发送 { type: 'WDP_EDITOR_SAVE', requestId } 到 iframe
  * - iframe 内主站执行完整保存流程后回执
  *   { type: 'WDP_EDITOR_SAVE_RESULT', requestId, success, message }
@@ -124,6 +124,7 @@ export function wdpSave(
     }
 
     window.addEventListener('message', onMessage)
-    frameWindow.postMessage({ type: WDP_EDITOR_SAVE, requestId }, targetOrigin)
+    // 空 origin 时兜底 '*'（getDtpUIOrigin 在 SSR 下可能返回空串，传空串会抛 TypeError）
+    frameWindow.postMessage({ type: WDP_EDITOR_SAVE, requestId }, targetOrigin || '*')
   })
 }

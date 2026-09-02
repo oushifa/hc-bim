@@ -1201,6 +1201,7 @@
                   <th class="py-3 px-4">原始格式</th>
                   <th class="py-3 px-4">转换状态</th>
                   <th class="py-3 px-4">进度</th>
+                  <th class="py-3 px-4">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -1225,9 +1226,38 @@
                       <span class="text-xs text-gray-500 whitespace-nowrap">{{ task.progress }}%</span>
                     </div>
                   </td>
+                  <td class="py-3 px-4 text-sm whitespace-nowrap">
+                    <!-- 未转化成功（非 SUCCEEDED）且已取得 assetId 的任务可删除 -->
+                    <template v-if="task.status !== 'SUCCEEDED' && task.assetId">
+                      <span v-if="deletingTaskId === task.id" class="text-gray-400">
+                        删除中…
+                      </span>
+                      <template v-else-if="confirmDeleteTaskId === task.id">
+                        <button
+                          class="text-red-500 hover:underline cursor-pointer"
+                          @click="handleDeleteConvertingTask(task)"
+                        >
+                          确认删除
+                        </button>
+                        <button
+                          class="text-gray-500 hover:underline cursor-pointer ml-3"
+                          @click="confirmDeleteTaskId = null"
+                        >
+                          取消
+                        </button>
+                      </template>
+                      <button
+                        v-else
+                        class="text-red-500 hover:underline cursor-pointer"
+                        @click="confirmDeleteTaskId = task.id"
+                      >
+                        删除
+                      </button>
+                    </template>
+                  </td>
                 </tr>
                 <tr v-if="convertingTasks.length === 0">
-                  <td colspan="4" class="py-16 text-center text-gray-400 text-sm">
+                  <td colspan="5" class="py-16 text-center text-gray-400 text-sm">
                     暂无正在转换的任务
                   </td>
                 </tr>
@@ -1297,6 +1327,8 @@ type ConvertingTask = {
   progress: number
   /** 转换任务原始状态（QUEUING/RUNNING/SUCCEEDED/FAILED/STOPPED），用于判断是否到达终态 */
   status: string
+  /** 资产 ID（轮询接口返回后保存，删除模型时使用） */
+  assetId?: string
 }
 
 const uploadTasksModalVisible = ref(false)
@@ -1354,6 +1386,13 @@ type PipelineTaskResult = {
 
 const convertingPollTimers = new Map<string, ReturnType<typeof setInterval>>()
 
+/** 停止并清理指定任务的轮询定时器（到达终态/删除任务时调用） */
+const stopConvertingPolling = (taskId: string) => {
+  const timer = convertingPollTimers.get(taskId)
+  if (timer) clearInterval(timer)
+  convertingPollTimers.delete(taskId)
+}
+
 const queryPipelineTask = async (taskId: string): Promise<PipelineTaskResult | null> => {
   const data = (await dtpFetch(`/v1/daas/pipeline/task/${taskId}`, {
     method: 'GET'
@@ -1372,6 +1411,7 @@ const refreshConvertingTask = async (taskId: string): Promise<boolean> => {
   const totalStage = result.totalStage ?? 0
   convertingTasks.value[index] = {
     ...convertingTasks.value[index],
+    assetId: result.assetId ?? convertingTasks.value[index].assetId,
     status: result.status ?? convertingTasks.value[index].status,
     convertStatus: CONVERT_STATUS_TEXT[result.status ?? ''] ?? result.status ?? '未知',
     progress:
@@ -1396,23 +1436,81 @@ const addConvertingTask = async (
     status: 'QUEUING'
   })
 
-  const stopPolling = () => {
-    clearInterval(timer)
-    convertingPollTimers.delete(taskId)
-  }
   const timer = setInterval(async () => {
-    if (await refreshConvertingTask(taskId)) stopPolling()
+    if (await refreshConvertingTask(taskId)) stopConvertingPolling(taskId)
   }, 3000)
   convertingPollTimers.set(taskId, timer)
 
   // 加入后立即查询一次
-  if (await refreshConvertingTask(taskId)) stopPolling()
+  if (await refreshConvertingTask(taskId)) stopConvertingPolling(taskId)
 }
 
 /** 是否存在尚未转换成功的任务（含排队中/转换中/失败/停止），用于控制上传按钮左侧 loading icon 显隐 */
 const hasActiveConvertingTask = computed(() =>
   convertingTasks.value.some((task) => task.status !== 'SUCCEEDED')
 )
+
+// ---- 未转化成功模型删除：DELETE /v1/daas/asset/model/delete/{assetId} ----
+/** 当前处于删除确认态的任务 id（行内两段式确认） */
+const confirmDeleteTaskId = ref<string | null>(null)
+/** 正在执行删除的任务 id（按钮 loading 禁用，防止重复提交） */
+const deletingTaskId = ref<string | null>(null)
+
+/**
+ * 删除未转化成功的模型：删除接口会同时中断模型转换；
+ * 删除成功后轮询 taskId 验证状态变为 STOPPED 确认中断成功。
+ */
+const handleDeleteConvertingTask = async (task: ConvertingTask) => {
+  if (!task.assetId) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '删除失败',
+      description: '该任务暂无资产信息，无法删除'
+    })
+    return
+  }
+
+  deletingTaskId.value = task.id
+  try {
+    await dtpFetch(`/v1/daas/asset/model/delete/${task.assetId}`, {
+      method: 'DELETE'
+    })
+  } catch (error) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '删除失败',
+      description: ensureError(error).message
+    })
+    deletingTaskId.value = null
+    return
+  }
+
+  // 删除成功：轮询 taskId 验证转换中断（3s × 3 次，总超时约 10s）
+  let stopped = false
+  for (let i = 0; i < 3; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+    const result = await queryPipelineTask(task.id).catch(() => null)
+    if (result?.status === 'STOPPED') {
+      stopped = true
+      break
+    }
+  }
+
+  // 清理：停止原轮询定时器并移除任务
+  stopConvertingPolling(task.id)
+  convertingTasks.value = convertingTasks.value.filter((t) => t.id !== task.id)
+  confirmDeleteTaskId.value = null
+  deletingTaskId.value = null
+
+  triggerNotification({
+    type: ToastNotificationType.Success,
+    title: '模型已删除',
+    description: stopped ? '模型已删除，转换已中断' : '模型已删除'
+  })
+
+  // 防抖刷新用户模型列表，确保被删模型不残留
+  scheduleRefreshUserModels()
+}
 const syncRefreshProjectIdSet = ref<Set<string>>(new Set())
 
 const LIGHT_MODEL_EXTENSIONS = new Set(['ifc', 'rvt', 'skp', 'nwd', 'nwc'])
