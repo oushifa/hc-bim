@@ -4,9 +4,6 @@
     @wheel.stop
     @touchmove.stop
   >
-    <!-- <div class="shrink-0 border-b border-gray-100 bg-white px-5 py-3">
-      <h1 class="text-heading">团队案例</h1>
-    </div> -->
     <div class="relative min-h-0 flex-1 bg-gray-50 overflow-hidden">
       <iframe
         v-if="caseCreateIframeSrc"
@@ -26,44 +23,12 @@
         <FormButton size="sm" color="outline" @click="loadIframe">重试</FormButton>
       </div>
     </div>
-
-    <LayoutDialog
-      v-model:open="showSaveDialog"
-      max-width="md"
-      :buttons="saveDialogButtons"
-      :hide-closer="saving"
-      :prevent-close-on-click-outside="saving"
-    >
-      <template #header>未保存的更改</template>
-      <div class="space-y-4">
-        <p>您正在编辑案例，是否保存更改？</p>
-      </div>
-    </LayoutDialog>
-
-    <LayoutDialog
-      v-model:open="showSaveFailedDialog"
-      max-width="sm"
-      :buttons="saveFailedDialogButtons"
-      :hide-closer="saving"
-      :prevent-close-on-click-outside="saving"
-    >
-      <template #header>{{ saveFailedTitle }}</template>
-      <div class="space-y-4">
-        <p>保存过程中出现问题，请重试或放弃本次修改。</p>
-        <p class="text-body-sm text-foreground-2">{{ saveFailedMessage }}</p>
-      </div>
-    </LayoutDialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import {
-  buildDtpIframeSrcEnsured,
-  getDtpUIOrigin
-} from '~~/composables/useDtpIframeSrc'
-import { onBeforeRouteLeave, useRouter } from 'vue-router'
-import type { RouteLocationRaw } from 'vue-router'
-import { LayoutDialog, type LayoutDialogButton } from '@speckle/ui-components'
+import { buildDtpIframeSrcEnsured, getDtpUIOrigin } from '~~/composables/useDtpIframeSrc'
+import { onBeforeRouteLeave } from 'vue-router'
 import {
   wdpSave,
   WdpSaveError,
@@ -72,6 +37,10 @@ import {
   WDP_EDITOR_SCENE_UNLOADED
 } from '~~/composables/useWdpEditorSave'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
+
+// 供 app.vue 的 <NuxtPage :keepalive> include 匹配——本页面被 KeepAlive 缓存后，
+// 切到其他页面组件不卸载（iframe 保持隐藏存活与通信），切回时原样恢复、不重新加载
+defineOptions({ name: 'WorkgroupCasesPage' })
 
 definePageMeta({
   middleware: ['auth', 'permission']
@@ -83,7 +52,9 @@ const CASE_CREATE_PATH = '/ui/case-create?embed=embed&theme=light'
 const caseCreateIframeSrc = ref('')
 const loadError = ref(false)
 
-// 获取 DTP token 并生成 iframe src；token 获取失败（返回 null）时展示错误提示
+// 获取 DTP token 并生成 iframe src；token 获取失败（返回 null）时展示错误提示。
+// 注意：src 只在组件首次挂载时生成一次——页面被 KeepAlive 缓存后重新激活
+// （切回团队案例）不会再次赋值，从而保持 iframe 场景不重新加载。
 const loadIframe = async () => {
   loadError.value = false
   const origin = getDtpUIOrigin()
@@ -105,154 +76,34 @@ useHead({
   title: '团队案例'
 })
 
-// ---- 离开前保存（WDP postMessage 协议）----
-// 编辑态信号来自三方场景生命周期事件（3.md，iframe → 父页面单向广播）：
+// ---- 离开自动保存（WDP postMessage 协议，见 2.md）----
+// 页面被 KeepAlive 缓存：切换页面时 iframe 不销毁，仅在后台隐藏并保持通信，
+// 因此离开不再阻塞跳转等待回执——守卫直接放行，保存请求在后台异步执行，
+// 回执仍能收到（组件未卸载、message 监听仍在）。
+// 编辑态信号来自三方场景生命周期事件（iframe → 父页面单向广播）：
 // - WDP_EDITOR_SCENE_LOADED：进入编辑、场景渲染完成 → 标记编辑中
 // - WDP_EDITOR_SCENE_UNLOADED：退出编辑/场景卸载 → 重置编辑状态
-// 仅编辑中离开才弹窗询问「是否保存」；未进入编辑（浏览列表 / VPN 不可达错误页）
-// 时直接放行，不发保存、零打扰。
-// 兜底（VPN 慢链路）：SCENE_LOADED 在场景首次渲染完成后才发出，VPN/云渲染
-// 慢时用户可能已在编辑器内操作而事件尚未到达。以父窗口 blur 记录用户是否与
-// iframe 交互过；离开时若未处于编辑态、但已交互过且 iframe 已加载完成，静默
-// 探测保存一次——三方回执 editor not ready 则静默放行，成功则放行，超时/明确
-// 失败弹「保存失败」弹窗。
+// 保存触发规则（不打扰用户）：
+// - iframe 未加载完成（2.md：onload 之前发保存消息会丢失）→ 不发
+// - 从未进入编辑（无 SCENE_LOADED 且从未与 iframe 交互）→ 无内容可保存，不发
+// - 其余情况 → 发送 WDP_EDITOR_SAVE 后台保存：
+//   成功 → Success 轻提示「已自动保存」
+//   editor not ready / 超时 → 静默（VPN 慢链路回执慢属正常，iframe 保活可随时重试）
+//   三方明确回执失败（success:false）→ Danger toast 提示，可回到团队案例页处理
 
-const router = useRouter()
-const { triggerNotification, dismiss } = useGlobalToast()
+const { triggerNotification } = useGlobalToast()
 
 const iframeRef = ref<HTMLIFrameElement | null>(null)
-const targetRoute = ref<RouteLocationRaw | undefined>(undefined)
-const showSaveDialog = ref(false)
-const showSaveFailedDialog = ref(false)
-const saving = ref(false)
-const allowLeave = ref(false)
 /** 用户是否与 iframe 交互过（点击/滚动使焦点移入 iframe，父窗口触发 blur）——「可能在编辑」的兜底信号 */
 const iframeInteracted = ref(false)
-/** iframe 是否已加载完成（3.md 第 6 节：保存消息须在 iframe.onload 之后发送） */
+/** iframe 是否已加载完成（保存消息须在 iframe.onload 之后发送） */
 const iframeLoaded = ref(false)
 /** 三方生命周期事件：是否正在编辑案例（SCENE_LOADED 置 true，SCENE_UNLOADED 置 false） */
 const isEditing = ref(false)
-/** 保存失败弹窗中展示的原因描述 */
-const saveFailedMessage = ref('')
-/** 保存失败弹窗标题（失败 / 超时区分展示） */
-const saveFailedTitle = ref('保存失败')
+/** 后台保存进行中标记（防止一次离开重复触发多次保存） */
+const saveInFlight = ref(false)
 
-const navigateToTargetRoute = async () => {
-  const route = targetRoute.value
-  targetRoute.value = undefined
-  if (!route) return
-  try {
-    const failure = await router.push(route)
-    if (failure) allowLeave.value = false
-  } catch {
-    allowLeave.value = false
-  }
-}
-
-/** 弹窗中选择「不保存」/失败后选择放弃：直接离开 */
-const leaveWithoutSave = () => {
-  showSaveDialog.value = false
-  showSaveFailedDialog.value = false
-  allowLeave.value = true
-  void navigateToTargetRoute()
-}
-
-const saveDialogButtons = computed<LayoutDialogButton[]>(() => [
-  {
-    text: '不保存',
-    props: { color: 'outline' },
-    disabled: saving.value,
-    onClick: leaveWithoutSave
-  },
-  {
-    text: '保存',
-    props: { submit: true, loading: saving.value },
-    disabled: saving.value,
-    onClick: saveAndLeave
-  }
-])
-
-const saveFailedDialogButtons = computed<LayoutDialogButton[]>(() => [
-  {
-    text: '不保存',
-    props: { color: 'outline' },
-    disabled: saving.value,
-    onClick: leaveWithoutSave
-  },
-  {
-    text: '重试',
-    props: { submit: true, loading: saving.value },
-    disabled: saving.value,
-    onClick: retrySave
-  }
-])
-
-/** 失败弹窗中点「重试」：再次发起保存（弹窗保持打开，展示保存中状态） */
-const retrySave = () => {
-  void saveAndLeave()
-}
-
-/** 保存失败统一处理：区分超时/明确失败，关闭保存弹窗并展示原因弹窗 */
-const showSaveFailure = (error: unknown) => {
-  const isTimeout =
-    error instanceof WdpSaveError && error.code === WdpSaveErrorCode.TIMEOUT
-  dismiss()
-  showSaveDialog.value = false
-  saveFailedTitle.value = isTimeout ? '保存超时' : '保存失败'
-  saveFailedMessage.value = isTimeout
-    ? '保存超时，请重试'
-    : error instanceof Error
-    ? error.message
-    : 'WDP 保存失败'
-  showSaveFailedDialog.value = true
-}
-
-/** 弹窗中选择「保存」/失败后「重试」：发送保存通知，成功提示后放行；失败/超时弹窗展示原因 */
-const saveAndLeave = async () => {
-  const frame = iframeRef.value?.contentWindow
-  if (!frame) {
-    // 编辑器不存在（异常兜底）→ 无内容可保存，直接放行
-    showSaveDialog.value = false
-    showSaveFailedDialog.value = false
-    allowLeave.value = true
-    void navigateToTargetRoute()
-    return
-  }
-
-  saving.value = true
-  try {
-    await wdpSave(frame, { timeout: 10000 })
-    // 保存成功 → 关闭弹窗，提示「保存成功」（默认展示时长），再放行跳转
-    dismiss()
-    showSaveDialog.value = false
-    showSaveFailedDialog.value = false
-    triggerNotification({
-      type: ToastNotificationType.Success,
-      title: '保存成功'
-    })
-    allowLeave.value = true
-    void navigateToTargetRoute()
-  } catch (error) {
-    if (
-      error instanceof WdpSaveError &&
-      error.code === WdpSaveErrorCode.EDITOR_NOT_READY
-    ) {
-      // 编辑器未就绪（无内容可保存）→ 不打扰用户，静默放行
-      dismiss()
-      showSaveDialog.value = false
-      showSaveFailedDialog.value = false
-      allowLeave.value = true
-      void navigateToTargetRoute()
-    } else {
-      // 保存超时或三方明确回执失败 → 弹窗展示原因，可重试或放弃
-      showSaveFailure(error)
-    }
-  } finally {
-    saving.value = false
-  }
-}
-
-// 监听三方场景生命周期事件（iframe → 父页面，见 3.md）
+// 监听三方场景生命周期事件（iframe → 父页面，见 2.md 第 9 节）
 const onWdpMessage = (e: MessageEvent) => {
   const targetOrigin = getDtpUIOrigin()
   if (targetOrigin && e.origin !== targetOrigin) return
@@ -261,15 +112,14 @@ const onWdpMessage = (e: MessageEvent) => {
   if (data.type === WDP_EDITOR_SCENE_LOADED) {
     isEditing.value = true
   } else if (data.type === WDP_EDITOR_SCENE_UNLOADED) {
-    // 三方界面内已主动退出编辑 → 同步重置交互信号，避免离开时误触发
-    // 静默探测保存（慢链路下三方不回执将误弹「保存超时」打扰用户）
+    // 三方界面内已主动退出编辑 → 同步重置交互信号，避免再次离开时误发保存
     isEditing.value = false
     iframeInteracted.value = false
   }
 }
 
 // 弱信号：点击 iframe 内部时焦点移入 iframe，父窗口触发 blur，以此感知「可能在编辑」；
-// 注意切标签页/打开 DevTools 也会触发 blur（误判），由 probeSave 的静默策略兜底
+// 注意切标签页/打开 DevTools 也会触发 blur（误判），由保存结果的静默策略兜底
 const onWindowBlur = () => {
   iframeInteracted.value = true
 }
@@ -279,7 +129,7 @@ const onIframeLoad = () => {
 }
 
 // 编辑中刷新/关闭标签页时由浏览器弹出原生确认框（无法自定义文案）；
-// beforeunload 是最后一道提示，路由内离开仍走上面的保存弹窗流程
+// beforeunload 是最后一道提示，路由内离开仍走上面的自动保存流程
 const onBeforeUnload = (e: BeforeUnloadEvent) => {
   if (!isEditing.value) return
   e.preventDefault()
@@ -299,63 +149,47 @@ onUnmounted(() => {
 })
 
 /**
- * 编辑态不确定时的静默探测保存（VPN 慢链路兜底）：
- * 未收到 SCENE_LOADED 但用户与已加载完成的 iframe 交互过，离开时静默发一次保存——
- * - 成功 / editor not ready（未编辑）→ 静默放行，不打扰用户
- * - 超时（三方未就绪或不可达，无可保存内容）→ 静默放行；blur 是弱信号，
- *   切标签页等也会触发误判，超时不弹窗可避免打扰从未编辑过的用户
- * - 三方明确回执失败（编辑器就绪但保存异常）→ 弹「保存失败」弹窗，可重试或放弃
+ * 离开时的静默自动保存（后台执行，不阻塞跳转）：
+ * - 保存成功 → Success 轻提示「已自动保存」（跳转已放行，提示出现在目标页面）
+ * - editor not ready（未编辑）/ 超时（三方未就绪或慢链路未及回执）→ 静默，
+ *   iframe 在后台保活，用户切回后可再次保存，不打扰
+ * - 三方明确回执失败（编辑器就绪但保存异常）→ Danger toast 提示，引导返回重试
  */
-const probeSave = async (frame: Window) => {
-  saving.value = true
-  try {
-    await wdpSave(frame, { timeout: 10000 })
-    allowLeave.value = true
-    void navigateToTargetRoute()
-  } catch (error) {
-    if (
-      error instanceof WdpSaveError &&
-      (error.code === WdpSaveErrorCode.EDITOR_NOT_READY ||
-        error.code === WdpSaveErrorCode.TIMEOUT)
-    ) {
-      // 未编辑 / 三方未就绪或不可达 → 无可保存内容，静默放行
-      allowLeave.value = true
-      void navigateToTargetRoute()
-    } else {
-      // 三方明确回执失败 → 可能有编辑内容，弹窗可重试或放弃
-      showSaveFailure(error)
-    }
-  } finally {
-    saving.value = false
-  }
+const autoSaveOnLeave = () => {
+  if (saveInFlight.value) return
+  const frame = iframeRef.value?.contentWindow
+  if (!frame || !iframeLoaded.value) return
+  if (!isEditing.value && !iframeInteracted.value) return
+
+  saveInFlight.value = true
+  wdpSave(frame, { timeout: 15000 })
+    .then(() => {
+      triggerNotification({
+        type: ToastNotificationType.Success,
+        title: '已自动保存'
+      })
+    })
+    .catch((error) => {
+      if (
+        error instanceof WdpSaveError &&
+        error.code === WdpSaveErrorCode.SAVE_FAILED
+      ) {
+        triggerNotification({
+          type: ToastNotificationType.Danger,
+          title: '保存失败',
+          description: '修改可能未保存，请回到团队案例页面重试'
+        })
+      }
+      // EDITOR_NOT_READY / TIMEOUT 静默放行（无内容可保存或慢链路，无需打扰）
+    })
+    .finally(() => {
+      saveInFlight.value = false
+    })
 }
 
-onBeforeRouteLeave((to, _from, next) => {
-  if (allowLeave.value) {
-    next()
-    return
-  }
-  targetRoute.value = to
-  if (!isEditing.value) {
-    // 未处于编辑态但用户与已加载的 iframe 交互过（如 VPN 慢导致 SCENE_LOADED
-    // 未到达）→ 静默探测保存兜底；未交互过或 iframe 未加载完成（3.md：onload
-    // 之前发保存消息会丢失）→ 直接放行
-    const frame = iframeRef.value?.contentWindow
-    if (iframeInteracted.value && iframeLoaded.value && frame) {
-      // 探测保存进行中同样拦截再次离开，防止回执未到就放行导致内容未保存
-      next(false)
-      if (!saving.value) void probeSave(frame)
-      return
-    }
-    next()
-    return
-  }
-  if (saving.value || showSaveDialog.value || showSaveFailedDialog.value) {
-    next(false)
-    return
-  }
-  // 编辑中离开 → 弹窗询问是否保存
-  showSaveDialog.value = true
-  next(false)
+// 切离团队案例：先触发后台自动保存，再立即放行跳转（零等待）。
+// 组件被 KeepAlive 缓存后不会卸载，iframe 在后台保持隐藏与通信
+onBeforeRouteLeave(() => {
+  autoSaveOnLeave()
 })
 </script>
