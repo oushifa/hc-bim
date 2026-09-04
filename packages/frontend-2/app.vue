@@ -4,15 +4,7 @@
     class="bg-foundation-page text-foreground has-[.viewer]:!overflow-hidden has-[.viewer-transparent]:!bg-transparent"
   >
     <NuxtLayout>
-      <!--
-        页面 KeepAlive：仅缓存团队案例页（WorkgroupCasesPage），保证路由切走后
-        其 iframe 不销毁、保持隐藏与三方通信；固定 page-key 使同组件路由参数
-        （工作组）切换时复用同一实例（与无缓存行为一致），避免缓存条目错乱。
-      -->
-      <NuxtPage
-        :page-key="'app-page-root'"
-        :keepalive="{ include: ['WorkgroupCasesPage'], max: 3 }"
-      />
+      <NuxtPage />
     </NuxtLayout>
     <SingletonManagers />
   </div>

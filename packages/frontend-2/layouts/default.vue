@@ -7,7 +7,7 @@
         <div class="size-full bg-[#E7EBEB] pt-[4.5rem] ml-3.5 mr-3.5 mt-2">
           <div
             style="border-radius: 26px"
-            class="size-full bg-white overflow-hidden"
+            class="size-full bg-white overflow-hidden relative"
           >
             <main
               class="w-full h-full simple-scrollbar pt-0 lg:pt-0"
@@ -17,6 +17,7 @@
                 <slot />
               </div>
             </main>
+            <TwinSceneCasesKeeper />
           </div>
         </div>
       </div>
