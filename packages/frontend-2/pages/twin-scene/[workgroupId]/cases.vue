@@ -4,8 +4,11 @@
     @wheel.stop
     @touchmove.stop
   >
-    <!-- 团队案例 iframe 由 Layout 层 TwinSceneCasesKeeper 常驻渲染并保活覆盖 -->
-    <div class="relative min-h-0 flex-1 bg-gray-50 overflow-hidden" />
+    <!-- 全局 TwinSceneCasesKeeper 渲染吸附的目标占位符 -->
+    <div
+      id="twin-scene-cases-portal-anchor"
+      class="relative min-h-0 flex-1 bg-gray-50 overflow-hidden"
+    />
   </div>
 </template>
 

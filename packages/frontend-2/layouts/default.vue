@@ -17,7 +17,6 @@
                 <slot />
               </div>
             </main>
-            <TwinSceneCasesKeeper />
           </div>
         </div>
       </div>
