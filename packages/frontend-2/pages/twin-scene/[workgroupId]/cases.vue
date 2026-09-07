@@ -17,6 +17,7 @@ import { onBeforeRouteLeave } from 'vue-router'
 import { WdpSaveError, WdpSaveErrorCode } from '~~/composables/useWdpEditorSave'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import {
+  dtpDebugLog,
   isDtpDebugEnabled,
   useTwinSceneCasesKeeper
 } from '~~/composables/useTwinSceneCasesKeeper'
@@ -59,13 +60,13 @@ const saveInFlight = ref(false)
  */
 const autoSaveOnLeave = () => {
   if (saveInFlight.value) {
-    if (dtpDebug) console.debug('[cases] skip auto save: in flight')
+    if (dtpDebug) dtpDebugLog('[cases] skip auto save: in flight')
     return
   }
   const frame = globalIframeRef.value?.contentWindow
   if (!frame || !iframeLoaded.value) {
     if (dtpDebug)
-      console.debug('[cases] skip auto save: iframe not ready', {
+      dtpDebugLog('[cases] skip auto save: iframe not ready', {
         hasFrame: Boolean(frame),
         iframeLoaded: iframeLoaded.value
       })
@@ -73,7 +74,7 @@ const autoSaveOnLeave = () => {
   }
 
   saveInFlight.value = true
-  if (dtpDebug) console.debug('[cases] auto save on leave triggered')
+  if (dtpDebug) dtpDebugLog('[cases] auto save on leave triggered')
   saveCases(15000)
     .then(() => {
       triggerNotification({
@@ -83,7 +84,7 @@ const autoSaveOnLeave = () => {
     })
     .catch((error) => {
       if (dtpDebug)
-        console.debug('[cases] auto save failed', {
+        dtpDebugLog('[cases] auto save failed', {
           code: error instanceof WdpSaveError ? error.code : undefined,
           message: error instanceof Error ? error.message : String(error)
         })

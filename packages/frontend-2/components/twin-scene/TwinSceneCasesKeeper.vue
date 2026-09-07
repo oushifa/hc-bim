@@ -34,7 +34,8 @@ import {
 } from '~~/composables/useWdpEditorSave'
 import {
   useTwinSceneCasesKeeper,
-  isDtpDebugEnabled
+  isDtpDebugEnabled,
+  dtpDebugLog
 } from '~~/composables/useTwinSceneCasesKeeper'
 
 const keeper = useTwinSceneCasesKeeper()
@@ -68,7 +69,7 @@ watch(
 
 const onIframeLoad = () => {
   iframeLoaded.value = true
-  if (dtpDebug) console.debug('[cases-keeper] iframe loaded')
+  if (dtpDebug) dtpDebugLog('[cases-keeper] iframe loaded')
 }
 
 const handleRetry = () => {
@@ -159,7 +160,7 @@ const onWdpMessage = (e: MessageEvent) => {
   const data = (e.data ?? {}) as { type?: string }
   // 仅调试已知的 WDP 消息，避免其它 iframe/页面消息噪音干扰排查
   if (dtpDebug && data.type && (data.type as string).startsWith('WDP_')) {
-    console.debug('[cases-keeper] wdp message', {
+    dtpDebugLog('[cases-keeper] wdp message', {
       type: data.type,
       origin: e.origin,
       fromTargetIframe: e.source === iframeDomRef.value?.contentWindow
@@ -170,11 +171,11 @@ const onWdpMessage = (e: MessageEvent) => {
   if (e.source !== iframeDomRef.value?.contentWindow) return
   if (data.type === WDP_EDITOR_SCENE_LOADED) {
     isEditing.value = true
-    if (dtpDebug) console.debug('[cases-keeper] scene loaded -> isEditing=true')
+    if (dtpDebug) dtpDebugLog('[cases-keeper] scene loaded -> isEditing=true')
   } else if (data.type === WDP_EDITOR_SCENE_UNLOADED) {
     isEditing.value = false
     iframeInteracted.value = false
-    if (dtpDebug) console.debug('[cases-keeper] scene unloaded -> isEditing=false')
+    if (dtpDebug) dtpDebugLog('[cases-keeper] scene unloaded -> isEditing=false')
   }
 }
 
@@ -182,7 +183,7 @@ const onWdpMessage = (e: MessageEvent) => {
 const onWindowBlur = () => {
   if (isCasesRoute.value) {
     iframeInteracted.value = true
-    if (dtpDebug) console.debug('[cases-keeper] window blur -> iframeInteracted=true')
+    if (dtpDebug) dtpDebugLog('[cases-keeper] window blur -> iframeInteracted=true')
   }
 }
 

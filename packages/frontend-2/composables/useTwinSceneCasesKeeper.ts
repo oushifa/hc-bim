@@ -21,6 +21,16 @@ export const isDtpDebugEnabled = (): boolean => {
   }
 }
 
+/**
+ * 调试日志输出：经 window.console 调用，
+ * 规避 nuxt.config 中 vite.esbuild.drop: ['console'] 对 console.* 的构建期移除
+ * （drop 仅匹配 console.xxx 字面形式，window.console.xxx 不受影响），
+ * 保证本地 dev 与部署环境均能输出
+ */
+export const dtpDebugLog = (...args: unknown[]): void => {
+  if (typeof window !== 'undefined') window.console.log(...args)
+}
+
 // 全局 DOM 引用，不使用 useState 避免序列化警告
 const globalIframeRef = shallowRef<HTMLIFrameElement | null>(null)
 
