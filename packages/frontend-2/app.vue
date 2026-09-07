@@ -7,6 +7,9 @@
       <NuxtPage />
     </NuxtLayout>
     <SingletonManagers />
+    <ClientOnly>
+      <TwinSceneCasesKeeper />
+    </ClientOnly>
   </div>
 </template>
 <script setup lang="ts">
