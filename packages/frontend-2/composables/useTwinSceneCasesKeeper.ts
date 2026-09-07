@@ -7,16 +7,27 @@ import { wdpSave } from '~~/composables/useWdpEditorSave'
 /** 团队案例 iframe 路径（host 由 getDtpUIOrigin() 动态获取） */
 export const CASE_CREATE_PATH = '/ui/case-create?embed=embed&theme=light'
 
+/**
+ * 团队案例 iframe 调试日志开关：
+ * localStorage 中写入 'hc-bim-dtp-debug' = '1' 后刷新页面即生效，
+ * 用于排查三方生命周期事件/保存回执是否到达、状态机是否被正确置位
+ */
+export const isDtpDebugEnabled = (): boolean => {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem('hc-bim-dtp-debug') === '1'
+  } catch {
+    return false
+  }
+}
+
 // 全局 DOM 引用，不使用 useState 避免序列化警告
 const globalIframeRef = shallowRef<HTMLIFrameElement | null>(null)
 
 export const useTwinSceneCasesKeeper = () => {
   const route = useRoute()
 
-  const caseCreateIframeSrc = useState<string>(
-    'cases_keeper_iframe_src',
-    () => ''
-  )
+  const caseCreateIframeSrc = useState<string>('cases_keeper_iframe_src', () => '')
   const loadError = useState<boolean>('cases_keeper_load_error', () => false)
   const isEditing = useState<boolean>('cases_keeper_is_editing', () => false)
   const iframeInteracted = useState<boolean>(

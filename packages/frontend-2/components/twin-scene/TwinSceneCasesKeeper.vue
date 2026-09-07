@@ -32,7 +32,10 @@ import {
   WDP_EDITOR_SCENE_LOADED,
   WDP_EDITOR_SCENE_UNLOADED
 } from '~~/composables/useWdpEditorSave'
-import { useTwinSceneCasesKeeper } from '~~/composables/useTwinSceneCasesKeeper'
+import {
+  useTwinSceneCasesKeeper,
+  isDtpDebugEnabled
+} from '~~/composables/useTwinSceneCasesKeeper'
 
 const keeper = useTwinSceneCasesKeeper()
 const {
@@ -45,6 +48,9 @@ const {
   isCasesRoute,
   loadIframe
 } = keeper
+
+/** 调试日志开关：localStorage['hc-bim-dtp-debug'] = '1' 开启 */
+const dtpDebug = isDtpDebugEnabled()
 
 const iframeDomRef = ref<HTMLIFrameElement | null>(null)
 const anchorRect = ref({ top: 0, left: 0, width: 0, height: 0 })
@@ -62,6 +68,7 @@ watch(
 
 const onIframeLoad = () => {
   iframeLoaded.value = true
+  if (dtpDebug) console.debug('[cases-keeper] iframe loaded')
 }
 
 const handleRetry = () => {
@@ -149,15 +156,25 @@ const containerStyle = computed<CSSProperties>(() => {
 
 // 监听三方场景生命周期事件（iframe → 父页面，见 3.md）
 const onWdpMessage = (e: MessageEvent) => {
+  const data = (e.data ?? {}) as { type?: string }
+  // 仅调试已知的 WDP 消息，避免其它 iframe/页面消息噪音干扰排查
+  if (dtpDebug && data.type && (data.type as string).startsWith('WDP_')) {
+    console.debug('[cases-keeper] wdp message', {
+      type: data.type,
+      origin: e.origin,
+      fromTargetIframe: e.source === iframeDomRef.value?.contentWindow
+    })
+  }
   const targetOrigin = getDtpUIOrigin()
   if (targetOrigin && e.origin !== targetOrigin) return
   if (e.source !== iframeDomRef.value?.contentWindow) return
-  const data = (e.data ?? {}) as { type?: string }
   if (data.type === WDP_EDITOR_SCENE_LOADED) {
     isEditing.value = true
+    if (dtpDebug) console.debug('[cases-keeper] scene loaded -> isEditing=true')
   } else if (data.type === WDP_EDITOR_SCENE_UNLOADED) {
     isEditing.value = false
     iframeInteracted.value = false
+    if (dtpDebug) console.debug('[cases-keeper] scene unloaded -> isEditing=false')
   }
 }
 
@@ -165,6 +182,7 @@ const onWdpMessage = (e: MessageEvent) => {
 const onWindowBlur = () => {
   if (isCasesRoute.value) {
     iframeInteracted.value = true
+    if (dtpDebug) console.debug('[cases-keeper] window blur -> iframeInteracted=true')
   }
 }
 
