@@ -88,3 +88,6 @@ packages/*/.tshy/
 
 .nuxt
 .output
+
+# Local dev plans (superpowers)
+/docs/

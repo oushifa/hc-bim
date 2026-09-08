@@ -1,0 +1,49 @@
+name: CI Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Type check & Nuxt build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NODE_ENV: production
+      SHARP_IGNORE_GLOBAL_LIBVIPS: 1
+      PUPPETEER_SKIP_DOWNLOAD: true
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+
+      - name: Enable Corepack (Yarn 4)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build workspace dependencies
+        run: yarn workspaces foreach --exclude "@speckle/frontend-2" -W run build
+
+      - name: Nuxt prepare
+        run: yarn workspace @speckle/frontend-2 build:postinstall
+
+      - name: TypeScript type check (vue-tsc)
+        run: yarn workspace @speckle/frontend-2 lint:tsc
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+
+      - name: Nuxt production build
+        run: yarn workspace @speckle/frontend-2 build
