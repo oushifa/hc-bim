@@ -1,3 +1,4 @@
+# NOTE: 修改本文件会触发 hc-frontend-aliyun workflow（前端镜像自动编译推送）
 .circleci
 .github
 .git
