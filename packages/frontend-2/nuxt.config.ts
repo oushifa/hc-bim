@@ -198,11 +198,11 @@ export default defineNuxtConfig({
     },
     // Proxy DTP API requests (both dev and production)
     '/__dtp/**': {
-      proxy: 'http://10.66.8.187:30080/service/**'
+      proxy: 'http://192.168.20.157:30080/service/**'
     },
     // Proxy DTP static resources (thumbnails, files, etc.)
     '/__dtp-static/**': {
-      proxy: 'http://10.66.8.187:30080/**'
+      proxy: 'http://192.168.20.157:30080/**'
     },
     '/functions': {
       redirect: {
