@@ -1,6 +1,6 @@
 <template>
   <div
-    class="flex w-full flex-col min-h-0 h-[calc(100dvh-4.5rem)] max-h-[calc(100dvh-4.5rem)]"
+    class="flex w-full flex-col min-h-0 h-full max-h-full"
     @wheel.stop
     @touchmove.stop
   >

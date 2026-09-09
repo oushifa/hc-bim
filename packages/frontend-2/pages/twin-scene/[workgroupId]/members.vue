@@ -1,6 +1,6 @@
 <template>
   <div
-    class="flex w-full flex-col min-h-0 h-[calc(100dvh-4.5rem)] max-h-[calc(100dvh-4.5rem)]"
+    class="flex w-full flex-col min-h-0 h-full max-h-full"
     @wheel.stop
     @touchmove.stop
   >
@@ -17,12 +17,8 @@
         v-else-if="loadError"
         class="absolute inset-0 flex flex-col items-center justify-center gap-3"
       >
-        <p class="text-body-sm text-foreground-2">
-          团队管理服务连接失败，请稍后重试
-        </p>
-        <FormButton size="sm" color="outline" @click="loadIframe">
-          重试
-        </FormButton>
+        <p class="text-body-sm text-foreground-2">团队管理服务连接失败，请稍后重试</p>
+        <FormButton size="sm" color="outline" @click="loadIframe">重试</FormButton>
       </div>
     </div>
   </div>

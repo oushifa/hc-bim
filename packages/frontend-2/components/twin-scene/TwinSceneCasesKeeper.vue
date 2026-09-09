@@ -148,6 +148,9 @@ const containerStyle = computed<CSSProperties>(() => {
     left: `${anchorRect.value.left}px`,
     width: `${anchorRect.value.width}px`,
     height: `${anchorRect.value.height}px`,
+    // 与 default.vue 布局内容卡片的 border-radius: 26px 保持一致，
+    // 否则 fixed 容器会直角盖住卡片圆角（配合类上的 overflow-hidden 裁剪 iframe 四角）
+    borderRadius: '26px',
     opacity: 1,
     pointerEvents: 'auto',
     visibility: 'visible',
