@@ -1,0 +1,81 @@
+name: HC 前端自动编译推送到阿里云 ACR
+
+# 触发条件：提交(推送)到 main 且涉及前端相关代码时，自动编译并推送镜像
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/frontend-2/**'
+      - 'packages/shared/**'
+      - 'packages/viewer/**'
+      - 'packages/objectloader2/**'
+      - 'packages/ui-components/**'
+      - 'packages/ui-components-nuxt/**'
+      - 'packages/tailwind-theme/**'
+      - 'utils/ensure-tailwind-deps.mjs'
+      - '.yarnrc.yml'
+      - '.dockerignore'
+      - 'package.json'
+      - 'yarn.lock'
+  # 也支持在 GitHub Actions 页面手动触发一次
+  workflow_dispatch:
+
+concurrency:
+  group: hc-frontend-aliyun-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # 阿里云容器镜像 ACR 公网地址（华东1-杭州）
+  REGISTRY: registry.cn-hangzhou.aliyuncs.com
+  # 仓库命名空间/仓库名
+  IMAGE_NAME: registry.cn-hangzhou.aliyuncs.com/lengyingxi/hc-speckle-frontend
+
+jobs:
+  build-and-push:
+    name: 构建并推送前端镜像
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      # 生成镜像版本号：时间戳 + git 短提交号，保证每次推送的 tag 唯一
+      - name: 生成版本号
+        id: version
+        run: |
+          echo "TAG=$(date +%Y%m%d%H%M%S)-${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录阿里云 ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          # 阿里云账号全名
+          username: lengyingxi
+          # 密码保存在 GitHub Actions Secrets 中，key 名称: ALIYUN_REGISTRY_PASSWORD
+          password: ${{ secrets.ALIYUN_REGISTRY_PASSWORD }}
+
+      - name: 构建并推送镜像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./packages/frontend-2/Dockerfile
+          push: true
+          # 同时打 时间戳版本号 与 latest 两个 tag
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.TAG }}
+            ${{ env.IMAGE_NAME }}:latest
+          build-args: |
+            SPECKLE_SERVER_VERSION=${{ steps.version.outputs.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: 输出镜像信息
+        run: |
+          echo "================================================="
+          echo "前端镜像编译并推送成功"
+          echo "镜像地址: ${{ env.IMAGE_NAME }}:${{ steps.version.outputs.TAG }}"
+          echo "================================================="
