@@ -1,4 +1,5 @@
 # NOTE: 修改本文件会触发 hc-frontend-aliyun workflow（前端镜像自动编译推送）
+# 已适配阿里云 ACR：构建改为 docker manifest list、关闭 OCI 空清单与 cache 导出。
 .circleci
 .github
 .git
