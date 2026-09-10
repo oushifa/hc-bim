@@ -140,30 +140,50 @@ export default defineNuxtConfig({
       fs: {
         // Allowing symlinks
         // allow: ['/home/fabis/Code/random/vue-apollo/']
+      },
+      // Dev-only proxy to the backend (remote speckle-server). Only active while
+      // `nuxt dev` runs - production relies on the ingress/Nitro route rules instead.
+      //
+      // Key matching (see Vite's doesProxyContextMatchUrl): keys starting with `^`
+      // are treated as a regex tested against the whole url, anything else is a raw
+      // `url.startsWith(key)` check. Raw prefixes are dangerous here, e.g. '/auth'
+      // would also swallow the frontend's own /authn/* pages.
+      proxy: {
+        '^/api/': {
+          target: 'http://120.133.226.216:3300/',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\//, '')
+        },
+        '^/graphql': {
+          target: 'http://120.133.226.216:3300/',
+          ws: true,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\//, '')
+        },
+        '^/auth/': {
+          target: 'http://120.133.226.216:3300/',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\//, '')
+        },
+        '^/objects/': {
+          target: 'http://120.133.226.216:3300/',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\//, '')
+        },
+        // Backend generated absolute URLs (previews/thumbnails, based on the
+        // backend's CANONICAL_URL) get rewritten to relative ones by
+        // `useInternalUrlUtils`, so they have to be proxied too.
+        '^/preview/': {
+          target: 'http://120.133.226.216:3300/',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\//, '')
+        },
+        '^/static/': {
+          target: 'http://120.133.226.216:3300/',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\//, '')
+        }
       }
-      // proxy: {
-      //   '/api': {
-      //     target: 'http://61.145.255.42:3300',
-      //     changeOrigin: true,
-      //     rewrite: (path) => path.replace(/^\//, '')
-      //   },
-      //   '/graphql': {
-      //     target: 'http://61.145.255.42:3300',
-      //     ws: true,
-      //     changeOrigin: true,
-      //     rewrite: (path) => path.replace(/^\//, '')
-      //   },
-      //   '/auth': {
-      //     target: 'http://61.145.255.42:3300',
-      //     changeOrigin: true,
-      //     rewrite: (path) => path.replace(/^\//, '')
-      //   },
-      //   '/objects': {
-      //     target: 'http://61.145.255.42:3300',
-      //     changeOrigin: true,
-      //     rewrite: (path) => path.replace(/^\//, '')
-      //   }
-      // }
     },
 
     build: {

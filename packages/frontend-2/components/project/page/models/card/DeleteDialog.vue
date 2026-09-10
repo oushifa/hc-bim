@@ -34,6 +34,7 @@
 import { graphql } from '~~/lib/common/generated/gql'
 import type { ProjectPageModelsCardDeleteDialogFragment } from '~~/lib/common/generated/gql/graphql'
 import { useDeleteModel } from '~~/lib/projects/composables/modelManagement'
+import { useStopModelSyncTask } from '~~/lib/projects/composables/stopModelSync'
 
 graphql(`
   fragment ProjectPageModelsCardDeleteDialog on Model {
@@ -53,11 +54,20 @@ const props = defineProps<{
 
 const isOpen = defineModel<boolean>('open', { required: true })
 const deleteModel = useDeleteModel()
+const stopModelSyncTask = useStopModelSyncTask()
 
 const loading = ref(false)
 
 const onDelete = async () => {
   loading.value = true
+
+  // 模型处于转换/同步阶段时，删除前先停止对应的后台任务（停止失败不阻塞删除）
+  await stopModelSyncTask({
+    projectId: props.projectId,
+    modelId: props.model.id,
+    reason: '模型已删除，任务已停止'
+  })
+
   const deleted = await deleteModel({
     id: props.model.id,
     projectId: props.projectId

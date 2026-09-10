@@ -9,6 +9,10 @@ import { useAuthCookie } from '~~/lib/auth/composables/auth'
 import { useScopedState } from '~~/lib/common/composables/scopedState'
 import { nanoid } from 'nanoid'
 import {
+  useStopModelSyncTask,
+  type ModelSyncStopResult
+} from '~~/lib/projects/composables/stopModelSync'
+import {
   resumableUpload,
   type ResumableUploadBackend,
   type ResumableUploadPart,
@@ -364,6 +368,7 @@ export const useWorkbenchUploadSync = () => {
   const taskMap = useWorkbenchUploadSyncTaskMap()
   const eventSources = useWorkbenchUploadSyncEventSources()
   const pageEventSources = useWorkbenchUploadSyncPageEventSources()
+  const stopModelSync = useStopModelSyncTask()
 
   const getHeaders = () =>
     authToken.value
@@ -517,6 +522,24 @@ export const useWorkbenchUploadSync = () => {
     eventSources.value = {
       ...eventSources.value,
       [taskId]: null
+    }
+  }
+
+  /** 清理某个模型在本地的全部任务状态（模型删除后不再显示转换中/同步中） */
+  const removeTasksForModel = (params: { projectId: string; modelId: string }) => {
+    const next = { ...taskMap.value }
+    let changed = false
+
+    for (const [taskId, task] of Object.entries(next)) {
+      if (task.projectId !== params.projectId || task.modelId !== params.modelId)
+        continue
+      delete next[taskId]
+      stopTaskEventSource(taskId)
+      changed = true
+    }
+
+    if (changed) {
+      taskMap.value = next
     }
   }
 
@@ -1064,6 +1087,26 @@ export const useWorkbenchUploadSync = () => {
     return isTaskRunning(latest)
   }
 
+  /**
+   * 停止某个模型当前阶段正在进行的转换/同步（模型删除前调用）。
+   *
+   * 接口分流见 useStopModelSyncTask；这里额外清理本地的任务状态，
+   * 使列表在模型删除后不再显示“转换中/同步中”。
+   */
+  const stopModelSyncTask = async (params: {
+    projectId: string
+    modelId: string
+    reason?: string
+  }): Promise<ModelSyncStopResult | null> => {
+    const result = await stopModelSync(params)
+
+    if (result) {
+      removeTasksForModel(params)
+    }
+
+    return result
+  }
+
   const setModelSyncing = (_params: {
     projectId: string
     modelId: string
@@ -1088,6 +1131,7 @@ export const useWorkbenchUploadSync = () => {
     consumeVersionCreated,
     runFullModelSync,
     setModelSyncing,
+    stopModelSyncTask,
     isModelSyncing
   }
 }

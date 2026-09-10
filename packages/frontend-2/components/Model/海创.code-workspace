@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../speckle-server"
+		},
+		{
+			"path": "../../../.."
+		}
+	],
+	"settings": {
+		"explorer.confirmDelete": false,
+		"files.associations": {
+			"*.vue": "vue"
+		}
+	}
+}

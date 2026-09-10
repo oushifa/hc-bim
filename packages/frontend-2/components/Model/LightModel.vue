@@ -872,7 +872,8 @@ const {
   syncVisibleTasks,
   cleanupVisibleTaskSubscriptions,
   getModelRuntimeProgress: getTaskRuntimeProgress,
-  getModelRuntimeProgressMessage
+  getModelRuntimeProgressMessage,
+  stopModelSyncTask
 } = useWorkbenchUploadSync()
 const logger = useLogger()
 const modelLibraryFileInput = ref<HTMLInputElement | null>(null)
@@ -1688,6 +1689,14 @@ const submitDeleteModel = async () => {
 
   try {
     deletingModel.value = true
+
+    // 模型处于转换/同步阶段时，删除前先停止对应的后台任务（停止失败不阻塞删除）
+    await stopModelSyncTask({
+      projectId: model.projectId,
+      modelId: model.id,
+      reason: '模型已删除，任务已停止'
+    })
+
     const deleted = await deleteModel({
       id: model.id,
       projectId: model.projectId

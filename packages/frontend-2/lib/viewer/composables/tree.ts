@@ -4,6 +4,7 @@ import type { Get } from 'type-fest'
 import type { WorldTree, ViewerEventPayload } from '@speckle/viewer'
 import { sortBy, flatten, isArray, isString, keyBy } from 'lodash-es'
 import { isObjectLike } from '~/lib/common/helpers/type'
+import { isHiddenTreeNode } from '~/lib/viewer/helpers/treeDisplay'
 import { ViewerEvent } from '@speckle/viewer'
 import { useEventListener } from '@vueuse/core'
 
@@ -274,6 +275,10 @@ export function useTreeManagement() {
     for (const node of nodes) {
       const nodeId = node.raw?.id || node.guid || ''
       if (!nodeId) continue
+
+      // Display-only: keep unhelpful collections (e.g. "definitionGeometry") out of the
+      // tree entirely, including their subtree. See lib/viewer/helpers/treeDisplay.ts
+      if (isHiddenTreeNode(node)) continue
 
       const speckleData = node.raw
       const isNodeSelected = selectedObjectIds.has(nodeId)

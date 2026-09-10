@@ -65,6 +65,7 @@ import {
   getTargetObjectIds,
   getHeaderAndSubheaderForSpeckleObject
 } from '~~/lib/object-sidebar/helpers'
+import { getTreeNodeDisplayName } from '~~/lib/viewer/helpers/treeDisplay'
 import {
   useSelectionUtilities,
   useHighlightedObjectsUtilities,
@@ -217,7 +218,8 @@ const getTreeItemHeader = (): string => {
   if (!speckleData) return ''
 
   const { header } = getHeaderAndSubheaderForSpeckleObject(speckleData)
-  return header
+  // Display-only rename (e.g. "No Level" -> "OTHER")
+  return getTreeNodeDisplayName(header)
 }
 
 const getTreeItemSubheader = (): string => {
