@@ -38,6 +38,7 @@
     "gqlgen": "yarn workspaces foreach --parallel --interlaced --verbose --worktree --jobs unlimited --include '{@speckle/server,@speckle/frontend-2}' run gqlgen",
     "dev:server": "yarn workspace @speckle/server dev",
     "dev:frontend-2": "yarn workspace @speckle/frontend-2 dev",
+    "dev:frontend-2:proxy": "cross-env NUXT_PUBLIC_API_ORIGIN=/ NUXT_PUBLIC_BACKEND_API_ORIGIN=http://120.133.226.216:3300 SPECKLE_DEV_PROXY_TARGET=http://120.133.226.216:3300 yarn workspace @speckle/frontend-2 dev",
     "dev:shared": "yarn workspace @speckle/shared dev",
     "dev:ifc-import-service": "./packages/ifc-import-service/run.sh",
     "prepare": "husky install",

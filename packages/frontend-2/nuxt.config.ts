@@ -29,6 +29,64 @@ const hydrationMismatchReportingEnabled = ['1', 'true', true, 1].includes(
 
 const external = ['ioredis', 'jsdom']
 
+/**
+ * Optional dev-only proxy to a remote backend (see `yarn dev:frontend-2:proxy` in the
+ * root package.json). When `SPECKLE_DEV_PROXY_TARGET` isn't set, no proxy is installed
+ * at all and the frontend talks directly to `NUXT_PUBLIC_API_ORIGIN`, like before.
+ *
+ * The same command also has to pass `NUXT_PUBLIC_API_ORIGIN=/` so that the browser
+ * keeps using relative urls (`/graphql`, `/api/...`) instead of a hardcoded backend
+ * origin - only then does everything end up in this proxy. `/` is not a usable origin
+ * and `normalizeOrigin()` turns it into `null`, i.e. "same origin" (an *empty* value
+ * wouldn't work, `.env` overrides it).
+ */
+const devProxyTarget = (process.env.SPECKLE_DEV_PROXY_TARGET || '')
+  .trim()
+  .replace(/\/+$/, '')
+
+if (devProxyTarget) {
+  // SSR runs inside this dev server and can't use its own proxy, so it has to reach the
+  // backend directly. This also marks the backend origin as internal, which makes
+  // `useInternalUrlUtils` turn backend absolute URLs (previews/thumbnails, built from
+  // the backend's CANONICAL_URL) into relative ones that the proxy can handle.
+  // (The npm script passes the same value through as well, since build tools like
+  // `yarn gqlgen` read it straight from the environment.)
+  process.env.NUXT_PUBLIC_BACKEND_API_ORIGIN = devProxyTarget
+}
+
+/**
+ * Vite matches these keys against the request url (see its `doesProxyContextMatchUrl`):
+ * keys starting with `^` are used as a regex, everything else is a plain
+ * `url.startsWith(key)`. Plain prefixes are too blunt here, e.g. '/auth' would also
+ * swallow the frontend's own /authn/* pages.
+ */
+const devProxyContexts = [
+  '^/api/',
+  '^/graphql',
+  '^/auth/',
+  '^/objects/',
+  // Backend generated absolute URLs (previews/thumbnails, built from the backend's
+  // CANONICAL_URL) get rewritten to relative ones by `useInternalUrlUtils`, so they
+  // have to be proxied too once the backend origin counts as internal.
+  '^/preview/',
+  '^/static/'
+]
+
+const devProxy = devProxyTarget
+  ? Object.fromEntries(
+      devProxyContexts.map((context) => [
+        context,
+        {
+          target: `${devProxyTarget}/`,
+          changeOrigin: true,
+          ws: context === '^/graphql',
+          // the target keeps its trailing slash, so drop the leading one here
+          rewrite: (path: string) => path.replace(/^\//, '')
+        }
+      ])
+    )
+  : undefined
+
 // https://v3.nuxtjs.org/api/configuration/nuxt.config
 export default defineNuxtConfig({
   ...(buildSourceMaps ? { sourcemap: true } : {}),
@@ -141,49 +199,11 @@ export default defineNuxtConfig({
         // Allowing symlinks
         // allow: ['/home/fabis/Code/random/vue-apollo/']
       },
-      // Dev-only proxy to the backend (remote speckle-server). Only active while
-      // `nuxt dev` runs - production relies on the ingress/Nitro route rules instead.
-      //
-      // Key matching (see Vite's doesProxyContextMatchUrl): keys starting with `^`
-      // are treated as a regex tested against the whole url, anything else is a raw
-      // `url.startsWith(key)` check. Raw prefixes are dangerous here, e.g. '/auth'
-      // would also swallow the frontend's own /authn/* pages.
-      proxy: {
-        '^/api/': {
-          target: 'http://120.133.226.216:3300/',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\//, '')
-        },
-        '^/graphql': {
-          target: 'http://120.133.226.216:3300/',
-          ws: true,
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\//, '')
-        },
-        '^/auth/': {
-          target: 'http://120.133.226.216:3300/',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\//, '')
-        },
-        '^/objects/': {
-          target: 'http://120.133.226.216:3300/',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\//, '')
-        },
-        // Backend generated absolute URLs (previews/thumbnails, based on the
-        // backend's CANONICAL_URL) get rewritten to relative ones by
-        // `useInternalUrlUtils`, so they have to be proxied too.
-        '^/preview/': {
-          target: 'http://120.133.226.216:3300/',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\//, '')
-        },
-        '^/static/': {
-          target: 'http://120.133.226.216:3300/',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\//, '')
-        }
-      }
+      // Dev-only proxy, only installed when SPECKLE_DEV_PROXY_TARGET is set - see
+      // `yarn dev:frontend-2:proxy` in the root package.json. Production doesn't use
+      // it: there the ingress (utils/docker-compose-ingress) or Nitro route rules
+      // take care of routing backend paths.
+      ...(devProxy ? { proxy: devProxy } : {})
     },
 
     build: {

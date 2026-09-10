@@ -109,7 +109,20 @@
         <div
           class="px-2 py-1 text-body-2xs text-foreground-2 border-b border-outline-3 flex items-center justify-between"
         >
-          目录节点
+          <div class="flex items-center gap-1 min-w-0">
+            <span>目录节点</span>
+            <span
+              v-if="isInheritingFilterState"
+              v-tippy="
+                getTooltipProps(
+                  '该节点未保存过，当前显示的是上一个保存过的目录节点的树结构'
+                )
+              "
+              class="truncate text-body-2xs text-[#00b4b6]"
+            >
+              已沿用上一节点
+            </span>
+          </div>
           <FormButton
             v-if="activeCatalogId"
             v-tippy="getTooltipProps('创建根节点')"
@@ -260,7 +273,11 @@ import {
   useViewerCatalogs,
   type ViewerCatalogNode
 } from '~/lib/viewer/composables/catalog'
-import { mapApplicationIdsToIds } from '~/lib/viewer/helpers/catalogHelpers'
+import {
+  mapApplicationIdsToIds,
+  resolveCatalogNodeFilterState,
+  type CatalogNodeFilterState
+} from '~/lib/viewer/helpers/catalogHelpers'
 import { useFilteringDataStore } from '~~/lib/viewer/composables/filtering/dataStore'
 
 graphql(`
@@ -282,6 +299,7 @@ const {
   resources: {
     response: { project }
   },
+  ui: { filters },
   viewer: {
     metadata: { worldTree }
   }
@@ -344,6 +362,10 @@ const catalogs = ref<CatalogTabItem[]>([])
 const activeCatalogItem = ref<CatalogTabItem | undefined>(undefined)
 
 const loadCatalogs = async () => {
+  // 项目/模型切换后，缓存的上一个节点树结构不再适用
+  lastSavedFilterState.value = null
+  isInheritingFilterState.value = false
+
   if (!projectId.value || !currentModelId.value) {
     catalogs.value = []
     activeCatalogItem.value = undefined
@@ -575,6 +597,14 @@ const saveToNode = async ({
     }
 
     replaceCatalogAtIndex(catalogIndex, updatedCatalog)
+
+    // 当前节点已保存，后续选择未保存过的节点时沿用这份树结构
+    lastSavedFilterState.value = {
+      isolatedApplicationIds,
+      hiddenApplicationIds
+    }
+    isInheritingFilterState.value = false
+
     triggerNotification({
       type: ToastNotificationType.Success,
       title: '视图状态保存成功'
@@ -740,25 +770,61 @@ const isNodeLockedInTree = (nodes: RawCatalogNode[], nodeId: string) => {
   return result.ancestors.some((node) => node.locked) || Boolean(result.node.locked)
 }
 
-const applyNodeFilters = (node: RawCatalogNode) => {
+// 上一个保存过树结构的目录节点所保存的隐藏/隔离状态，用于未保存过的节点沿用
+const lastSavedFilterState = ref<CatalogNodeFilterState | null>(null)
+// 当前选中节点是否正在沿用上一个节点保存的树结构
+const isInheritingFilterState = ref(false)
+
+const isSameIdSet = (left: string[], right: string[]) => {
+  if (left.length !== right.length) return false
+
+  const rightSet = new Set(right)
+  return left.every((id) => rightSet.has(id))
+}
+
+const applyFilterState = (filterState: CatalogNodeFilterState) => {
+  const isolatedObjectIds = mapApplicationIdsToIds(
+    filterState.isolatedApplicationIds,
+    dataStore
+  )
+  const hiddenObjectIds = mapApplicationIdsToIds(
+    filterState.hiddenApplicationIds,
+    dataStore
+  )
+
+  // 目标树结构与当前视图一致时无需重置再应用，避免树节点闪烁
+  if (
+    isSameIdSet(filters.isolatedObjectIds.value, isolatedObjectIds) &&
+    isSameIdSet(filters.hiddenObjectIds.value, hiddenObjectIds)
+  )
+    return
+
   resetHiddenAndIsolations()
   nextTick(() => {
-    const isolatedObjectIds = mapApplicationIdsToIds(
-      node.isolatedApplicationIds || [],
-      dataStore
-    )
-    const hiddenObjectIds = mapApplicationIdsToIds(
-      node.hiddenApplicationIds || [],
-      dataStore
-    )
     isolateObjects(isolatedObjectIds, { replace: true })
     hideObjects(hiddenObjectIds, { replace: true })
   })
 }
 
+const applyNodeFilters = (node: RawCatalogNode) => {
+  const { state, inherited } = resolveCatalogNodeFilterState(
+    node,
+    lastSavedFilterState.value
+  )
+
+  isInheritingFilterState.value = inherited
+  if (!state) return
+
+  if (!inherited) lastSavedFilterState.value = state
+  applyFilterState(state)
+}
+
 watch(selectedTreeNodeId, (nodeId) => {
   const currentCatalogId = activeCatalogId.value
-  if (!nodeId || !currentCatalogId) return
+  if (!nodeId || !currentCatalogId) {
+    isInheritingFilterState.value = false
+    return
+  }
 
   const currentCatalog = catalogs.value.find((item) => item.id === currentCatalogId)
   const selectedNode = findNodeById(currentCatalog?.childrens || [], nodeId)

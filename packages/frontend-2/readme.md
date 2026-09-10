@@ -26,6 +26,29 @@ Start the development server on http://localhost:8081
 yarn dev
 ```
 
+### Developing against a remote backend
+
+By default the dev server talks straight to `NUXT_PUBLIC_API_ORIGIN` from `.env`
+(`http://127.0.0.1:3000`, i.e. a locally running `speckle-server`).
+
+To develop against a remote backend instead, run this from the repo root:
+
+```bash
+yarn dev:frontend-2:proxy
+```
+
+That's the same dev server, but it proxies `/api/...`, `/graphql`, `/auth/...`,
+`/objects/...`, `/preview/...` and `/static/...` to `http://120.133.226.216:3300`.
+The browser only ever talks to the dev server itself (no CORS/cookie surprises),
+while SSR reaches the backend directly. Nothing needs to be edited to switch between
+the two modes - the target comes from `SPECKLE_DEV_PROXY_TARGET` (see the proxy block
+in `nuxt.config.ts`), so another backend works too:
+
+```bash
+cross-env NUXT_PUBLIC_API_ORIGIN=/ NUXT_PUBLIC_BACKEND_API_ORIGIN=http://other:3000 \
+  SPECKLE_DEV_PROXY_TARGET=http://other:3000 yarn workspace @speckle/frontend-2 dev
+```
+
 ### Typed GraphQL
 
 Type your queries & fragments using the `graphql()` helper from `~~/lib/common/generated/gql` and then run `yarn gqlgen` (or `yarn gqlgen:watch` to run it in watch mode) to generated TS typing information for these GQL documents.
