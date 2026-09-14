@@ -242,6 +242,160 @@
         </div>
       </div>
 
+      <!-- IFC 转换性能与并发线程配置卡片 -->
+      <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2.5 flex-wrap">
+            <div class="p-1.5 rounded-lg bg-cyan-50 text-[#00b4b6]">
+              <AdjustmentsHorizontalIcon class="size-5" />
+            </div>
+            <h2 class="text-base font-semibold text-slate-900">
+              IFC 转换性能与并发线程配置
+            </h2>
+            <span
+              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-50 text-[#00b4b6] border border-[#00b4b6]/30"
+            >
+              当前生效：{{ currentConcurrency }} 线程
+            </span>
+            <span
+              v-if="serverCpuCount"
+              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600"
+            >
+              主机环境：{{ serverCpuCount }} 核 CPU
+            </span>
+            <span
+              v-if="recommendedConcurrency"
+              class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60"
+            >
+              推荐并发：{{ recommendedConcurrency }} 线程
+            </span>
+          </div>
+
+          <!-- 右侧折叠/展开控制 -->
+          <div class="flex items-center gap-3">
+            <span class="text-xs text-slate-400 hidden sm:inline">
+              调节几何三角化并发数，加快大模型解析速度（目标缩短至 20 分钟内）
+            </span>
+            <button
+              type="button"
+              class="text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors inline-flex items-center gap-1 px-2.5 py-1 rounded border border-slate-200 hover:bg-slate-50"
+              @click="isConcurrencyCollapsed = !isConcurrencyCollapsed"
+            >
+              <span>{{ isConcurrencyCollapsed ? '展开配置' : '收起' }}</span>
+              <ChevronDownIcon
+                class="size-3.5 transition-transform duration-200"
+                :class="{ 'rotate-180': !isConcurrencyCollapsed }"
+              />
+            </button>
+          </div>
+        </div>
+
+        <!-- 设置主体 -->
+        <div v-show="!isConcurrencyCollapsed" class="space-y-4 pt-1">
+          <div
+            class="p-4 rounded-lg bg-slate-50 border border-slate-200/70 flex flex-col md:flex-row md:items-center justify-between gap-4"
+          >
+            <!-- 快捷预设按钮组 -->
+            <div class="space-y-2">
+              <div class="text-xs font-medium text-slate-600 flex items-center gap-1.5">
+                <span>并发线程预设：</span>
+                <span class="text-slate-400 text-[11px]">
+                  (多线程并发加速几何解析与网格三角化)
+                </span>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  v-for="preset in concurrencyPresets"
+                  :key="preset.value"
+                  type="button"
+                  class="px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-150 flex items-center gap-1.5"
+                  :class="[
+                    selectedConcurrency === preset.value
+                      ? 'bg-[#00b4b6] border-[#00b4b6] text-white shadow-sm font-semibold'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-100/70'
+                  ]"
+                  @click="selectedConcurrency = preset.value"
+                >
+                  <span>{{ preset.label }}</span>
+                  <span
+                    class="text-[10px] px-1 rounded"
+                    :class="[
+                      selectedConcurrency === preset.value
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-100 text-slate-500'
+                    ]"
+                  >
+                    {{ preset.desc }}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 自定义数值与保存按钮 -->
+            <div
+              class="flex items-center gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-slate-200 shrink-0"
+            >
+              <div class="flex items-center gap-2">
+                <label
+                  for="custom-concurrency"
+                  class="text-xs font-medium text-slate-600 whitespace-nowrap"
+                >
+                  自定义线程：
+                </label>
+                <div class="relative w-20">
+                  <input
+                    id="custom-concurrency"
+                    v-model.number="selectedConcurrency"
+                    type="number"
+                    min="1"
+                    max="32"
+                    step="1"
+                    class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 font-mono focus:border-[#00b4b6] focus:ring-1 focus:ring-[#00b4b6] focus:outline-none"
+                  />
+                </div>
+                <span class="text-xs text-slate-400">核</span>
+              </div>
+
+              <button
+                type="button"
+                :disabled="
+                  concurrencySaving ||
+                  selectedConcurrency === currentConcurrency ||
+                  selectedConcurrency < 1 ||
+                  selectedConcurrency > 32
+                "
+                class="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[#00b4b6] hover:bg-[#009fa1] text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                @click="openConcurrencyConfirm"
+              >
+                <ArrowPathIcon
+                  v-if="concurrencySaving"
+                  class="size-3.5 animate-spin text-white"
+                />
+                <span>
+                  {{
+                    selectedConcurrency === currentConcurrency
+                      ? '当前已生效'
+                      : '保存并应用'
+                  }}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 提示说明条 -->
+          <div class="flex items-start gap-2 text-[11px] text-slate-500 leading-relaxed px-1">
+            <span class="text-[#00b4b6] font-bold shrink-0">💡 说明：</span>
+            <span>
+              每个 IFC 导入任务将根据此配置启动独立多进程解析池。数值过低（如 1~2 线程）复杂模型的几何三角化阶段耗时较长；建议配置为
+              <strong class="text-slate-700 font-semibold">
+                {{ recommendedConcurrency || 4 }} 线程
+              </strong>
+              ，大模型解析耗时可大幅缩短至 15~20 分钟内。配置即时生效，下次任务或恢复任务自动按新配置执行。
+            </span>
+          </div>
+        </div>
+      </div>
+
       <!-- Tab 切换栏 -->
       <div class="flex border-b border-slate-200 space-x-2">
         <button
@@ -1053,6 +1207,32 @@
           </p>
         </div>
       </CommonConfirmDialog>
+
+      <!-- 二次确认弹窗 4：修改 IFC 转换并发线程确认 (根据用户全局规则使用 commonConfirmdialog) -->
+      <CommonConfirmDialog
+        v-model:open="showConcurrencyDialog"
+        title="修改 IFC 转换并发线程确认"
+        confirm-text="确认应用"
+        :loading="concurrencySaving"
+        @confirm="confirmSaveConcurrency"
+      >
+        <div class="text-sm text-slate-600 space-y-2.5 py-2">
+          <p>
+            确定要将 IFC 模型转换并发线程数从
+            <span class="font-bold text-slate-900">{{ currentConcurrency }} 线程</span>
+            调整为
+            <span class="font-bold text-[#00b4b6]">{{ selectedConcurrency }} 线程</span>
+            吗？
+          </p>
+          <div
+            class="text-xs text-amber-800 bg-amber-50 p-3 rounded-lg border border-amber-200/60 leading-relaxed space-y-1"
+          >
+            <p class="font-semibold">⚠️ 性能与生效说明：</p>
+            <p>• 并发线程数增加会显著提升几何多边形三角化与构件解析速度，缩短大模型耗时至 20 分钟以内；</p>
+            <p>• 保存后配置将直接写入数据库并对后续所有 IFC 转换任务即时生效，无需重启服务。</p>
+          </div>
+        </div>
+      </CommonConfirmDialog>
     </main>
   </div>
 </template>
@@ -1073,7 +1253,8 @@ import {
   ChevronRightIcon,
   CpuChipIcon,
   ExclamationTriangleIcon,
-  ExclamationCircleIcon
+  ExclamationCircleIcon,
+  AdjustmentsHorizontalIcon
 } from '@heroicons/vue/24/outline'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
@@ -1298,8 +1479,26 @@ const queueSummary = ref<Record<FileType, { total: number }>>({
 const showPauseDialog = ref(false)
 const showResumeDialog = ref(false)
 const showRetryDialog = ref(false)
+const showConcurrencyDialog = ref(false)
 const targetJob = ref<ConversionJobItem | null>(null)
 const targetFailedJob = ref<FailedConversionJobItem | null>(null)
+
+// 并发设置相关状态
+const currentConcurrency = ref(4)
+const selectedConcurrency = ref(4)
+const serverCpuCount = ref(4)
+const recommendedConcurrency = ref(4)
+const concurrencyLoading = ref(false)
+const concurrencySaving = ref(false)
+const isConcurrencyCollapsed = ref(false)
+
+const concurrencyPresets = [
+  { value: 1, label: '1 线程', desc: '单核节能' },
+  { value: 2, label: '2 线程', desc: '保守' },
+  { value: 4, label: '4 线程', desc: '推荐平衡' },
+  { value: 6, label: '6 线程', desc: '高性能' },
+  { value: 8, label: '8 线程', desc: '极致速度' }
+]
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -1371,7 +1570,12 @@ const fetchWorkersData = async () => {
 
 // 统一刷新方法
 const handleRefresh = async () => {
-  await Promise.allSettled([fetchQueueData(), fetchAllSummaries(), fetchWorkersData()])
+  await Promise.allSettled([
+    fetchQueueData(),
+    fetchAllSummaries(),
+    fetchWorkersData(),
+    fetchSettings()
+  ])
 }
 
 // 获取当前 Tab 的队列数据，同时附带更新其余格式的摘要数与失败列表
@@ -1624,12 +1828,93 @@ const moveJobDown = (index: number) => {
   submitReorder(list)
 }
 
+// 获取与保存并发设置
+const fetchSettings = async () => {
+  concurrencyLoading.value = true
+  try {
+    const res = await fetch(`${apiOrigin}/api/v1/admin/file-import-queues/settings`, {
+      headers: {
+        ...getAuthHeaders()
+      }
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (typeof data.ifcConcurrency === 'number') {
+        currentConcurrency.value = data.ifcConcurrency
+        // 如果用户尚未编辑或初次加载，同步 selected
+        if (!concurrencySaving.value) {
+          selectedConcurrency.value = data.ifcConcurrency
+        }
+      }
+      if (typeof data.cpuCount === 'number') {
+        serverCpuCount.value = data.cpuCount
+      }
+      if (typeof data.recommendedConcurrency === 'number') {
+        recommendedConcurrency.value = data.recommendedConcurrency
+      }
+    }
+  } catch (err: any) {
+    console.error('Failed to fetch import settings:', err)
+  } finally {
+    concurrencyLoading.value = false
+  }
+}
+
+const openConcurrencyConfirm = () => {
+  if (selectedConcurrency.value < 1 || selectedConcurrency.value > 32) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '参数错误',
+      description: '并发线程数必须介于 1 到 32 之间'
+    })
+    return
+  }
+  showConcurrencyDialog.value = true
+}
+
+const confirmSaveConcurrency = async () => {
+  concurrencySaving.value = true
+  try {
+    const res = await fetch(`${apiOrigin}/api/v1/admin/file-import-queues/settings`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify({
+        ifcConcurrency: selectedConcurrency.value
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data.error || '保存并发设置失败')
+    }
+
+    currentConcurrency.value = selectedConcurrency.value
+    showConcurrencyDialog.value = false
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '并发配置更新成功',
+      description: `IFC 转换并发已调整为 ${selectedConcurrency.value} 线程，后续任务即时生效`
+    })
+  } catch (err: any) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '保存失败',
+      description: err.message
+    })
+  } finally {
+    concurrencySaving.value = false
+  }
+}
+
 let secondTimer: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   fetchQueueData()
   fetchAllSummaries()
   fetchWorkersData()
+  fetchSettings()
 
   // 1秒时钟驱动已耗时计时显示
   secondTimer = setInterval(() => {
@@ -1642,6 +1927,7 @@ onMounted(() => {
       !showPauseDialog.value &&
       !showResumeDialog.value &&
       !showRetryDialog.value &&
+      !showConcurrencyDialog.value &&
       !reorderLoading.value
     ) {
       fetchQueueData()
