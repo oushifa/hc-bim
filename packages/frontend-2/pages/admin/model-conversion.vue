@@ -838,6 +838,83 @@
                 </tr>
               </tbody>
             </table>
+
+            <!-- 分页控制器 -->
+            <div
+              v-if="failedTotal > 0"
+              class="px-4 py-3 bg-slate-50/80 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-600"
+            >
+              <div class="flex items-center gap-3">
+                <span>
+                  共
+                  <span class="font-semibold text-slate-900">{{ failedTotal }}</span>
+                  条失败记录，第
+                  <span class="font-semibold text-slate-900">
+                    {{ (failedPage - 1) * failedPageSize + 1 }}-{{
+                      Math.min(failedPage * failedPageSize, failedTotal)
+                    }}
+                  </span>
+                  条
+                </span>
+                <div class="h-3.5 w-px bg-slate-300"></div>
+                <div class="flex items-center gap-1.5">
+                  <span>每页显示</span>
+                  <select
+                    :value="failedPageSize"
+                    class="bg-white border border-slate-200 rounded px-2 py-0.5 text-xs text-slate-700 focus:border-[#00b4b6] focus:ring-1 focus:ring-[#00b4b6] outline-none shadow-xs"
+                    @change="
+                      changeFailedPageSize(
+                        Number(($event.target as HTMLSelectElement).value)
+                      )
+                    "
+                  >
+                    <option :value="10">10 条</option>
+                    <option :value="20">20 条</option>
+                    <option :value="50">50 条</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1">
+                <!-- 上一页 -->
+                <button
+                  type="button"
+                  :disabled="failedPage <= 1"
+                  class="p-1 rounded border border-slate-200 hover:bg-white text-slate-600 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  title="上一页"
+                  @click="changeFailedPage(failedPage - 1)"
+                >
+                  <ChevronLeftIcon class="size-4" />
+                </button>
+
+                <!-- 页码按钮 -->
+                <button
+                  v-for="p in visibleFailedPages"
+                  :key="p"
+                  type="button"
+                  class="min-w-[28px] h-7 px-1.5 rounded border text-xs font-medium transition-colors"
+                  :class="[
+                    failedPage === p
+                      ? 'bg-[#00b4b6] border-[#00b4b6] text-white font-semibold shadow-xs'
+                      : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700'
+                  ]"
+                  @click="changeFailedPage(p)"
+                >
+                  {{ p }}
+                </button>
+
+                <!-- 下一页 -->
+                <button
+                  type="button"
+                  :disabled="failedPage >= failedTotalPages"
+                  class="p-1 rounded border border-slate-200 hover:bg-white text-slate-600 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                  title="下一页"
+                  @click="changeFailedPage(failedPage + 1)"
+                >
+                  <ChevronRightIcon class="size-4" />
+                </button>
+              </div>
+            </div>
           </div>
 
           <div
@@ -939,6 +1016,8 @@ import {
   QueueListIcon,
   ChevronUpIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   CpuChipIcon,
   ExclamationTriangleIcon,
   ExclamationCircleIcon
@@ -1086,6 +1165,44 @@ const queuedJobs = ref<ConversionJobItem[]>([])
 const pausedJobs = ref<ConversionJobItem[]>([])
 const failedJobs = ref<FailedConversionJobItem[]>([])
 
+// 失败列表分页状态（默认每页 10 条）
+const failedPage = ref(1)
+const failedPageSize = ref(10)
+const failedTotal = ref(0)
+const failedTotalPages = computed(
+  () => Math.ceil(failedTotal.value / failedPageSize.value) || 1
+)
+
+const visibleFailedPages = computed(() => {
+  const total = failedTotalPages.value
+  const current = failedPage.value
+  if (total <= 5) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+  let start = Math.max(1, current - 2)
+  let end = Math.min(total, start + 4)
+  if (end - start < 4) {
+    start = Math.max(1, end - 4)
+  }
+  const pages: number[] = []
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
+})
+
+const changeFailedPage = (p: number) => {
+  if (p < 1 || p > failedTotalPages.value || p === failedPage.value) return
+  failedPage.value = p
+  fetchQueueData()
+}
+
+const changeFailedPageSize = (size: number) => {
+  failedPageSize.value = size
+  failedPage.value = 1
+  fetchQueueData()
+}
+
 const nowTimestamp = ref(Date.now())
 const elapsedTimeText = computed(() => {
   if (!activeJob.value) return '-'
@@ -1135,6 +1252,7 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const switchTab = (tab: FileType) => {
   activeTab.value = tab
+  failedPage.value = 1
   fetchQueueData()
 }
 
@@ -1208,7 +1326,7 @@ const fetchQueueData = async () => {
   loading.value = true
   try {
     const res = await fetch(
-      `${apiOrigin}/api/v1/admin/file-import-queues?fileType=${activeTab.value}`,
+      `${apiOrigin}/api/v1/admin/file-import-queues?fileType=${activeTab.value}&failedPage=${failedPage.value}&failedPageSize=${failedPageSize.value}`,
       {
         headers: {
           ...getAuthHeaders()
@@ -1223,6 +1341,12 @@ const fetchQueueData = async () => {
     queuedJobs.value = data.queuedJobs || []
     pausedJobs.value = data.pausedJobs || []
     failedJobs.value = data.failedJobs || []
+
+    if (data.failedPagination) {
+      failedTotal.value = data.failedPagination.total || 0
+    } else {
+      failedTotal.value = failedJobs.value.length
+    }
 
     const currentTotal =
       (activeJob.value ? 1 : 0) + queuedJobs.value.length + pausedJobs.value.length
