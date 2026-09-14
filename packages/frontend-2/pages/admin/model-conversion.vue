@@ -297,65 +297,136 @@
           <!-- 有正在转换的任务 -->
           <div
             v-if="activeJob"
-            class="bg-gradient-to-r from-cyan-50/50 via-slate-50 to-white rounded-lg border border-cyan-100/70 p-5 flex flex-col md:flex-row md:items-center justify-between gap-5"
+            class="bg-gradient-to-r from-cyan-50/40 via-slate-50 to-white rounded-xl border border-cyan-100/80 p-5 flex flex-col gap-4 shadow-sm"
           >
-            <div class="space-y-2 flex-1 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap">
-                <span class="text-base font-bold text-slate-900 truncate">
-                  {{ activeJob.modelName || activeJob.fileName }}
-                </span>
-                <span
-                  class="px-2 py-0.5 rounded text-xs font-semibold bg-cyan-100 text-cyan-800 uppercase"
-                >
-                  {{ activeJob.fileType }}
-                </span>
-              </div>
-
-              <div
-                class="grid grid-cols-1 sm:grid-cols-3 gap-y-1 gap-x-4 text-xs text-slate-500"
-              >
-                <div>
-                  <span class="text-slate-400">所属项目：</span>
-                  <span class="font-medium text-slate-700">
-                    {{ activeJob.projectName }}
+            <!-- 头部基本信息与操作按钮 -->
+            <div
+              class="flex flex-col md:flex-row md:items-center justify-between gap-4"
+            >
+              <div class="space-y-1.5 flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-base font-bold text-slate-900 truncate">
+                    {{ activeJob.modelName || activeJob.fileName }}
                   </span>
-                </div>
-                <div>
-                  <span class="text-slate-400">原始文件：</span>
                   <span
-                    class="font-medium text-slate-700 truncate"
-                    :title="activeJob.fileName"
+                    class="px-2 py-0.5 rounded text-xs font-semibold bg-cyan-100 text-cyan-800 uppercase"
                   >
-                    {{ activeJob.fileName }}
+                    {{ activeJob.fileType }}
+                  </span>
+                  <span
+                    v-if="activeJob.attempt > 1"
+                    class="px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"
+                  >
+                    第 {{ activeJob.attempt }} 次尝试
                   </span>
                 </div>
-                <div>
-                  <span class="text-slate-400">开始时间：</span>
-                  <span class="font-medium text-slate-700">
-                    {{ formatTime(activeJob.createdAt) }}
-                  </span>
+
+                <div
+                  class="grid grid-cols-1 sm:grid-cols-4 gap-y-1 gap-x-4 text-xs text-slate-500 pt-1"
+                >
+                  <div>
+                    <span class="text-slate-400">所属项目：</span>
+                    <span class="font-medium text-slate-700">
+                      {{ activeJob.projectName }}
+                    </span>
+                  </div>
+                  <div>
+                    <span class="text-slate-400">原始文件：</span>
+                    <span
+                      class="font-medium text-slate-700 truncate"
+                      :title="activeJob.fileName"
+                    >
+                      {{ activeJob.fileName }}
+                    </span>
+                  </div>
+                  <div>
+                    <span class="text-slate-400">开始/重试时间：</span>
+                    <span class="font-medium text-slate-700">
+                      {{ formatTime(activeJob.startedAt || activeJob.updatedAt) }}
+                    </span>
+                  </div>
+                  <div>
+                    <span class="text-slate-400">已耗时：</span>
+                    <span class="font-semibold text-cyan-700 font-mono">
+                      {{ elapsedTimeText }}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div
-                v-if="activeJob.progressMessage"
-                class="text-xs text-cyan-700 bg-cyan-50/80 px-2.5 py-1 rounded inline-block"
-              >
-                阶段提示：{{ activeJob.progressMessage }}
+              <!-- 暂停操作按钮 -->
+              <div class="shrink-0 flex items-center gap-3">
+                <button
+                  type="button"
+                  :disabled="actionLoading"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-medium text-sm shadow-sm transition-colors disabled:opacity-50"
+                  @click="openPauseConfirm(activeJob)"
+                >
+                  <PauseIcon class="size-4" />
+                  暂停转换并执行下一个
+                </button>
               </div>
             </div>
 
-            <!-- 暂停操作按钮 -->
-            <div class="shrink-0 flex items-center gap-3">
-              <button
-                type="button"
-                :disabled="actionLoading"
-                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-medium text-sm shadow-sm transition-colors disabled:opacity-50"
-                @click="openPauseConfirm(activeJob)"
+            <!-- 当前详细情况（正在做什么）与动态进度条 -->
+            <div
+              class="bg-white/80 rounded-lg border border-slate-200/80 p-4 space-y-3"
+            >
+              <div class="flex items-center justify-between text-xs gap-3 flex-wrap">
+                <!-- 左侧工作阶段与动作描述 -->
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span
+                    v-if="getPhaseInfo(activeJob.progressPhase)"
+                    class="px-2.5 py-0.5 rounded-full font-semibold border text-xs"
+                    :class="[
+                      getPhaseInfo(activeJob.progressPhase)?.badgeClass,
+                      'border-current/20'
+                    ]"
+                  >
+                    {{ getPhaseInfo(activeJob.progressPhase)?.label }}
+                  </span>
+                  <span class="font-medium text-slate-800">
+                    {{
+                      activeJob.progressMessage ||
+                      getPhaseInfo(activeJob.progressPhase)?.desc ||
+                      '正在准备转换...'
+                    }}
+                  </span>
+                </div>
+
+                <!-- 右侧百分比数字 -->
+                <div
+                  class="flex items-center gap-1 text-xs font-semibold text-[#00b4b6] font-mono"
+                >
+                  <span>
+                    {{
+                      activeJob.progressPercent !== null &&
+                      activeJob.progressPercent !== undefined
+                        ? `${activeJob.progressPercent}%`
+                        : '处理中'
+                    }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- 进度条本体 -->
+              <div
+                class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden p-0.5 border border-slate-200/60"
               >
-                <PauseIcon class="size-4" />
-                暂停转换并执行下一个
-              </button>
+                <div
+                  class="bg-gradient-to-r from-cyan-400 to-[#00b4b6] h-full rounded-full transition-all duration-300 ease-out relative"
+                  :style="{
+                    width: `${Math.max(
+                      3,
+                      Math.min(100, activeJob.progressPercent ?? 15)
+                    )}%`
+                  }"
+                >
+                  <div
+                    class="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"
+                  ></div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -608,6 +679,174 @@
             暂无被暂停的 {{ activeTab.toUpperCase() }} 模型
           </div>
         </div>
+
+        <!-- 4. 转换失败记录 (Failed Models) -->
+        <div class="bg-white rounded-xl border border-slate-200/80 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+              <div class="p-1 rounded bg-rose-50 text-rose-600">
+                <ExclamationCircleIcon class="size-5" />
+              </div>
+              <h2 class="text-base font-semibold text-slate-900">转换失败记录</h2>
+              <span
+                class="px-2 py-0.5 rounded-full text-xs font-semibold"
+                :class="[
+                  failedJobs.length > 0
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                    : 'bg-slate-100 text-slate-500'
+                ]"
+              >
+                {{ failedJobs.length }} 个模型
+              </span>
+            </div>
+
+            <span class="text-xs text-slate-400">
+              记录最近转换失败的模型任务，支持一键插队重新转换
+            </span>
+          </div>
+
+          <div
+            v-if="failedJobs.length > 0"
+            class="overflow-x-auto border border-slate-200 rounded-lg"
+          >
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+              <thead class="bg-slate-50/80 text-slate-600">
+                <tr>
+                  <th scope="col" class="py-3 px-4 text-left font-semibold">
+                    模型名称
+                  </th>
+                  <th scope="col" class="py-3 px-4 text-left font-semibold">
+                    所属项目
+                  </th>
+                  <th scope="col" class="py-3 px-4 text-left font-semibold">
+                    失败时进度与正在做什么
+                  </th>
+                  <th scope="col" class="py-3 px-4 text-left font-semibold">
+                    失败原因
+                  </th>
+                  <th
+                    scope="col"
+                    class="py-3 px-4 text-left font-semibold whitespace-nowrap"
+                  >
+                    失败时间 / 尝试
+                  </th>
+                  <th
+                    scope="col"
+                    class="py-3 px-4 text-right font-semibold w-36 whitespace-nowrap"
+                  >
+                    操作
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 bg-white">
+                <tr
+                  v-for="job in failedJobs"
+                  :key="job.id"
+                  class="hover:bg-rose-50/20 transition-colors"
+                >
+                  <!-- 模型名称 -->
+                  <td class="py-3.5 px-4 font-medium text-slate-900">
+                    <div class="flex items-center gap-2">
+                      <span class="truncate max-w-[200px]" :title="job.modelName">
+                        {{ job.modelName }}
+                      </span>
+                      <span
+                        class="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-slate-100 text-slate-500 uppercase"
+                      >
+                        {{ job.fileType }}
+                      </span>
+                    </div>
+                    <div
+                      class="text-[11px] text-slate-400 truncate max-w-[200px] mt-0.5"
+                      :title="job.fileName"
+                    >
+                      {{ job.fileName }}
+                    </div>
+                  </td>
+
+                  <!-- 所属项目 -->
+                  <td
+                    class="py-3.5 px-4 text-slate-600 truncate max-w-[150px]"
+                    :title="job.projectName"
+                  >
+                    {{ job.projectName }}
+                  </td>
+
+                  <!-- 失败时进度与正在做什么 -->
+                  <td class="py-3.5 px-4 max-w-[260px]">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          v-if="getPhaseInfo(job.failedPhase)"
+                          class="px-2 py-0.5 rounded text-[11px] font-medium border"
+                          :class="[
+                            getPhaseInfo(job.failedPhase)?.badgeClass,
+                            'border-current/20'
+                          ]"
+                        >
+                          {{ getPhaseInfo(job.failedPhase)?.label }}
+                        </span>
+                        <span
+                          v-if="
+                            job.failedPercent !== null &&
+                            job.failedPercent !== undefined
+                          "
+                          class="px-1.5 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700 font-mono"
+                        >
+                          {{ job.failedPercent }}%
+                        </span>
+                      </div>
+                      <p
+                        class="text-xs text-slate-600 truncate"
+                        :title="job.failedProgressMessage || '无步骤描述'"
+                      >
+                        {{ job.failedProgressMessage || '阶段中断' }}
+                      </p>
+                    </div>
+                  </td>
+
+                  <!-- 失败原因 -->
+                  <td class="py-3.5 px-4 max-w-[280px]">
+                    <div
+                      class="text-xs text-rose-700 bg-rose-50/80 p-2 rounded border border-rose-200/50 break-words font-mono line-clamp-2 hover:line-clamp-none cursor-pointer transition-all"
+                      :title="job.errorMessage || '未知异常'"
+                    >
+                      {{ job.errorMessage || '未知异常' }}
+                    </div>
+                  </td>
+
+                  <!-- 失败时间与尝试次数 -->
+                  <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">
+                    <div>{{ formatTime(job.failedAt) }}</div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">
+                      尝试 {{ job.attempt }} / {{ job.maxAttempt }} 次
+                    </div>
+                  </td>
+
+                  <!-- 操作列 -->
+                  <td class="py-3.5 px-4 text-right whitespace-nowrap">
+                    <button
+                      type="button"
+                      :disabled="actionLoading"
+                      class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 active:bg-black text-white text-xs font-semibold transition-colors disabled:opacity-50 shadow-sm"
+                      @click="openRetryConfirm(job)"
+                    >
+                      <ArrowPathIcon class="size-3.5" />
+                      重新转换
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div
+            v-else
+            class="rounded-lg border border-dashed border-slate-200 py-6 text-center text-slate-400 text-sm bg-slate-50/50"
+          >
+            暂无转换失败的 {{ activeTab.toUpperCase() }} 模型记录
+          </div>
+        </div>
       </div>
 
       <!-- 二次确认弹窗 1：暂停转换确认 -->
@@ -659,6 +898,31 @@
           </p>
         </div>
       </CommonConfirmDialog>
+
+      <!-- 二次确认弹窗 3：重新转换失败模型确认 (根据用户全局规则使用 commonConfirmdialog) -->
+      <CommonConfirmDialog
+        v-model:open="showRetryDialog"
+        title="重新转换模型确认"
+        confirm-text="确认重新转换"
+        :loading="actionLoading"
+        @confirm="confirmRetryJob"
+      >
+        <div class="text-sm text-slate-600 space-y-2 py-2">
+          <p>
+            确定要重新转换失败的模型
+            <span class="font-semibold text-slate-900">
+              「{{ targetFailedJob?.modelName }}」
+            </span>
+            吗？
+          </p>
+          <p
+            class="text-xs text-cyan-700 bg-cyan-50 p-2.5 rounded border border-cyan-200/60"
+          >
+            ℹ️
+            提示：系统将清理之前的失败日志与进度，并将该模型直接插队进入等待队列首位（#1）优先开始重新转换。
+          </p>
+        </div>
+      </CommonConfirmDialog>
     </main>
   </div>
 </template>
@@ -676,7 +940,8 @@ import {
   ChevronUpIcon,
   ChevronDownIcon,
   CpuChipIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  ExclamationCircleIcon
 } from '@heroicons/vue/24/outline'
 import { ToastNotificationType, useGlobalToast } from '~~/lib/common/composables/toast'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
@@ -714,11 +979,94 @@ interface ConversionJobItem {
   status: 'processing' | 'queued' | 'paused' | string
   createdAt: string
   updatedAt: string
+  startedAt?: string | null
   attempt: number
   maxAttempt: number
   queuePosition?: number | null
+  progressPhase?: string | null
   progressPercent?: number | null
   progressMessage?: string | null
+}
+
+interface FailedConversionJobItem {
+  id: string
+  jobType: string
+  fileType: string
+  fileName: string
+  projectId: string
+  projectName: string
+  modelId: string
+  modelName: string
+  blobId: string
+  status: string
+  createdAt: string
+  updatedAt: string
+  failedAt: string
+  attempt: number
+  maxAttempt: number
+  failedPhase?: string | null
+  failedPercent?: number | null
+  failedProgressMessage?: string | null
+  errorMessage?: string | null
+}
+
+const PHASE_MAP: Record<string, { label: string; desc: string; badgeClass: string }> = {
+  starting: {
+    label: '环境准备',
+    desc: '正在准备转换运行环境并初始化参数',
+    badgeClass: 'bg-slate-100 text-slate-700'
+  },
+  downloading_source: {
+    label: '下载源文件',
+    desc: '正在从对象存储下载原始模型文件',
+    badgeClass: 'bg-blue-50 text-blue-700'
+  },
+  opening_ifc: {
+    label: '解析 IFC 结构',
+    desc: '正在读取 IFC 拓扑结构与根实体',
+    badgeClass: 'bg-indigo-50 text-indigo-700'
+  },
+  preprocessing_geometry: {
+    label: '几何网格预处理',
+    desc: '正在提取并三角化几何体，分批暂存至磁盘缓存',
+    badgeClass: 'bg-cyan-50 text-cyan-700'
+  },
+  converting_objects: {
+    label: '构建对象树',
+    desc: '正在提取属性并构建 Speckle 构件树',
+    badgeClass: 'bg-teal-50 text-teal-700'
+  },
+  uploading_model_object: {
+    label: '上传模型对象',
+    desc: '正在向服务端批量上传转换后的构件对象',
+    badgeClass: 'bg-sky-50 text-sky-700'
+  },
+  creating_version: {
+    label: '创建新版本',
+    desc: '正在生成 Speckle 模型版本记录并提交',
+    badgeClass: 'bg-emerald-50 text-emerald-700'
+  },
+  completed: {
+    label: '转换完成',
+    desc: '模型转换已全部完成',
+    badgeClass: 'bg-emerald-50 text-emerald-700'
+  },
+  failed: {
+    label: '转换失败',
+    desc: '转换发生异常中断',
+    badgeClass: 'bg-rose-50 text-rose-700'
+  }
+}
+
+const getPhaseInfo = (phase?: string | null) => {
+  if (!phase) return null
+  return (
+    PHASE_MAP[phase.toLowerCase()] || {
+      label: phase,
+      desc: phase,
+      badgeClass: 'bg-slate-100 text-slate-700'
+    }
+  )
 }
 
 const tabs: { type: FileType; label: string }[] = [
@@ -736,6 +1084,25 @@ const actionLoading = ref(false)
 const activeJob = ref<ConversionJobItem | null>(null)
 const queuedJobs = ref<ConversionJobItem[]>([])
 const pausedJobs = ref<ConversionJobItem[]>([])
+const failedJobs = ref<FailedConversionJobItem[]>([])
+
+const nowTimestamp = ref(Date.now())
+const elapsedTimeText = computed(() => {
+  if (!activeJob.value) return '-'
+  const startTimeStr =
+    activeJob.value.startedAt || activeJob.value.updatedAt || activeJob.value.createdAt
+  if (!startTimeStr) return '-'
+  const diffSec = Math.max(
+    0,
+    Math.floor((nowTimestamp.value - new Date(startTimeStr).getTime()) / 1000)
+  )
+  const minutes = Math.floor(diffSec / 60)
+  const seconds = diffSec % 60
+  if (minutes > 0) {
+    return `${minutes}分${seconds.toString().padStart(2, '0')}秒`
+  }
+  return `${seconds}秒`
+})
 
 interface WorkerItem {
   workerId: string
@@ -760,7 +1127,9 @@ const queueSummary = ref<Record<FileType, { total: number }>>({
 // 弹窗状态
 const showPauseDialog = ref(false)
 const showResumeDialog = ref(false)
+const showRetryDialog = ref(false)
 const targetJob = ref<ConversionJobItem | null>(null)
+const targetFailedJob = ref<FailedConversionJobItem | null>(null)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -834,7 +1203,7 @@ const handleRefresh = async () => {
   await Promise.allSettled([fetchQueueData(), fetchAllSummaries(), fetchWorkersData()])
 }
 
-// 获取当前 Tab 的队列数据，同时附带更新其余格式的摘要数
+// 获取当前 Tab 的队列数据，同时附带更新其余格式的摘要数与失败列表
 const fetchQueueData = async () => {
   loading.value = true
   try {
@@ -853,6 +1222,7 @@ const fetchQueueData = async () => {
     activeJob.value = data.activeJob || null
     queuedJobs.value = data.queuedJobs || []
     pausedJobs.value = data.pausedJobs || []
+    failedJobs.value = data.failedJobs || []
 
     const currentTotal =
       (activeJob.value ? 1 : 0) + queuedJobs.value.length + pausedJobs.value.length
@@ -975,6 +1345,46 @@ const confirmResumeJob = async () => {
   }
 }
 
+// 重新转换操作
+const openRetryConfirm = (job: FailedConversionJobItem) => {
+  targetFailedJob.value = job
+  showRetryDialog.value = true
+}
+
+const confirmRetryJob = async () => {
+  if (!targetFailedJob.value) return
+  actionLoading.value = true
+  try {
+    const res = await fetch(
+      `${apiOrigin}/api/v1/admin/file-import-queues/${targetFailedJob.value.id}/retry`,
+      {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders()
+        }
+      }
+    )
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || '重试失败')
+
+    triggerNotification({
+      type: ToastNotificationType.Success,
+      title: '模型转换已重置',
+      description: '该模型已成功排入等待队列首位（#1）并重新开始转换'
+    })
+    showRetryDialog.value = false
+    await fetchQueueData()
+  } catch (err: any) {
+    triggerNotification({
+      type: ToastNotificationType.Danger,
+      title: '重试失败',
+      description: err.message
+    })
+  } finally {
+    actionLoading.value = false
+  }
+}
+
 // 队列顺序调整
 const submitReorder = async (newJobs: ConversionJobItem[]) => {
   reorderLoading.value = true
@@ -1037,16 +1447,24 @@ const moveJobDown = (index: number) => {
   submitReorder(list)
 }
 
+let secondTimer: ReturnType<typeof setInterval> | null = null
+
 onMounted(() => {
   fetchQueueData()
   fetchAllSummaries()
   fetchWorkersData()
+
+  // 1秒时钟驱动已耗时计时显示
+  secondTimer = setInterval(() => {
+    nowTimestamp.value = Date.now()
+  }, 1000)
 
   pollTimer = setInterval(() => {
     if (
       autoRefresh.value &&
       !showPauseDialog.value &&
       !showResumeDialog.value &&
+      !showRetryDialog.value &&
       !reorderLoading.value
     ) {
       fetchQueueData()
@@ -1060,6 +1478,10 @@ onBeforeUnmount(() => {
   if (pollTimer) {
     clearInterval(pollTimer)
     pollTimer = null
+  }
+  if (secondTimer) {
+    clearInterval(secondTimer)
+    secondTimer = null
   }
 })
 </script>
