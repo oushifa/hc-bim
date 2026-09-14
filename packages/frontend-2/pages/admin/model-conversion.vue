@@ -718,8 +718,14 @@
                   <th scope="col" class="py-3 px-4 text-left font-semibold">
                     所属项目
                   </th>
+                  <th
+                    scope="col"
+                    class="py-3 px-4 text-left font-semibold whitespace-nowrap"
+                  >
+                    失败阶段
+                  </th>
                   <th scope="col" class="py-3 px-4 text-left font-semibold">
-                    失败时进度与正在做什么
+                    失败进度与动作
                   </th>
                   <th scope="col" class="py-3 px-4 text-left font-semibold">
                     失败原因
@@ -747,7 +753,7 @@
                   <!-- 模型名称 -->
                   <td class="py-3.5 px-4 font-medium text-slate-900">
                     <div class="flex items-center gap-2">
-                      <span class="truncate max-w-[200px]" :title="job.modelName">
+                      <span class="truncate max-w-[180px]" :title="job.modelName">
                         {{ job.modelName }}
                       </span>
                       <span
@@ -757,7 +763,7 @@
                       </span>
                     </div>
                     <div
-                      class="text-[11px] text-slate-400 truncate max-w-[200px] mt-0.5"
+                      class="text-[11px] text-slate-400 truncate max-w-[180px] mt-0.5"
                       :title="job.fileName"
                     >
                       {{ job.fileName }}
@@ -766,47 +772,93 @@
 
                   <!-- 所属项目 -->
                   <td
-                    class="py-3.5 px-4 text-slate-600 truncate max-w-[150px]"
+                    class="py-3.5 px-4 text-slate-600 truncate max-w-[140px]"
                     :title="job.projectName"
                   >
                     {{ job.projectName }}
                   </td>
 
-                  <!-- 失败时进度与正在做什么 -->
-                  <td class="py-3.5 px-4 max-w-[260px]">
+                  <!-- 失败阶段 -->
+                  <td class="py-3.5 px-4 whitespace-nowrap">
                     <div class="space-y-1">
-                      <div class="flex items-center gap-1.5 flex-wrap">
-                        <span
-                          v-if="getPhaseInfo(job.failedPhase)"
-                          class="px-2 py-0.5 rounded text-[11px] font-medium border"
-                          :class="[
-                            getPhaseInfo(job.failedPhase)?.badgeClass,
-                            'border-current/20'
-                          ]"
-                        >
-                          {{ getPhaseInfo(job.failedPhase)?.label }}
-                        </span>
+                      <span
+                        v-if="getPhaseInfo(job.failedPhase)"
+                        class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border shadow-2xs"
+                        :class="[
+                          getPhaseInfo(job.failedPhase)?.badgeClass,
+                          'border-current/20'
+                        ]"
+                      >
+                        {{ getPhaseInfo(job.failedPhase)?.label }}
+                      </span>
+                      <span
+                        v-else
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600"
+                      >
+                        {{ job.failedPhase || '未知阶段' }}
+                      </span>
+                      <div class="text-[11px] text-slate-400">
+                        {{ getPhaseInfo(job.failedPhase)?.desc || '工序记录' }}
+                      </div>
+                    </div>
+                  </td>
+
+                  <!-- 失败进度与动作 -->
+                  <td class="py-3.5 px-4 min-w-[200px] max-w-[280px]">
+                    <div class="space-y-1.5">
+                      <div class="flex items-center gap-2">
                         <span
                           v-if="
                             job.failedPercent !== null &&
                             job.failedPercent !== undefined
                           "
-                          class="px-1.5 py-0.5 rounded bg-slate-100 text-[11px] font-semibold text-slate-700 font-mono"
+                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold font-mono shadow-2xs"
+                          :class="[
+                            job.failedPercent >= 80
+                              ? 'bg-sky-100 text-sky-800 border border-sky-300/60'
+                              : job.failedPercent >= 40
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300/60'
+                              : 'bg-slate-100 text-slate-800 border border-slate-300/60'
+                          ]"
                         >
                           {{ job.failedPercent }}%
                         </span>
+                        <span v-else class="text-xs text-slate-400 font-mono">--%</span>
+
+                        <!-- 微型进度指示条 -->
+                        <div
+                          class="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden border border-slate-200/40"
+                        >
+                          <div
+                            class="h-full rounded-full transition-all duration-300"
+                            :class="[
+                              job.failedPercent && job.failedPercent >= 80
+                                ? 'bg-sky-500'
+                                : job.failedPercent && job.failedPercent >= 40
+                                ? 'bg-amber-500'
+                                : 'bg-slate-400'
+                            ]"
+                            :style="{
+                              width: `${Math.max(
+                                4,
+                                Math.min(100, job.failedPercent ?? 0)
+                              )}%`
+                            }"
+                          ></div>
+                        </div>
                       </div>
+
                       <p
-                        class="text-xs text-slate-600 truncate"
-                        :title="job.failedProgressMessage || '无步骤描述'"
+                        class="text-xs text-slate-600 truncate font-mono"
+                        :title="job.failedProgressMessage || '无具体步骤描述'"
                       >
-                        {{ job.failedProgressMessage || '阶段中断' }}
+                        {{ job.failedProgressMessage || '阶段异常中断' }}
                       </p>
                     </div>
                   </td>
 
                   <!-- 失败原因 -->
-                  <td class="py-3.5 px-4 max-w-[280px]">
+                  <td class="py-3.5 px-4 max-w-[260px]">
                     <div
                       class="text-xs text-rose-700 bg-rose-50/80 p-2 rounded border border-rose-200/50 break-words font-mono line-clamp-2 hover:line-clamp-none cursor-pointer transition-all"
                       :title="job.errorMessage || '未知异常'"
@@ -861,6 +913,7 @@
                   <span>每页显示</span>
                   <select
                     :value="failedPageSize"
+                    aria-label="每页显示条数"
                     class="bg-white border border-slate-200 rounded px-2 py-0.5 text-xs text-slate-700 focus:border-[#00b4b6] focus:ring-1 focus:ring-[#00b4b6] outline-none shadow-xs"
                     @change="
                       changeFailedPageSize(
