@@ -870,6 +870,7 @@ const {
   isModelSyncing,
   retryTask,
   syncVisibleTasks,
+  onModelSyncSettled,
   cleanupVisibleTaskSubscriptions,
   getModelRuntimeProgress: getTaskRuntimeProgress,
   getModelRuntimeProgressMessage,
@@ -910,6 +911,17 @@ const getModelNameFromFile = (fileName: string) => {
 }
 
 const shouldSubscribeProjectUpdates = (model: Model) => {
+  // 中海同步阶段（DTP 上传/转换）可能晚于 Speckle 转换完成，
+  // 此时仍需持续轮询任务状态，否则“同步中”会一直停留在页面上。
+  if (
+    isModelSyncing({
+      projectId: model.projectId,
+      modelId: model.id
+    })
+  ) {
+    return true
+  }
+
   if (model.latestUpload?.id && !model.latestUpload.uploadComplete) {
     return true
   }
@@ -939,6 +951,11 @@ const scheduleRefreshModels = () => {
     void fetchModels({ silent: true })
   }, 200)
 }
+
+// 中海同步任务进入终态（成功/失败）后，自动刷新模型列表状态，无需手动刷新
+onModelSyncSettled(() => {
+  scheduleRefreshModels()
+})
 
 const createModelNameError = computed(() => {
   const sanitized = sanitizeModelName(createModelName.value || '')

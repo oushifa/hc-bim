@@ -96,6 +96,18 @@ const FINAL_STATUSES: WorkbenchUploadSyncTaskStatus[] = ['succeeded', 'failed']
 const CLIENT_UPLOAD_ONLY_STATUSES: WorkbenchUploadSyncTaskStatus[] = ['waiting_upload']
 const RVT_FILE_NAME_RE = /\.(rvt|nwd|nwc)$/i
 
+/**
+ * 中海（DTP）同步阶段进度基线，与后端 DtpSyncStageProgress 对应：
+ * 获取上传信息 65% -> 上传文件到中海 70% -> 触发中海转换 80% -> 轮询每轮 +2%（上限 99%）。
+ * 后端未上报 progressPercent 时按此兜底。
+ */
+const SYNC_STAGE_FALLBACK_PERCENT = new Map<WorkbenchUploadSyncTaskStatus, number>([
+  ['syncing_dtp_model', 65],
+  ['syncing_external_ids', 70],
+  ['triggering_model_transform', 80],
+  ['polling_model_transform', 80]
+])
+
 export type WorkbenchModelSyncRuntimeProgress = {
   percent: number
   phase: string | null
@@ -103,6 +115,12 @@ export type WorkbenchModelSyncRuntimeProgress = {
 }
 
 type VisibleTaskTarget = {
+  projectId: string
+  modelIds: string[]
+}
+
+/** 模型同步任务从“进行中”进入终态（成功/失败/消失）时回调的载荷 */
+export type ModelSyncSettledPayload = {
   projectId: string
   modelIds: string[]
 }
@@ -434,40 +452,45 @@ export const useWorkbenchUploadSync = () => {
     const task = getLatestTask(params)
     if (!task) return null
 
-    if (
-      task.status !== 'waiting_upload' &&
-      task.status !== 'speckle_converting' &&
-      task.status !== 'failed'
-    ) {
+    // 中海同步阶段：优先采用后端上报的细分进度（65/70/80/轮询递增），
+    // 后端未上报时按阶段基线兜底。
+    const syncStageFallback = SYNC_STAGE_FALLBACK_PERCENT.get(task.status)
+    if (typeof syncStageFallback === 'number') {
+      const reported = clampProgressPercent(task.progressPercent)
       return {
-        percent: RVT_CONVERSION_RUNTIME_END,
-        phase: 'completed',
-        message: '转换完成'
+        percent:
+          reported === null ? syncStageFallback : Math.max(syncStageFallback, reported),
+        phase: task.progressPhase,
+        message: task.progressMessage
       }
     }
 
-    if (!isRvtSyncTask(task)) return null
+    if (task.status === 'waiting_upload' || task.status === 'speckle_converting') {
+      if (!isRvtSyncTask(task)) return null
 
-    if (
-      task.versionId ||
-      task.progressPercent === 100 ||
-      task.progressPhase === 'completed'
-    ) {
+      if (
+        task.versionId ||
+        task.progressPercent === 100 ||
+        task.progressPhase === 'completed'
+      ) {
+        return {
+          percent: RVT_CONVERSION_RUNTIME_END,
+          phase: 'completed',
+          message: '转换完成'
+        }
+      }
+
+      const percent = mapRvtConversionProgressToRuntimePercent(task.progressPercent)
+      if (percent === null) return null
+
       return {
-        percent: RVT_CONVERSION_RUNTIME_END,
-        phase: 'completed',
-        message: '转换完成'
+        percent,
+        phase: task.progressPhase,
+        message: task.progressMessage
       }
     }
 
-    const percent = mapRvtConversionProgressToRuntimePercent(task.progressPercent)
-    if (percent === null) return null
-
-    return {
-      percent,
-      phase: task.progressPhase,
-      message: task.progressMessage
-    }
+    return null
   }
 
   const getModelRuntimeProgressMessage = (params: {
@@ -964,6 +987,34 @@ export const useWorkbenchUploadSync = () => {
     scheduleNextPoll()
   }
 
+  /**
+   * 页面注册“模型同步已完成（成功/失败/任务消失）”回调。
+   * 用于在轮询发现任务进入终态后，自动刷新页面上的模型状态，无需手动刷新。
+   */
+  const modelSyncSettledListeners = new Set<
+    (payload: ModelSyncSettledPayload) => void
+  >()
+
+  const onModelSyncSettled = (listener: (payload: ModelSyncSettledPayload) => void) => {
+    modelSyncSettledListeners.add(listener)
+    onScopeDispose(() => {
+      modelSyncSettledListeners.delete(listener)
+    })
+  }
+
+  const notifyModelSyncSettled = (payload: ModelSyncSettledPayload) => {
+    for (const listener of [...modelSyncSettledListeners]) {
+      try {
+        listener(payload)
+      } catch (error) {
+        logger.warn(
+          { projectId: payload.projectId, modelIds: payload.modelIds, error },
+          '模型同步完成回调执行失败'
+        )
+      }
+    }
+  }
+
   const syncVisibleTasks = async (targets: VisibleTaskTarget[]) => {
     currentVisibleTargets = targets
     visibleTaskSyncRunId += 1
@@ -976,10 +1027,16 @@ export const useWorkbenchUploadSync = () => {
       .filter((target) => target.projectId && target.modelIds.length)
 
     const targetsWithTasks: VisibleTaskTarget[] = []
+    const settledTargets: VisibleTaskTarget[] = []
 
     await Promise.all(
       normalizedTargets.map(async (target) => {
         try {
+          // 记录本次快照前仍在“进行中”的模型，用于识别已经完成同步的模型
+          const runningModelIdsBeforeSync = target.modelIds.filter((modelId) =>
+            isModelSyncing({ projectId: target.projectId, modelId })
+          )
+
           const response = await fetchProjectTaskSnapshot(target)
           if (currentRunId !== visibleTaskSyncRunId) return
 
@@ -988,6 +1045,16 @@ export const useWorkbenchUploadSync = () => {
             modelIds: target.modelIds,
             serverTasks: response.data
           })
+
+          const settledModelIds = runningModelIdsBeforeSync.filter(
+            (modelId) => !isModelSyncing({ projectId: target.projectId, modelId })
+          )
+          if (settledModelIds.length) {
+            settledTargets.push({
+              projectId: target.projectId,
+              modelIds: settledModelIds
+            })
+          }
 
           if (response.data.length) {
             targetsWithTasks.push(target)
@@ -1007,6 +1074,11 @@ export const useWorkbenchUploadSync = () => {
 
     if (currentRunId !== visibleTaskSyncRunId) return
     startPollingIfNeeded()
+
+    // 同步任务刚结束的模型需要重新拉取模型数据（seedId 等），以刷新页面状态
+    for (const target of settledTargets) {
+      notifyModelSyncSettled(target)
+    }
 
     const nextSubscriptionKey = targetsWithTasks.length
       ? buildVisibleTaskBatchSubscriptionKey(targetsWithTasks)
@@ -1127,6 +1199,7 @@ export const useWorkbenchUploadSync = () => {
     retryTask,
     executeTask: retryTask,
     syncVisibleTasks,
+    onModelSyncSettled,
     cleanupVisibleTaskSubscriptions,
     consumeVersionCreated,
     runFullModelSync,

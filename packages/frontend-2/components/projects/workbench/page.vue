@@ -853,6 +853,7 @@ const {
   isModelSyncing,
   retryTask,
   syncVisibleTasks,
+  onModelSyncSettled,
   cleanupVisibleTaskSubscriptions,
   getModelRuntimeProgress: getTaskRuntimeProgress,
   getModelRuntimeProgressMessage,
@@ -1632,6 +1633,33 @@ const loadSourceModelObjectTree = async (params: {
   return objects
 }
 
+/**
+ * 导入完成后调用后端，把模型库源模型的源文件 / 中海同步标识 / 自定义属性
+ * 复制到刚导入的模型上。
+ */
+const attachImportedModelSource = async (params: {
+  modelId: string
+  versionId: string
+  sourceProjectId: string
+  sourceModelId: string
+}) => {
+  await $fetch(
+    `${apiOrigin}/api/v1/projects/${props.projectId}/models/${params.modelId}/import-library-source`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getApiHeaders()
+      },
+      body: {
+        sourceProjectId: params.sourceProjectId,
+        sourceModelId: params.sourceModelId,
+        versionId: params.versionId
+      }
+    }
+  )
+}
+
 const targetRetryModel = ref<ModelListItem | null>(null)
 const showRetryConfirm = ref(false)
 const isRetryingModel = ref(false)
@@ -2058,6 +2086,11 @@ const refreshModels = async () => {
   await Promise.allSettled([refetchBaseModels(), refetchExtraModels()])
 }
 
+// 中海同步任务进入终态（成功/失败）后，自动刷新模型列表状态，无需手动刷新
+onModelSyncSettled(() => {
+  void refreshModels()
+})
+
 const modelsLoading = computed(() => {
   if (shouldSkipModelsQuery.value) return false
   return baseModelsLoading.value || extraModelsLoading.value
@@ -2185,24 +2218,37 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
         throw new Error(`模型 ${sourceModel.title} 创建失败`)
       }
 
-      await apollo
-        .mutate({
-          mutation: createImportedVersionMutation,
-          variables: {
-            input: {
-              projectId: props.projectId,
-              modelId: createdModelId,
-              objectId: referencedObject,
-              message: '从模型库导入快照'
-            }
+      const createVersionRes = await apollo.mutate<{
+        versionMutations?: {
+          create?: {
+            id: string
+          } | null
+        }
+      }>({
+        mutation: createImportedVersionMutation,
+        variables: {
+          input: {
+            projectId: props.projectId,
+            modelId: createdModelId,
+            objectId: referencedObject,
+            message: '从模型库导入快照'
           }
-        })
-        .then((res) => {
-          const versionId = res.data?.versionMutations?.create?.id
-          if (!versionId) {
-            throw new Error(`模型 ${sourceModel.title} 的版本创建失败`)
-          }
-        })
+        }
+      })
+
+      const createdVersionId = createVersionRes.data?.versionMutations?.create?.id
+      if (!createdVersionId) {
+        throw new Error(`模型 ${sourceModel.title} 的版本创建失败`)
+      }
+
+      // 把模型库的源文件 / 中海同步标识 / 自定义属性复制到导入模型，
+      // 否则导入模型没有中海同步，也无法下载源文件、导出模型数据
+      await attachImportedModelSource({
+        modelId: createdModelId,
+        versionId: createdVersionId,
+        sourceProjectId: sourceModel.projectId,
+        sourceModelId: sourceModel.id
+      })
 
       if (targetFolderId) {
         await apollo.mutate({
