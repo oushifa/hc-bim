@@ -1,29 +1,17 @@
 name: HC 前端自动编译推送到阿里云 ACR
 
-# 触发条件：提交(推送)到 main 且涉及前端相关代码时，自动编译并推送镜像
+# 触发条件：只要提交(推送)代码到 main 就自动编译并推送镜像到阿里云 ACR
 on:
   push:
     branches:
       - main
-    paths:
-      - 'packages/frontend-2/**'
-      - 'packages/shared/**'
-      - 'packages/viewer/**'
-      - 'packages/objectloader2/**'
-      - 'packages/ui-components/**'
-      - 'packages/ui-components-nuxt/**'
-      - 'packages/tailwind-theme/**'
-      - 'utils/ensure-tailwind-deps.mjs'
-      - '.yarnrc.yml'
-      - '.dockerignore'
-      - 'package.json'
-      - 'yarn.lock'
   # 也支持在 GitHub Actions 页面手动触发一次
   workflow_dispatch:
 
 concurrency:
   group: hc-frontend-aliyun-${{ github.ref }}
-  cancel-in-progress: false
+  # 新提交会取消上一次未完成的构建，避免无意义排队
+  cancel-in-progress: true
 
 env:
   # 阿里云容器镜像 ACR 公网地址（华东1-杭州）
