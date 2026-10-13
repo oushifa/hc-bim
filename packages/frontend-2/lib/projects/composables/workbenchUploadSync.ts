@@ -533,6 +533,13 @@ export const useWorkbenchUploadSync = () => {
     return task
   }
 
+  /**
+   * 直接把后端返回的任务快照写入本地任务表。
+   * 用于模型库导入后立刻展示「同步中/待同步」，无需等快照轮询或刷新页面。
+   */
+  const upsertServerTask = (serverTask: ServerModelSyncTask) =>
+    upsertTask(mapServerTask(serverTask))
+
   const removeTask = (taskId: string) => {
     const next = { ...taskMap.value }
     delete next[taskId]
@@ -1199,6 +1206,7 @@ export const useWorkbenchUploadSync = () => {
     retryTask,
     executeTask: retryTask,
     syncVisibleTasks,
+    upsertServerTask,
     onModelSyncSettled,
     cleanupVisibleTaskSubscriptions,
     consumeVersionCreated,

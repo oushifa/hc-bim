@@ -853,6 +853,7 @@ const {
   isModelSyncing,
   retryTask,
   syncVisibleTasks,
+  upsertServerTask,
   onModelSyncSettled,
   cleanupVisibleTaskSubscriptions,
   getModelRuntimeProgress: getTaskRuntimeProgress,
@@ -1643,7 +1644,11 @@ const attachImportedModelSource = async (params: {
   sourceProjectId: string
   sourceModelId: string
 }) => {
-  await $fetch(
+  const response = await $fetch<{
+    data: {
+      syncTask?: Parameters<typeof upsertServerTask>[0] | null
+    }
+  }>(
     `${apiOrigin}/api/v1/projects/${props.projectId}/models/${params.modelId}/import-library-source`,
     {
       method: 'POST',
@@ -1658,6 +1663,14 @@ const attachImportedModelSource = async (params: {
       }
     }
   )
+
+  // 后端导入时会自动发起一次中海同步任务，这里直接把任务写入本地任务表，
+  // 让模型导入后立刻显示「同步中/待同步」，无需刷新页面
+  if (response?.data?.syncTask) {
+    upsertServerTask(response.data.syncTask)
+  }
+
+  return response
 }
 
 const targetRetryModel = ref<ModelListItem | null>(null)
@@ -2140,6 +2153,7 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
   isImportingFromLibrary.value = true
   const targetFolderId = activeDir.value === ROOT_ID ? null : activeDir.value
   let successCount = 0
+  const importedModelIds: string[] = []
 
   try {
     for (const sourceModel of models) {
@@ -2263,6 +2277,7 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
         })
       }
 
+      importedModelIds.push(createdModelId)
       successCount++
     }
 
@@ -2274,6 +2289,12 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
     })
     loadCacheBuster.value++
     await Promise.all([loadFolders(), refetchBaseModels(), refetchExtraModels()])
+
+    // 导入后立刻拉取一次中海同步任务快照，让「同步中/待同步」状态直接
+    // 显示出来，不需要手动刷新页面
+    if (importedModelIds.length) {
+      await syncVisibleTasks(visibleModelSyncTargets.value)
+    }
   } catch (e) {
     triggerNotification({
       type: ToastNotificationType.Danger,
