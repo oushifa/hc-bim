@@ -108,6 +108,9 @@ const SYNC_STAGE_FALLBACK_PERCENT = new Map<WorkbenchUploadSyncTaskStatus, numbe
   ['polling_model_transform', 80]
 ])
 
+/** 后端构建指纹只打印一次（避免每次进入工作台都刷控制台） */
+let didLogBackendBuild = false
+
 export type WorkbenchModelSyncRuntimeProgress = {
   percent: number
   phase: string | null
@@ -387,6 +390,30 @@ export const useWorkbenchUploadSync = () => {
   const eventSources = useWorkbenchUploadSyncEventSources()
   const pageEventSources = useWorkbenchUploadSyncPageEventSources()
   const stopModelSync = useStopModelSyncTask()
+
+  // 便于确认后端实际版本：控制台打印 model-sync 后端构建指纹。
+  // 接口同源、无需登录；如果打印失败（404 等），说明后端还是旧版本。
+  if (import.meta.client && !didLogBackendBuild) {
+    didLogBackendBuild = true
+    void $fetch<{
+      data?: { buildTag?: string; features?: Record<string, boolean> }
+    }>(`${apiOrigin}/api/v1/model-sync/version`)
+      .then((res) => {
+        // eslint-disable-next-line no-console
+        console.info(
+          '[model-sync] 后端构建指纹:',
+          res?.data?.buildTag,
+          res?.data?.features
+        )
+      })
+      .catch((error) => {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[model-sync] 后端构建指纹获取失败（后端可能仍是旧版本）:',
+          error?.status || error
+        )
+      })
+  }
 
   const getHeaders = () =>
     authToken.value
