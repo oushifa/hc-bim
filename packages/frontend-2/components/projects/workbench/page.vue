@@ -784,7 +784,6 @@ import { useFileImportBaseSettings } from '~~/lib/core/composables/fileImport'
 import type { ModelLibraryListItem } from '~/lib/projects/composables/modelLibrary'
 import { useApiOrigin } from '~~/composables/env'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
-import { useInternalUrlUtils } from '~~/lib/common/composables/url'
 import { useFileDownload } from '~~/lib/core/composables/fileUpload'
 
 const props = defineProps<{
@@ -797,7 +796,6 @@ const apollo = useApolloClient().client
 const { triggerNotification } = useGlobalToast()
 const apiOrigin = useApiOrigin()
 const authToken = useAuthCookie()
-const { updateUrlSearchParams } = useInternalUrlUtils()
 const { downloadWithAuth } = useFileDownload()
 const { activeUser, isLoggedIn } = useActiveUser()
 const { ensureLoaded: ensureUserPermsLoaded, hasModelOp } = useUserPermissions()
@@ -1712,12 +1710,6 @@ const createImportedVersionMutation = gql`
   }
 `
 
-const createObjectsMutation = gql`
-  mutation WorkbenchCreateObjects($input: ObjectCreateInput!) {
-    objectCreate(objectInput: $input)
-  }
-`
-
 const addModelToFolderMutation = gql`
   mutation WorkbenchAddModelToFolder($input: AddModelToFolderInput!) {
     folderMutations {
@@ -1740,82 +1732,41 @@ const findProjectModelsByNameQuery = gql`
   }
 `
 
-type ProjectModelObjectsResponse = {
-  projectId: string
-  modelId: string
-  modelName: string
-  versionId: string | null
-  rootObjectId: string | null
-  totalCount: number
-  limit: number
-  cursor: string | null
-  items: Array<{
-    id: string
-    data: Record<string, unknown> | null
-  }>
-}
-
-type ProjectModelObjectResponse = {
-  projectId: string
-  modelId: string
-  modelName: string
-  versionId: string | null
-  rootObjectId: string | null
-  item: {
-    id: string
-    data: Record<string, unknown> | null
-  }
-}
-
 const getApiHeaders = () => {
   const headers: Record<string, string> = {}
   if (authToken.value) headers.Authorization = `Bearer ${authToken.value}`
   return headers
 }
 
-async function requestJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: getApiHeaders()
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(errorText || `Request failed with status ${response.status}`)
-  }
-
-  return (await response.json()) as T
-}
-
-const loadSourceModelObjectTree = async (params: {
-  projectId: string
+/**
+ * 从模型库导入：让后端按源模型 root 的 __closure 把整棵对象树
+ * （root + 全部子对象）复制到目标项目。必须在创建导入版本前调用，
+ * 因为创建版本时会校验 referencedObject 在目标项目中已存在。
+ */
+const importModelObjectTree = async (params: {
   modelId: string
-  rootObjectId: string
+  sourceProjectId: string
+  sourceModelId: string
 }) => {
-  const rootObjectUrl: string = `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/objects/${params.rootObjectId}`
-  const rootResponse = await requestJson<ProjectModelObjectResponse>(rootObjectUrl)
-
-  const objects: Record<string, unknown>[] = []
-  if (rootResponse.item.data) {
-    objects.push(rootResponse.item.data)
-  }
-
-  let cursor: string | null = null
-  do {
-    const objectsUrl = updateUrlSearchParams(
-      `${apiOrigin}/api/v1/projects/${params.projectId}/models/${params.modelId}/objects`,
-      (searchParams) => {
-        searchParams.set('limit', '100')
-        if (cursor) searchParams.set('cursor', cursor)
+  return await $fetch<{
+    data: {
+      referencedObject: string
+      objectCount: number
+    }
+  }>(
+    `${apiOrigin}/api/v1/projects/${props.projectId}/models/${params.modelId}/import-object-tree`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getApiHeaders()
+      },
+      body: {
+        sourceProjectId: params.sourceProjectId,
+        sourceModelId: params.sourceModelId
       }
-    )
-    const response = await requestJson<ProjectModelObjectsResponse>(objectsUrl)
-    response.items.forEach((item: ProjectModelObjectsResponse['items'][number]) => {
-      if (item.data) objects.push(item.data)
-    })
-    cursor = response.cursor || null
-  } while (cursor)
-
-  return objects
+    }
+  )
 }
 
 /**
@@ -2369,31 +2320,6 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
         throw new Error(`模型 ${sourceModel.title} 缺少可导入的快照数据`)
       }
 
-      const sourceObjects = await loadSourceModelObjectTree({
-        projectId: sourceModel.projectId,
-        modelId: sourceModel.id,
-        rootObjectId: referencedObject
-      })
-      if (!sourceObjects.length) {
-        throw new Error(`模型 ${sourceModel.title} 的对象数据为空，无法导入`)
-      }
-
-      const createObjectsRes = await apollo.mutate<{
-        objectCreate?: string[]
-      }>({
-        mutation: createObjectsMutation,
-        variables: {
-          input: {
-            streamId: props.projectId,
-            objects: sourceObjects
-          }
-        }
-      })
-
-      if (!createObjectsRes.data?.objectCreate?.includes(referencedObject)) {
-        throw new Error(`模型 ${sourceModel.title} 的对象复制失败`)
-      }
-
       const createModelRes = await apollo.mutate<{
         modelMutations?: {
           create?: {
@@ -2414,6 +2340,17 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
       const createdModelId = createModelRes.data?.modelMutations?.create?.id
       if (!createdModelId) {
         throw new Error(`模型 ${sourceModel.title} 创建失败`)
+      }
+
+      // 后端按 root.__closure 复制整棵对象树，保证 root 声明的子对象全部到位
+      // （必须在创建版本前完成，否则版本创建时校验 referencedObject 会失败）
+      const copyRes = await importModelObjectTree({
+        modelId: createdModelId,
+        sourceProjectId: sourceModel.projectId,
+        sourceModelId: sourceModel.id
+      })
+      if (!copyRes.data?.objectCount) {
+        throw new Error(`模型 ${sourceModel.title} 的对象复制失败`)
       }
 
       const createVersionRes = await apollo.mutate<{

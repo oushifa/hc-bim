@@ -182,7 +182,6 @@ type Documents = {
     "\n  query WorkbenchImportSourceModel($projectId: String!, $modelId: String!) {\n    project(id: $projectId) {\n      id\n      model(id: $modelId) {\n        id\n        name\n        versions(limit: 1) {\n          items {\n            id\n            referencedObject\n          }\n        }\n      }\n    }\n  }\n": typeof types.WorkbenchImportSourceModelDocument,
     "\n  mutation WorkbenchCreateImportedModel($input: CreateModelInput!) {\n    modelMutations {\n      create(input: $input) {\n        id\n        name\n      }\n    }\n  }\n": typeof types.WorkbenchCreateImportedModelDocument,
     "\n  mutation WorkbenchCreateImportedVersion($input: CreateVersionInput!) {\n    versionMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n": typeof types.WorkbenchCreateImportedVersionDocument,
-    "\n  mutation WorkbenchCreateObjects($input: ObjectCreateInput!) {\n    objectCreate(objectInput: $input)\n  }\n": typeof types.WorkbenchCreateObjectsDocument,
     "\n  mutation WorkbenchAddModelToFolder($input: AddModelToFolderInput!) {\n    folderMutations {\n      addModel(input: $input)\n    }\n  }\n": typeof types.WorkbenchAddModelToFolderDocument,
     "\n  query WorkbenchFindProjectModelsByName($projectId: String!, $search: String!) {\n    project(id: $projectId) {\n      id\n      models(limit: 500, filter: { search: $search }) {\n        items {\n          id\n          name\n        }\n      }\n    }\n  }\n": typeof types.WorkbenchFindProjectModelsByNameDocument,
     "\n  fragment SettingsSidebar_Workspace on Workspace {\n    ...SettingsMenu_Workspace\n    id\n    slug\n    role\n  }\n": typeof types.SettingsSidebar_WorkspaceFragmentDoc,
@@ -781,7 +780,6 @@ const documents: Documents = {
     "\n  query WorkbenchImportSourceModel($projectId: String!, $modelId: String!) {\n    project(id: $projectId) {\n      id\n      model(id: $modelId) {\n        id\n        name\n        versions(limit: 1) {\n          items {\n            id\n            referencedObject\n          }\n        }\n      }\n    }\n  }\n": types.WorkbenchImportSourceModelDocument,
     "\n  mutation WorkbenchCreateImportedModel($input: CreateModelInput!) {\n    modelMutations {\n      create(input: $input) {\n        id\n        name\n      }\n    }\n  }\n": types.WorkbenchCreateImportedModelDocument,
     "\n  mutation WorkbenchCreateImportedVersion($input: CreateVersionInput!) {\n    versionMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n": types.WorkbenchCreateImportedVersionDocument,
-    "\n  mutation WorkbenchCreateObjects($input: ObjectCreateInput!) {\n    objectCreate(objectInput: $input)\n  }\n": types.WorkbenchCreateObjectsDocument,
     "\n  mutation WorkbenchAddModelToFolder($input: AddModelToFolderInput!) {\n    folderMutations {\n      addModel(input: $input)\n    }\n  }\n": types.WorkbenchAddModelToFolderDocument,
     "\n  query WorkbenchFindProjectModelsByName($projectId: String!, $search: String!) {\n    project(id: $projectId) {\n      id\n      models(limit: 500, filter: { search: $search }) {\n        items {\n          id\n          name\n        }\n      }\n    }\n  }\n": types.WorkbenchFindProjectModelsByNameDocument,
     "\n  fragment SettingsSidebar_Workspace on Workspace {\n    ...SettingsMenu_Workspace\n    id\n    slug\n    role\n  }\n": types.SettingsSidebar_WorkspaceFragmentDoc,
@@ -1898,10 +1896,6 @@ export function graphql(source: "\n  mutation WorkbenchCreateImportedModel($inpu
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation WorkbenchCreateImportedVersion($input: CreateVersionInput!) {\n    versionMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n"): (typeof documents)["\n  mutation WorkbenchCreateImportedVersion($input: CreateVersionInput!) {\n    versionMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation WorkbenchCreateObjects($input: ObjectCreateInput!) {\n    objectCreate(objectInput: $input)\n  }\n"): (typeof documents)["\n  mutation WorkbenchCreateObjects($input: ObjectCreateInput!) {\n    objectCreate(objectInput: $input)\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
