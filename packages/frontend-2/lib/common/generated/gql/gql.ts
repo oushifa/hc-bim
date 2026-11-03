@@ -184,6 +184,7 @@ type Documents = {
     "\n  mutation WorkbenchCreateImportedVersion($input: CreateVersionInput!) {\n    versionMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n": typeof types.WorkbenchCreateImportedVersionDocument,
     "\n  mutation WorkbenchCreateObjects($input: ObjectCreateInput!) {\n    objectCreate(objectInput: $input)\n  }\n": typeof types.WorkbenchCreateObjectsDocument,
     "\n  mutation WorkbenchAddModelToFolder($input: AddModelToFolderInput!) {\n    folderMutations {\n      addModel(input: $input)\n    }\n  }\n": typeof types.WorkbenchAddModelToFolderDocument,
+    "\n  query WorkbenchFindProjectModelsByName($projectId: String!, $search: String!) {\n    project(id: $projectId) {\n      id\n      models(limit: 500, filter: { search: $search }) {\n        items {\n          id\n          name\n        }\n      }\n    }\n  }\n": typeof types.WorkbenchFindProjectModelsByNameDocument,
     "\n  fragment SettingsSidebar_Workspace on Workspace {\n    ...SettingsMenu_Workspace\n    id\n    slug\n    role\n  }\n": typeof types.SettingsSidebar_WorkspaceFragmentDoc,
     "\n  fragment SettingsServerRegionsAddEditDialog_ServerRegionItem on ServerRegionItem {\n    id\n    name\n    description\n    key\n  }\n": typeof types.SettingsServerRegionsAddEditDialog_ServerRegionItemFragmentDoc,
     "\n  fragment SettingsServerRegionsTable_ServerRegionItem on ServerRegionItem {\n    id\n    name\n    key\n    description\n  }\n": typeof types.SettingsServerRegionsTable_ServerRegionItemFragmentDoc,
@@ -782,6 +783,7 @@ const documents: Documents = {
     "\n  mutation WorkbenchCreateImportedVersion($input: CreateVersionInput!) {\n    versionMutations {\n      create(input: $input) {\n        id\n      }\n    }\n  }\n": types.WorkbenchCreateImportedVersionDocument,
     "\n  mutation WorkbenchCreateObjects($input: ObjectCreateInput!) {\n    objectCreate(objectInput: $input)\n  }\n": types.WorkbenchCreateObjectsDocument,
     "\n  mutation WorkbenchAddModelToFolder($input: AddModelToFolderInput!) {\n    folderMutations {\n      addModel(input: $input)\n    }\n  }\n": types.WorkbenchAddModelToFolderDocument,
+    "\n  query WorkbenchFindProjectModelsByName($projectId: String!, $search: String!) {\n    project(id: $projectId) {\n      id\n      models(limit: 500, filter: { search: $search }) {\n        items {\n          id\n          name\n        }\n      }\n    }\n  }\n": types.WorkbenchFindProjectModelsByNameDocument,
     "\n  fragment SettingsSidebar_Workspace on Workspace {\n    ...SettingsMenu_Workspace\n    id\n    slug\n    role\n  }\n": types.SettingsSidebar_WorkspaceFragmentDoc,
     "\n  fragment SettingsServerRegionsAddEditDialog_ServerRegionItem on ServerRegionItem {\n    id\n    name\n    description\n    key\n  }\n": types.SettingsServerRegionsAddEditDialog_ServerRegionItemFragmentDoc,
     "\n  fragment SettingsServerRegionsTable_ServerRegionItem on ServerRegionItem {\n    id\n    name\n    key\n    description\n  }\n": types.SettingsServerRegionsTable_ServerRegionItemFragmentDoc,
@@ -1904,6 +1906,10 @@ export function graphql(source: "\n  mutation WorkbenchCreateObjects($input: Obj
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation WorkbenchAddModelToFolder($input: AddModelToFolderInput!) {\n    folderMutations {\n      addModel(input: $input)\n    }\n  }\n"): (typeof documents)["\n  mutation WorkbenchAddModelToFolder($input: AddModelToFolderInput!) {\n    folderMutations {\n      addModel(input: $input)\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query WorkbenchFindProjectModelsByName($projectId: String!, $search: String!) {\n    project(id: $projectId) {\n      id\n      models(limit: 500, filter: { search: $search }) {\n        items {\n          id\n          name\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query WorkbenchFindProjectModelsByName($projectId: String!, $search: String!) {\n    project(id: $projectId) {\n      id\n      models(limit: 500, filter: { search: $search }) {\n        items {\n          id\n          name\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

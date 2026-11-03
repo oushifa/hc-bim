@@ -514,6 +514,31 @@
         </div>
       </div>
     </CommonConfirmDialog>
+    <!-- 同名模型确认弹窗 -->
+    <CommonConfirmDialog
+      v-model:open="showDuplicateModelConfirm"
+      title="同名模型确认"
+      confirm-text="更新"
+      :loading="creatingModel"
+      @confirm="confirmDuplicateModelUpdate"
+      @cancel="cancelDuplicateModelUpload"
+    >
+      <p class="mb-2">
+        当前上传模型与已有模型名称一致，请确认是否需要更新当前模型版本？若需新增模型请改名后上传
+      </p>
+      <div
+        class="border border-gray-100 rounded-lg divide-y divide-gray-100 bg-gray-50/50 p-2 text-xs"
+      >
+        <div
+          v-for="name in duplicateModelNames"
+          :key="name"
+          class="py-1.5 truncate text-gray-800 font-medium"
+          :title="name"
+        >
+          {{ name }}
+        </div>
+      </div>
+    </CommonConfirmDialog>
     <!-- 模型重试转换二次确认弹窗 -->
     <CommonConfirmDialog
       v-model:open="showRetryConfirm"
@@ -704,7 +729,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useApolloClient } from '@vue/apollo-composable'
 import type { LayoutDialogButton } from '@speckle/ui-components'
 import {
@@ -735,6 +760,7 @@ import { useApiOrigin } from '~~/composables/env'
 import { useFileDownload } from '~~/lib/core/composables/fileUpload'
 import { ensureError } from '@speckle/shared'
 import { useModelLibraryApi } from '~~/lib/projects/composables/modelLibrary'
+import type { ModelLibraryEnsureModelResponse } from '~~/lib/projects/composables/modelLibrary'
 import WorkbenchUploadSyncProjectSubscriber from '~~/components/singleton/WorkbenchUploadSyncProjectSubscriber.vue'
 import {
   useDeleteModel,
@@ -889,6 +915,20 @@ const { maxSizeInBytes, accept: modelAccept } = useFileImportBaseSettings()
 const pendingUploadFiles = ref<File[]>([])
 const showBatchUploadConfirm = ref(false)
 const batchModelUploadStatusText = ref('')
+
+// 同名模型确认：key 为文件 name，value 为命中的已有模型
+const showDuplicateModelConfirm = ref(false)
+const pendingDuplicateModels = ref<Map<string, { id: string; name: string }>>(
+  new Map()
+)
+// 新建模型命中同名时，暂存待上传信息，等待用户确认是否更新版本
+const pendingCreateModelUpload = ref<{
+  ensured: ModelLibraryEnsureModelResponse
+  file: File
+} | null>(null)
+const duplicateModelNames = computed(() => [
+  ...new Set([...pendingDuplicateModels.value.values()].map((m) => m.name))
+])
 
 const expiryOptions = [
   { label: '7天', value: '7' },
@@ -1061,9 +1101,118 @@ const onModelLibraryFileSelected = (event: Event) => {
   showBatchUploadConfirm.value = true
 }
 
+// 检测待上传文件中与模型库已有模型同名的项，key 为文件 name
+const detectDuplicateLightModels = async (files: File[]) => {
+  const duplicateMap = new Map<string, { id: string; name: string }>()
+  const entries = files
+    .map((file) => ({
+      file,
+      name: sanitizeModelName(getModelNameFromFile(file.name))
+    }))
+    .filter((entry) => !!entry.name)
+
+  const uniqueNames = [...new Set(entries.map((entry) => entry.name))]
+  const foundByName = new Map<string, { id: string; name: string }>()
+
+  await Promise.all(
+    uniqueNames.map(async (name) => {
+      try {
+        const ensured = await ensureModel({ name })
+        if (ensured.existed) foundByName.set(name, ensured.model)
+      } catch (err) {
+        logger.error(`检测同名模型 ${name} 失败:`, err)
+      }
+    })
+  )
+
+  for (const { file, name } of entries) {
+    const match = foundByName.get(name)
+    if (match) duplicateMap.set(file.name, match)
+  }
+
+  return duplicateMap
+}
+
 const startBatchModelUpload = async () => {
   const filesToUpload = [...pendingUploadFiles.value]
+  if (!filesToUpload.length || creatingModel.value) return
+
+  // 先检测是否存在同名模型，命中则弹窗让用户确认是否更新版本
+  const duplicateMap = await detectDuplicateLightModels(filesToUpload)
+  if (duplicateMap.size > 0) {
+    pendingDuplicateModels.value = duplicateMap
+    showBatchUploadConfirm.value = false
+    showDuplicateModelConfirm.value = true
+    return
+  }
+
   showBatchUploadConfirm.value = false
+  await runBatchModelUpload(filesToUpload)
+}
+
+// 点击【更新】：对所有同名模型上传新版本
+const confirmDuplicateModelUpdate = async () => {
+  pendingDuplicateModels.value = new Map()
+  showDuplicateModelConfirm.value = false
+
+  // 新建模型（单文件）场景
+  if (pendingCreateModelUpload.value) {
+    const { ensured, file } = pendingCreateModelUpload.value
+    pendingCreateModelUpload.value = null
+    creatingModel.value = true
+    createModelProgress.value = 0
+    try {
+      await performCreateModelUpload(ensured, file)
+    } catch (e) {
+      triggerNotification({
+        type: ToastNotificationType.Danger,
+        title: '新建模型失败',
+        description: ensureError(e).message
+      })
+    } finally {
+      resetModelLibraryUploadState()
+    }
+    return
+  }
+
+  // 批量上传场景
+  const filesToUpload = [...pendingUploadFiles.value]
+  if (!filesToUpload.length || creatingModel.value) return
+  await runBatchModelUpload(filesToUpload)
+}
+
+// 点击【取消】：新建模型场景放弃上传；批量场景仅跳过同名文件
+const cancelDuplicateModelUpload = async () => {
+  const duplicateMap = new Map(pendingDuplicateModels.value)
+  pendingDuplicateModels.value = new Map()
+  showDuplicateModelConfirm.value = false
+
+  if (pendingCreateModelUpload.value) {
+    pendingCreateModelUpload.value = null
+    resetCreateModelDialogState()
+    resetModelLibraryUploadState()
+    return
+  }
+
+  const filesToUpload = pendingUploadFiles.value.filter(
+    (file) => !duplicateMap.has(file.name)
+  )
+  if (!filesToUpload.length) {
+    pendingUploadFiles.value = []
+    return
+  }
+  if (creatingModel.value) return
+  await runBatchModelUpload(filesToUpload)
+}
+
+// 直接关闭同名确认弹窗（如点击右上角关闭）时，按“取消”处理
+watch(showDuplicateModelConfirm, (open) => {
+  if (!open && pendingDuplicateModels.value.size > 0) {
+    void cancelDuplicateModelUpload()
+  }
+})
+
+const runBatchModelUpload = async (filesToUpload: File[]) => {
   if (!filesToUpload.length || creatingModel.value) return
 
   creatingModel.value = true
@@ -1180,6 +1329,29 @@ const openVersionFilePicker = (model: Model) => {
   versionFileInput.value?.click()
 }
 
+const performCreateModelUpload = async (
+  ensured: ModelLibraryEnsureModelResponse,
+  file: File
+) => {
+  await uploadModelFile({
+    projectId: ensured.projectId,
+    modelId: ensured.model.id,
+    file,
+    onProgress: (percentage) => {
+      createModelProgress.value = percentage
+    }
+  })
+
+  triggerNotification({
+    type: ToastNotificationType.Success,
+    title: '模型已提交到模型库',
+    description: `模型 ${ensured.model.name} 已开始上传和处理`
+  })
+
+  resetCreateModelDialogState()
+  await fetchModels()
+}
+
 const submitCreateModel = async () => {
   const file = selectedCreateModelFile.value
   const modelName = sanitizeModelName(createModelName.value || '')
@@ -1203,23 +1375,16 @@ const submitCreateModel = async () => {
       description: createModelDescription.value.trim() || undefined
     })
 
-    await uploadModelFile({
-      projectId: ensured.projectId,
-      modelId: ensured.model.id,
-      file,
-      onProgress: (percentage) => {
-        createModelProgress.value = percentage
-      }
-    })
+    // 命中同名模型：弹窗让用户确认是否更新版本
+    if (ensured.existed) {
+      pendingCreateModelUpload.value = { ensured, file }
+      pendingDuplicateModels.value = new Map([[file.name, ensured.model]])
+      createModelDialogOpen.value = false
+      showDuplicateModelConfirm.value = true
+      return
+    }
 
-    triggerNotification({
-      type: ToastNotificationType.Success,
-      title: '模型已提交到模型库',
-      description: `模型 ${ensured.model.name} 已开始上传和处理`
-    })
-
-    resetCreateModelDialogState()
-    await fetchModels()
+    await performCreateModelUpload(ensured, file)
   } catch (e) {
     triggerNotification({
       type: ToastNotificationType.Danger,

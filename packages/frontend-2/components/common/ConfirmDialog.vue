@@ -20,6 +20,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   confirm: []
+  cancel: []
 }>()
 
 const open = defineModel<boolean>('open', { required: true })
@@ -30,6 +31,7 @@ const dialogButtons = computed((): LayoutDialogButton[] => {
       text: '取消',
       props: { color: 'outline' },
       onClick: () => {
+        emit('cancel')
         open.value = false
       }
     },

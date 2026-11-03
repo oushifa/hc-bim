@@ -26,6 +26,8 @@ export type ModelLibraryEnsureModelResponse = {
   projectId: string
   projectName: string
   model: ModelLibraryModel
+  /** true 表示命中了同名已有模型（未新建），前端据此提示用户是否更新版本 */
+  existed: boolean
 }
 
 export type ModelLibraryPrepareUploadResponse = {

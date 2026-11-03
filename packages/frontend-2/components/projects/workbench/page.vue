@@ -530,6 +530,31 @@
         </div>
       </div>
     </CommonConfirmDialog>
+    <!-- 同名模型确认弹窗 -->
+    <CommonConfirmDialog
+      v-model:open="showDuplicateModelConfirm"
+      title="同名模型确认"
+      confirm-text="更新"
+      :loading="isBatchModelUploading"
+      @confirm="confirmDuplicateModelUpdate"
+      @cancel="cancelDuplicateModelUpload"
+    >
+      <p class="mb-2">
+        当前上传模型与已有模型名称一致，请确认是否需要更新当前模型版本？若需新增模型请改名后上传
+      </p>
+      <div
+        class="border border-gray-100 rounded-lg divide-y divide-gray-100 bg-gray-50/50 p-2 text-xs"
+      >
+        <div
+          v-for="name in duplicateModelNames"
+          :key="name"
+          class="py-1.5 truncate text-gray-800 font-medium"
+          :title="name"
+        >
+          {{ name }}
+        </div>
+      </div>
+    </CommonConfirmDialog>
     <!-- 模型重试转换二次确认弹窗 -->
     <CommonConfirmDialog
       v-model:open="showRetryConfirm"
@@ -847,6 +872,13 @@ const showBatchUploadConfirm = ref(false)
 const isBatchModelUploading = ref(false)
 const batchModelUploadProgress = ref(0)
 const batchModelUploadStatusText = ref('')
+
+// 同名模型确认：key 为文件 name，value 为命中的已有模型
+const showDuplicateModelConfirm = ref(false)
+const pendingDuplicateModels = ref<Map<string, { id: string; name: string }>>(new Map())
+const duplicateModelNames = computed(() => [
+  ...new Set([...pendingDuplicateModels.value.values()].map((m) => m.name))
+])
 
 const {
   getLatestTask,
@@ -1171,9 +1203,128 @@ const onBatchModelFilesPicked = (e: Event) => {
   showBatchUploadConfirm.value = true
 }
 
+const getModelNameFromFile = (file: File) =>
+  file.name.replace(/\.[^/.]+$/, '').trim() || file.name
+
+const getGraphQLErrorCode = (err: unknown) => {
+  const errors = (err as { graphQLErrors?: Array<{ extensions?: { code?: string } }> })
+    ?.graphQLErrors
+  return errors?.[0]?.extensions?.code
+}
+
+const normalizeModelNameForCompare = (name: string) =>
+  sanitizeModelName(name).toLowerCase()
+
+// 按名称查询项目内已有模型。后端判重是大小写不敏感的（LOWER(name) ilike），
+// 而 modelByName 走的数据加载器按原始名称回填、是大小写敏感的，会漏判，
+// 因此改用模糊搜索 + 大小写不敏感的精确比对，命中返回模型，否则返回 null。
+const findProjectModelByName = async (name: string) => {
+  const target = normalizeModelNameForCompare(name)
+  if (!target) return null
+  try {
+    const res = await apollo.query<{
+      project?: {
+        models?: { items: Array<{ id: string; name: string }> }
+      } | null
+    }>({
+      query: findProjectModelsByNameQuery,
+      variables: { projectId: props.projectId, search: name },
+      fetchPolicy: 'network-only'
+    })
+    const items = res.data?.project?.models?.items ?? []
+    return (
+      items.find((item) => normalizeModelNameForCompare(item.name) === target) ?? null
+    )
+  } catch (err) {
+    logger.error(`查询同名模型 ${name} 失败:`, err)
+    return null
+  }
+}
+
+// 检测待上传文件中与项目已有模型同名的项，key 为文件 name
+const findExistingModelsForFiles = async (files: File[]) => {
+  const duplicateMap = new Map<string, { id: string; name: string }>()
+  const entries = files
+    .map((file) => ({
+      file,
+      name: sanitizeModelName(getModelNameFromFile(file))
+    }))
+    .filter((entry) => !!entry.name)
+
+  const uniqueNames = [...new Set(entries.map((entry) => entry.name))]
+  const foundByName = new Map<string, { id: string; name: string }>()
+
+  await Promise.all(
+    uniqueNames.map(async (name) => {
+      const match = await findProjectModelByName(name)
+      if (match) foundByName.set(name, match)
+    })
+  )
+
+  for (const { file, name } of entries) {
+    const match = foundByName.get(name)
+    if (match) duplicateMap.set(file.name, match)
+  }
+
+  return duplicateMap
+}
+
 const startBatchModelUpload = async () => {
   const filesToUpload = [...pendingUploadFiles.value]
+  if (!filesToUpload.length || isBatchModelUploading.value) return
+
+  // 先检测是否存在同名模型，命中则弹窗让用户确认是否更新版本
+  const duplicateMap = await findExistingModelsForFiles(filesToUpload)
+  if (duplicateMap.size > 0) {
+    pendingDuplicateModels.value = duplicateMap
+    showBatchUploadConfirm.value = false
+    showDuplicateModelConfirm.value = true
+    return
+  }
+
   showBatchUploadConfirm.value = false
+  await runBatchModelUpload(filesToUpload, new Map())
+}
+
+// 点击【更新】：对所有同名模型上传新版本
+const confirmDuplicateModelUpdate = async () => {
+  const filesToUpload = [...pendingUploadFiles.value]
+  const duplicateMap = new Map(pendingDuplicateModels.value)
+  pendingDuplicateModels.value = new Map()
+  showDuplicateModelConfirm.value = false
+  if (!filesToUpload.length || isBatchModelUploading.value) return
+
+  await runBatchModelUpload(filesToUpload, duplicateMap)
+}
+
+// 点击【取消】：仅跳过同名文件，其余文件照常上传
+const cancelDuplicateModelUpload = async () => {
+  const duplicateMap = new Map(pendingDuplicateModels.value)
+  const filesToUpload = pendingUploadFiles.value.filter(
+    (file) => !duplicateMap.has(file.name)
+  )
+  pendingDuplicateModels.value = new Map()
+  showDuplicateModelConfirm.value = false
+  if (!filesToUpload.length) {
+    pendingUploadFiles.value = []
+    return
+  }
+  if (isBatchModelUploading.value) return
+
+  await runBatchModelUpload(filesToUpload, new Map())
+}
+
+// 直接关闭同名确认弹窗（如点击右上角关闭）时，按“取消”处理
+watch(showDuplicateModelConfirm, (open) => {
+  if (!open && pendingDuplicateModels.value.size > 0) {
+    void cancelDuplicateModelUpload()
+  }
+})
+
+const runBatchModelUpload = async (
+  filesToUpload: File[],
+  existingModelByName: Map<string, { id: string; name: string }>
+) => {
   if (!filesToUpload.length || isBatchModelUploading.value) return
 
   isBatchModelUploading.value = true
@@ -1203,50 +1354,69 @@ const startBatchModelUpload = async () => {
 
   const uploadSingleFile = async (file: File, fileIndex: number) => {
     const fileKey = `${file.name}-${fileIndex}`
-    const modelName = file.name.replace(/\.[^/.]+$/, '').trim() || file.name
+    const modelName = getModelNameFromFile(file)
 
     try {
-      // 1. 创建模型
-      const createModelRes = await apollo.mutate<{
-        modelMutations?: {
-          create?: {
-            id: string
-            name: string
-          } | null
-        }
-      }>({
-        mutation: createImportedModelMutation,
-        variables: {
-          input: {
-            projectId: props.projectId,
-            name: sanitizeModelName(modelName)
-          }
-        }
-      })
+      // 1. 命中同名模型则复用，否则创建新模型
+      const existingModel = existingModelByName.get(file.name)
+      let modelId: string
 
-      const createdModelId = createModelRes.data?.modelMutations?.create?.id
-      if (!createdModelId) {
-        throw new Error(`创建模型 ${modelName} 失败`)
-      }
-
-      // 2. 如果当前在子目录下，关联到目录
-      if (targetFolderId) {
-        await apollo.mutate({
-          mutation: addModelToFolderMutation,
-          variables: {
-            input: {
-              projectId: props.projectId,
-              folderId: targetFolderId,
-              modelId: createdModelId
+      if (existingModel) {
+        // 在已存在的 branch 上上传新版本
+        modelId = existingModel.id
+      } else {
+        const sanitizedName = sanitizeModelName(modelName)
+        try {
+          const createModelRes = await apollo.mutate<{
+            modelMutations?: {
+              create?: {
+                id: string
+                name: string
+              } | null
             }
+          }>({
+            mutation: createImportedModelMutation,
+            variables: {
+              input: {
+                projectId: props.projectId,
+                name: sanitizedName
+              }
+            }
+          })
+
+          const createdModelId = createModelRes.data?.modelMutations?.create?.id
+          if (!createdModelId) {
+            throw new Error(`创建模型 ${modelName} 失败`)
           }
-        })
+          modelId = createdModelId
+        } catch (err) {
+          // 兜底：若因并发或检测遗漏导致同名冲突，复用已有模型继续上传新版本
+          if (getGraphQLErrorCode(err) !== 'BRANCH_CREATE_ERROR') throw err
+
+          const existing = await findProjectModelByName(sanitizedName)
+          if (!existing) throw err
+          modelId = existing.id
+        }
+
+        // 2. 如果当前在子目录下，关联到目录
+        if (targetFolderId) {
+          await apollo.mutate({
+            mutation: addModelToFolderMutation,
+            variables: {
+              input: {
+                projectId: props.projectId,
+                folderId: targetFolderId,
+                modelId
+              }
+            }
+          })
+        }
       }
 
       // 3. 上传模型文件 (REST)
       await uploadModelFile({
         projectId: props.projectId,
-        modelId: createdModelId,
+        modelId,
         file,
         onProgress: (percentage) => {
           fileProgressMap.set(fileKey, percentage)
@@ -1552,6 +1722,20 @@ const addModelToFolderMutation = gql`
   mutation WorkbenchAddModelToFolder($input: AddModelToFolderInput!) {
     folderMutations {
       addModel(input: $input)
+    }
+  }
+`
+
+const findProjectModelsByNameQuery = gql`
+  query WorkbenchFindProjectModelsByName($projectId: String!, $search: String!) {
+    project(id: $projectId) {
+      id
+      models(limit: 500, filter: { search: $search }) {
+        items {
+          id
+          name
+        }
+      }
     }
   }
 `
