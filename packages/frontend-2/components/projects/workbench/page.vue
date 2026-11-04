@@ -80,6 +80,27 @@
     </div>
 
     <div
+      v-if="isImportingFromLibrary"
+      class="shrink-0 px-4 py-2 bg-white/80 backdrop-blur-md border-b border-gray-100"
+    >
+      <div class="flex items-center justify-between gap-3 text-xs text-gray-600">
+        <span class="truncate">{{ importStatusText }}</span>
+        <span class="shrink-0">
+          {{ importProgress }}%<template v-if="importElapsedSeconds">
+            · {{ importElapsedSeconds }}s</template
+          >
+        </span>
+      </div>
+      <div class="mt-1 h-2 w-full rounded bg-gray-200 overflow-hidden">
+        <div
+          class="h-full bg-[#00b4b6] transition-all"
+          :class="{ 'animate-pulse': isImportCopyingObjects }"
+          :style="{ width: `${importProgress}%` }"
+        />
+      </div>
+    </div>
+
+    <div
       v-if="activeTab === 'drawings' && isDrawingUploading"
       class="shrink-0 px-4 py-2 bg-white/80 backdrop-blur-md border-b border-gray-100"
     >
@@ -478,6 +499,9 @@
       v-if="showImportModal"
       :active-dir-name="activeDirName"
       :importing="isImportingFromLibrary"
+      :progress="importProgress"
+      :status-text="importStatusText"
+      :elapsed-seconds="importElapsedSeconds"
       @close="showImportModal = false"
       @import="handleImport"
     />
@@ -870,6 +894,64 @@ const showBatchUploadConfirm = ref(false)
 const isBatchModelUploading = ref(false)
 const batchModelUploadProgress = ref(0)
 const batchModelUploadStatusText = ref('')
+
+// 从模型库导入进度
+type ImportStage = 'prepare' | 'objects' | 'version' | 'source'
+const importProgress = ref(0)
+const importStatusText = ref('')
+const importStage = ref<ImportStage>('prepare')
+const importElapsedSeconds = ref(0)
+const isImportCopyingObjects = computed(
+  () => isImportingFromLibrary.value && importStage.value === 'objects'
+)
+let importTimer: ReturnType<typeof setInterval> | undefined
+
+// 每个阶段在「单个模型」内对应的起始占比，用于把阶段映射成整体进度
+const IMPORT_STAGE_START_AT: Record<ImportStage, number> = {
+  prepare: 0,
+  objects: 0.05,
+  version: 0.85,
+  source: 0.95
+}
+const IMPORT_STAGE_LABELS: Record<ImportStage, string> = {
+  prepare: '准备导入',
+  objects: '正在复制模型对象（大模型可能较慢）',
+  version: '正在创建版本',
+  source: '正在同步源文件与属性'
+}
+
+const setImportStage = (params: {
+  index: number
+  total: number
+  modelName: string
+  stage: ImportStage
+}) => {
+  const { index, total, modelName, stage } = params
+  importStage.value = stage
+  const perModel = IMPORT_STAGE_START_AT[stage]
+  const overall = total > 0 ? (index + perModel) / total : 0
+  importProgress.value = Math.min(99, Math.round(overall * 100))
+  importStatusText.value = `正在导入 (${index + 1}/${total})：${modelName} · ${IMPORT_STAGE_LABELS[stage]}`
+}
+
+const startImportTimer = () => {
+  importElapsedSeconds.value = 0
+  if (importTimer) clearInterval(importTimer)
+  importTimer = setInterval(() => {
+    importElapsedSeconds.value += 1
+  }, 1000)
+}
+
+const stopImportTimer = () => {
+  if (importTimer) {
+    clearInterval(importTimer)
+    importTimer = undefined
+  }
+}
+
+onBeforeUnmount(() => {
+  stopImportTimer()
+})
 
 // 同名模型确认：key 为文件 name，value 为命中的已有模型
 const showDuplicateModelConfirm = ref(false)
@@ -2286,12 +2368,25 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
   if (!models.length || isImportingFromLibrary.value) return
 
   isImportingFromLibrary.value = true
+  importProgress.value = 0
+  importStatusText.value = '开始导入…'
+  startImportTimer()
+
+  const total = models.length
+  let index = 0
   const targetFolderId = activeDir.value === ROOT_ID ? null : activeDir.value
   let successCount = 0
   const importedModelIds: string[] = []
 
   try {
     for (const sourceModel of models) {
+      setImportStage({
+        index,
+        total,
+        modelName: sourceModel.title,
+        stage: 'prepare'
+      })
+
       const sourceRes = await apollo.query<{
         project?: {
           model?: {
@@ -2344,6 +2439,12 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
 
       // 后端按 root.__closure 复制整棵对象树，保证 root 声明的子对象全部到位
       // （必须在创建版本前完成，否则版本创建时校验 referencedObject 会失败）
+      setImportStage({
+        index,
+        total,
+        modelName: sourceModel.title,
+        stage: 'objects'
+      })
       const copyRes = await importModelObjectTree({
         modelId: createdModelId,
         sourceProjectId: sourceModel.projectId,
@@ -2353,6 +2454,12 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
         throw new Error(`模型 ${sourceModel.title} 的对象复制失败`)
       }
 
+      setImportStage({
+        index,
+        total,
+        modelName: sourceModel.title,
+        stage: 'version'
+      })
       const createVersionRes = await apollo.mutate<{
         versionMutations?: {
           create?: {
@@ -2378,6 +2485,12 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
 
       // 把模型库的源文件 / 中海同步标识 / 自定义属性复制到导入模型，
       // 否则导入模型没有中海同步，也无法下载源文件、导出模型数据
+      setImportStage({
+        index,
+        total,
+        modelName: sourceModel.title,
+        stage: 'source'
+      })
       await attachImportedModelSource({
         modelId: createdModelId,
         versionId: createdVersionId,
@@ -2400,6 +2513,10 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
 
       importedModelIds.push(createdModelId)
       successCount++
+
+      // 当前模型导入完成，推进整体进度
+      index++
+      importProgress.value = Math.min(99, Math.round((index / total) * 100))
     }
 
     showImportModal.value = false
@@ -2423,7 +2540,11 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
       description: ensureError(e).message
     })
   } finally {
+    stopImportTimer()
     isImportingFromLibrary.value = false
+    importProgress.value = 0
+    importStatusText.value = ''
+    importStage.value = 'prepare'
   }
 }
 

@@ -72,29 +72,47 @@
       </div>
 
       <!-- Footer -->
-      <div class="p-4 border-t border-gray-100 flex justify-between items-center bg-white/50">
-        <span class="text-sm text-gray-600">
-          已选择 <span class="font-medium text-[#00b4b6]">{{ selectedCount }}</span> 个模型
-        </span>
-        <div class="space-x-3">
-          <button 
-            @click="$emit('close')"
-            class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-          >
-            取消
-          </button>
-          <button 
-            @click="$emit('import', selectedModels)"
-            :disabled="selectedCount === 0 || importing"
-            :class="[
-              'px-4 py-2 text-sm font-medium text-white rounded-md transition-colors',
-              selectedCount > 0 && !importing
-                ? 'bg-[#00b4b6] hover:bg-[#009fa1]' 
-                : 'bg-gray-300 cursor-not-allowed'
-            ]"
-          >
-            {{ importing ? '导入中...' : '确认导入' }}
-          </button>
+      <div class="p-4 border-t border-gray-100 bg-white/50">
+        <div v-if="importing" class="mb-3">
+          <div class="flex items-center justify-between gap-3 text-xs text-gray-600">
+            <span class="truncate">{{ statusText || '正在导入…' }}</span>
+            <span class="shrink-0">
+              {{ progress }}%<template v-if="elapsedSeconds">
+                · {{ elapsedSeconds }}s</template
+              >
+            </span>
+          </div>
+          <div class="mt-1 h-2 w-full rounded bg-gray-200 overflow-hidden">
+            <div
+              class="h-full bg-[#00b4b6] transition-all"
+              :style="{ width: `${progress}%` }"
+            />
+          </div>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-sm text-gray-600">
+            已选择 <span class="font-medium text-[#00b4b6]">{{ selectedCount }}</span> 个模型
+          </span>
+          <div class="space-x-3">
+            <button
+              @click="$emit('close')"
+              class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+            >
+              取消
+            </button>
+            <button
+              @click="$emit('import', selectedModels)"
+              :disabled="selectedCount === 0 || importing"
+              :class="[
+                'px-4 py-2 text-sm font-medium text-white rounded-md transition-colors',
+                selectedCount > 0 && !importing
+                  ? 'bg-[#00b4b6] hover:bg-[#009fa1]'
+                  : 'bg-gray-300 cursor-not-allowed'
+              ]"
+            >
+              {{ importing ? '导入中...' : '确认导入' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -107,12 +125,15 @@ import dayjs from 'dayjs'
 import type { ModelLibraryListItem } from '~/lib/projects/composables/modelLibrary'
 import { useModelLibraryApi } from '~/lib/projects/composables/modelLibrary'
 
-const props = defineProps<{
+defineProps<{
   activeDirName: string
   importing?: boolean
+  progress?: number
+  statusText?: string
+  elapsedSeconds?: number
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   close: []
   import: [models: ModelLibraryListItem[]]
 }>()
