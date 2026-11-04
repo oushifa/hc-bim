@@ -9,6 +9,10 @@
  * - "No Level" is renamed to "OTHER" for display
  * - "definitionGeometry" (and its subtree) is not rendered at all
  *
+ * On top of that, the "OTHER" collection (and anything literally named "OTHER") is
+ * hidden in the 3D viewer by default. Its row is kept in the tree - it simply shows up
+ * as hidden and can be toggled back on by the user.
+ *
  * These are display-only rules: the loaded objects, their ids and their 3D geometry
  * are untouched, so selection, filtering and isolation keep working as before.
  */
@@ -20,6 +24,9 @@ export const HIDDEN_TREE_NODE_NAMES = new Set(['definitiongeometry'])
 export const TREE_NODE_DISPLAY_NAMES: Record<string, string> = {
   'no level': 'OTHER'
 }
+
+/** Collection names that are hidden in the 3D viewer by default (case-insensitive) */
+export const VIEWER_DEFAULT_HIDDEN_NODE_NAMES = new Set(['no level', 'other'])
 
 const normalizeName = (name: string) => name.trim().toLowerCase()
 
@@ -38,6 +45,31 @@ export function isHiddenTreeNode(node?: { raw?: { name?: unknown; Name?: unknown
   if (!raw) return false
 
   return isHiddenTreeNodeName(raw.name) || isHiddenTreeNodeName(raw.Name)
+}
+
+/**
+ * Whether a node name should be hidden in the 3D viewer by default
+ */
+export function isViewerDefaultHiddenNodeName(name: unknown): boolean {
+  return (
+    typeof name === 'string' &&
+    VIEWER_DEFAULT_HIDDEN_NODE_NAMES.has(normalizeName(name))
+  )
+}
+
+/**
+ * Whether a tree node's objects should be hidden in the 3D viewer by default
+ * (by its raw object name)
+ */
+export function isViewerDefaultHiddenNode(node?: {
+  raw?: { name?: unknown; Name?: unknown }
+}) {
+  const raw = node?.raw
+  if (!raw) return false
+
+  return (
+    isViewerDefaultHiddenNodeName(raw.name) || isViewerDefaultHiddenNodeName(raw.Name)
+  )
 }
 
 /**

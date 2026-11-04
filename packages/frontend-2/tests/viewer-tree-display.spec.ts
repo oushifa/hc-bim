@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   getTreeNodeDisplayName,
   isHiddenTreeNode,
-  isHiddenTreeNodeName
+  isHiddenTreeNodeName,
+  isViewerDefaultHiddenNode,
+  isViewerDefaultHiddenNodeName
 } from '../lib/viewer/helpers/treeDisplay'
 
 describe('viewer tree display tweaks', () => {
@@ -54,6 +56,37 @@ describe('viewer tree display tweaks', () => {
     it('handles nodes without raw data', () => {
       expect(isHiddenTreeNode({})).toBe(false)
       expect(isHiddenTreeNode()).toBe(false)
+    })
+  })
+
+  describe('isViewerDefaultHiddenNodeName', () => {
+    it('matches the OTHER collection and its original "No Level" name', () => {
+      expect(isViewerDefaultHiddenNodeName('No Level')).toBe(true)
+      expect(isViewerDefaultHiddenNodeName('no level')).toBe(true)
+      expect(isViewerDefaultHiddenNodeName(' No Level ')).toBe(true)
+      expect(isViewerDefaultHiddenNodeName('OTHER')).toBe(true)
+      expect(isViewerDefaultHiddenNodeName('other')).toBe(true)
+    })
+
+    it('does not match anything else', () => {
+      expect(isViewerDefaultHiddenNodeName('Level 1')).toBe(false)
+      expect(isViewerDefaultHiddenNodeName('definitionGeometry')).toBe(false)
+      expect(isViewerDefaultHiddenNodeName('')).toBe(false)
+      expect(isViewerDefaultHiddenNodeName(undefined)).toBe(false)
+      expect(isViewerDefaultHiddenNodeName(42)).toBe(false)
+    })
+  })
+
+  describe('isViewerDefaultHiddenNode', () => {
+    it('matches nodes whose raw name (or Name) is the OTHER collection', () => {
+      expect(isViewerDefaultHiddenNode({ raw: { name: 'No Level' } })).toBe(true)
+      expect(isViewerDefaultHiddenNode({ raw: { Name: 'OTHER' } })).toBe(true)
+    })
+
+    it('handles nodes without raw data', () => {
+      expect(isViewerDefaultHiddenNode({ raw: { name: 'Level 1' } })).toBe(false)
+      expect(isViewerDefaultHiddenNode({})).toBe(false)
+      expect(isViewerDefaultHiddenNode()).toBe(false)
     })
   })
 })

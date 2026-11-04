@@ -1,12 +1,15 @@
 import type { FilterData } from '~/lib/viewer/helpers/filters/types'
 import type { SpeckleObject } from '@speckle/viewer'
 import type { Raw } from 'vue'
+import { uniq } from 'lodash-es'
 import { FilteringExtension, SelectionExtension } from '@speckle/viewer'
 import { watchTriggerable } from '@vueuse/core'
 import { useInjectedViewerState } from '~/lib/viewer/composables/setup'
 import { useOnViewerLoadComplete } from '~/lib/viewer/composables/viewer'
 import { useFilteringDataStore } from '~/lib/viewer/composables/filtering/dataStore'
 import { HighlightExtension } from '~/lib/viewer/composables/setup/highlighting'
+import { getTargetObjectIds } from '~~/lib/object-sidebar/helpers'
+import { isViewerDefaultHiddenNode } from '~/lib/viewer/helpers/treeDisplay'
 
 /**
  * Setup composable for filter-related state
@@ -173,6 +176,41 @@ export const useManualFilteringPostSetup = () => {
     if (filters.hiddenObjectIds.value.length > 0) {
       extension.showObjects(filters.hiddenObjectIds.value, 'manual-hiding', false)
     }
+  })
+}
+
+/**
+ * Hides the objects of the "OTHER" collection (Revit's "No Level") in the 3D viewer by
+ * default, once a model finished loading. The tree row is kept - it simply shows up as
+ * hidden and can be toggled back on by the user.
+ */
+export const useDefaultHiddenNodesPostSetup = () => {
+  const {
+    viewer: {
+      metadata: { worldTree }
+    },
+    ui: { filters }
+  } = useInjectedViewerState()
+
+  const applyDefaultHiddenNodes = () => {
+    const tree = worldTree.value
+    if (!tree) return
+
+    const ids: string[] = []
+    tree.walk((node) => {
+      const raw = node.model?.raw as Record<string, unknown> | undefined
+      if (raw && isViewerDefaultHiddenNode({ raw })) {
+        ids.push(...getTargetObjectIds(raw))
+      }
+      return true
+    })
+
+    if (!ids.length) return
+    filters.hiddenObjectIds.value = uniq([...filters.hiddenObjectIds.value, ...ids])
+  }
+
+  useOnViewerLoadComplete(() => {
+    applyDefaultHiddenNodes()
   })
 }
 
