@@ -99,7 +99,7 @@
             </thead>
             <tbody class="text-sm text-[#333]">
               <tr
-                v-for="log in filteredModelLogs"
+                v-for="log in modelTab.items"
                 :key="log.id"
                 class="border-b border-gray-50 hover:bg-[#fcfcfc] transition-colors"
               >
@@ -110,7 +110,10 @@
                 </td>
                 <td class="py-3.5 text-gray-600">{{ log.target }}</td>
                 <td class="py-3.5 text-gray-500">
-                  <span class="px-2.5 py-1 rounded-[6px] bg-gray-100 text-xs">
+                  <span
+                    class="inline-block align-middle max-w-[260px] truncate px-2.5 py-1 rounded-[6px] bg-gray-100 text-xs"
+                    :title="log.version"
+                  >
                     {{ log.version }}
                   </span>
                 </td>
@@ -121,7 +124,7 @@
                   正在加载日志...
                 </td>
               </tr>
-              <tr v-else-if="filteredModelLogs.length === 0">
+              <tr v-else-if="modelTab.items.length === 0">
                 <td colspan="6" class="py-16 text-center text-gray-400 text-sm">
                   暂无匹配的模型操作日志
                 </td>
@@ -144,7 +147,7 @@
             </thead>
             <tbody class="text-sm text-[#333]">
               <tr
-                v-for="log in filteredLoginLogs"
+                v-for="log in loginTab.items"
                 :key="log.id"
                 class="border-b border-gray-50 hover:bg-[#fcfcfc] transition-colors"
               >
@@ -170,7 +173,7 @@
                   正在加载日志...
                 </td>
               </tr>
-              <tr v-else-if="filteredLoginLogs.length === 0">
+              <tr v-else-if="loginTab.items.length === 0">
                 <td colspan="5" class="py-16 text-center text-gray-400 text-sm">
                   暂无匹配的用户登录日志
                 </td>
@@ -178,6 +181,46 @@
             </tbody>
           </table>
         </template>
+      </div>
+
+      <!-- Pagination -->
+      <div
+        class="shrink-0 px-5 py-3 border-t border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-3 text-sm text-gray-500"
+      >
+        <div class="flex items-center gap-2">
+          <label for="logs-page-size" class="sr-only">每页显示条数</label>
+          <span>每页显示</span>
+          <select
+            id="logs-page-size"
+            v-model.number="activePageState.pageSize"
+            class="bg-[#f5f7fa] border border-gray-200 rounded-[6px] px-2 py-1 focus:outline-none focus:border-[#00b4b6]"
+          >
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+          </select>
+          <span>条</span>
+          <span class="ml-1">共 {{ activePageState.total }} 条</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button
+            class="px-2 py-1 rounded hover:bg-[#f5f7fa] disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="activePageState.page <= 1 || isLoading"
+            @click="goPrevPage"
+          >
+            &lt; 上一页
+          </button>
+          <span class="px-2">
+            第 {{ activePageState.page }} / {{ activeTotalPages }} 页
+          </span>
+          <button
+            class="px-2 py-1 rounded hover:bg-[#f5f7fa] disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="activePageState.page >= activeTotalPages || isLoading"
+            @click="goNextPage"
+          >
+            下一页 &gt;
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -189,21 +232,22 @@ import {
   FunnelIcon,
   ArrowPathIcon
 } from '@heroicons/vue/24/outline'
+import { useDebounceFn } from '@vueuse/core'
 import { useAuthCookie } from '~~/lib/auth/composables/auth'
 
 // ─── Tab 状态 ────────────────────────────────────────────────
 const activeTab = ref<'model' | 'login'>('model')
 const searchQuery = ref('')
+const debouncedSearch = ref('')
 const isLoading = ref(false)
 const errorMessage = ref('')
 const authToken = useAuthCookie()
 
-type RawLogEvent = {
+type LogApiEvent = {
+  eventId?: string
   eventTime?: string
-  action?: string
   what?: {
     action?: string
-    targetType?: string | null
     targetId?: string | null
     payloadSummary?: Record<string, unknown> | string | null
   }
@@ -219,12 +263,26 @@ type RawLogEvent = {
   where?: {
     route?: string | null
     page?: string | null
+    module?: string | null
   }
   result?: {
     status?: 'success' | 'fail' | 'unknown'
     message?: string | null
   }
-  metadata?: Record<string, unknown> | null
+  metadata?: {
+    opType?: string
+    operatorDept?: string
+    target?: string
+    detail?: string
+    location?: string
+  } | null
+}
+
+type LogsApiResponse = {
+  items: LogApiEvent[]
+  total: number
+  page: number
+  pageSize: number
 }
 
 type ModelLogItem = {
@@ -246,8 +304,32 @@ type LoginLogItem = {
   status: string
 }
 
-const modelLogs = ref<ModelLogItem[]>([])
-const loginLogs = ref<LoginLogItem[]>([])
+type TabState = {
+  page: number
+  pageSize: number
+  total: number
+  items: ModelLogItem[] | LoginLogItem[]
+}
+
+const modelTab = reactive<TabState>({
+  page: 1,
+  pageSize: 10,
+  total: 0,
+  items: []
+}) as TabState & { items: ModelLogItem[] }
+const loginTab = reactive<TabState>({
+  page: 1,
+  pageSize: 10,
+  total: 0,
+  items: []
+}) as TabState & { items: LoginLogItem[] }
+
+const activePageState = computed(() =>
+  activeTab.value === 'model' ? modelTab : loginTab
+)
+const activeTotalPages = computed(() =>
+  Math.max(1, Math.ceil(activePageState.value.total / activePageState.value.pageSize))
+)
 
 const formatTime = (value?: string) => {
   if (!value) return '-'
@@ -256,64 +338,27 @@ const formatTime = (value?: string) => {
   return date.toLocaleString('zh-CN', { hour12: false })
 }
 
-const asRecord = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
-
-const parseEvents = (payload: unknown): RawLogEvent[] => {
-  if (Array.isArray(payload)) return payload as RawLogEvent[]
-  const root = asRecord(payload)
-  const candidates = [root.events, root.items, root.data]
-  for (const candidate of candidates) {
-    if (Array.isArray(candidate)) return candidate as RawLogEvent[]
-  }
-  return []
-}
-
-const isLoginEvent = (event: RawLogEvent) => {
-  const action = event.what?.action || event.action || ''
-  return action.startsWith('auth.login')
-}
-
-const getDisplayUserName = (event: RawLogEvent) => {
+const getDisplayUserName = (event: LogApiEvent) => {
   return (
     event.who?.user?.name || event.who?.user?.email || event.who?.userId || '未知用户'
   )
 }
 
-const getModelActionLabel = (event: RawLogEvent) => {
-  const action = event.what?.action || event.action || '-'
-  if (action === 'model.upload.dtp') {
-    return event.result?.status === 'fail' ? '模型上传失败' : '模型上传成功'
-  }
-  return action
-}
-
-const toModelLogItem = (event: RawLogEvent, index: number): ModelLogItem => {
-  const action = getModelActionLabel(event)
-  const payload = asRecord(event.what?.payloadSummary)
-  const metadata = asRecord(event.metadata)
+const toModelLogItem = (event: LogApiEvent, index: number): ModelLogItem => {
+  const action = event.metadata?.opType || event.what?.action || '-'
 
   return {
-    id: `${event.eventTime || 'model'}-${index}-${action}`,
+    id: event.eventId || `${event.eventTime || 'model'}-${index}`,
     time: formatTime(event.eventTime),
     user: getDisplayUserName(event),
     action,
-    target: String(
-      payload.target ||
-        payload.assetName ||
-        payload.fileName ||
-        event.what?.targetId ||
-        payload.targetId ||
-        payload.target ||
-        metadata.target ||
-        '-'
-    ),
-    version: String(payload.version || payload.versionId || metadata.version || '-'),
+    target: event.metadata?.target || event.what?.targetId || '-',
+    version: event.metadata?.detail || '-',
     ip: event.who?.ip || '-'
   }
 }
 
-const toLoginLogItem = (event: RawLogEvent, index: number): LoginLogItem => {
+const toLoginLogItem = (event: LogApiEvent, index: number): LoginLogItem => {
   const status = event.result?.status || 'unknown'
   const statusText =
     status === 'success'
@@ -321,78 +366,113 @@ const toLoginLogItem = (event: RawLogEvent, index: number): LoginLogItem => {
       : status === 'fail'
       ? `失败${event.result?.message ? ` (${event.result.message})` : ''}`
       : '未知'
-  const metadata = asRecord(event.metadata)
 
   return {
-    id: `${event.eventTime || 'login'}-${index}-${status}`,
+    id: event.eventId || `${event.eventTime || 'login'}-${index}`,
     time: formatTime(event.eventTime),
     user: getDisplayUserName(event),
     ip: event.who?.ip || '-',
     location: String(
-      metadata.location || event.where?.route || event.where?.page || '未知'
+      event.metadata?.location || event.where?.page || event.where?.route || '未知'
     ),
     status: statusText
   }
 }
 
-const refreshLogs = async () => {
+const buildHeaders = (): HeadersInit => {
+  const headers: HeadersInit = { 'Content-Type': 'application/json' }
+  const token = authToken.value
+  if (token) headers.Authorization = `Bearer ${token}`
+  return headers
+}
+
+const fetchLogs = async (tab: 'model' | 'login') => {
+  const target = tab === 'model' ? modelTab : loginTab
+
   isLoading.value = true
   errorMessage.value = ''
   try {
-    const token = authToken.value
-    const headers: HeadersInit = { 'Content-Type': 'application/json' }
-    if (token) headers.Authorization = `Bearer ${token}`
-
-    const response = await fetch(`${useApiOrigin()}/api/v1/logs/events?limit=300`, {
-      method: 'GET',
-      headers
+    const query = new URLSearchParams({
+      type: tab,
+      page: String(target.page),
+      pageSize: String(target.pageSize)
     })
+    if (debouncedSearch.value) query.set('q', debouncedSearch.value)
+
+    const response = await fetch(
+      `${useApiOrigin()}/api/v1/logs/events?${query.toString()}`,
+      {
+        method: 'GET',
+        headers: buildHeaders()
+      }
+    )
     if (!response.ok) {
       throw new Error(`日志加载失败（${response.status}）`)
     }
 
-    const payload = (await response.json()) as unknown
-    const events = parseEvents(payload)
+    const payload = (await response.json()) as LogsApiResponse
+    const items = Array.isArray(payload.items) ? payload.items : []
 
-    const modelEvents = events.filter((event) => !isLoginEvent(event))
-    const loginEvents = events.filter((event) => isLoginEvent(event))
-
-    modelLogs.value = modelEvents.map(toModelLogItem)
-    loginLogs.value = loginEvents.map(toLoginLogItem)
+    if (tab === 'model') {
+      modelTab.total = Number(payload.total || 0)
+      modelTab.items = items.map(toModelLogItem)
+    } else {
+      loginTab.total = Number(payload.total || 0)
+      loginTab.items = items.map(toLoginLogItem)
+    }
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : '日志加载失败，请稍后重试。'
-    modelLogs.value = []
-    loginLogs.value = []
+    if (tab === 'model') {
+      modelTab.items = []
+      modelTab.total = 0
+    } else {
+      loginTab.items = []
+      loginTab.total = 0
+    }
   } finally {
     isLoading.value = false
   }
 }
 
-onMounted(() => {
-  void refreshLogs()
+const refreshLogs = () => {
+  void fetchLogs(activeTab.value)
+}
+
+const goPrevPage = () => {
+  if (activePageState.value.page <= 1) return
+  activePageState.value.page -= 1
+}
+
+const goNextPage = () => {
+  if (activePageState.value.page >= activeTotalPages.value) return
+  activePageState.value.page += 1
+}
+
+const updateDebouncedSearch = useDebounceFn((value: string) => {
+  debouncedSearch.value = value.trim()
+  modelTab.page = 1
+  loginTab.page = 1
+}, 300)
+
+watch(searchQuery, (value) => {
+  updateDebouncedSearch(value)
 })
 
-// ─── 计算属性：过滤后的日志 ──────────────────────────────────
-const filteredModelLogs = computed(() => {
-  if (!searchQuery.value) return modelLogs.value
-  return modelLogs.value.filter(
-    (log) =>
-      log.user.includes(searchQuery.value) ||
-      log.action.includes(searchQuery.value) ||
-      log.target.includes(searchQuery.value)
-  )
-})
-
-const filteredLoginLogs = computed(() => {
-  if (!searchQuery.value) return loginLogs.value
-  return loginLogs.value.filter(
-    (log) =>
-      log.user.includes(searchQuery.value) ||
-      log.ip.includes(searchQuery.value) ||
-      log.location.includes(searchQuery.value)
-  )
-})
+// 切换 Tab、翻页、修改每页条数或搜索词时，均按当前 Tab 重新向后端请求
+watch(
+  () =>
+    [
+      activeTab.value,
+      activePageState.value.page,
+      activePageState.value.pageSize,
+      debouncedSearch.value
+    ].join('|'),
+  () => {
+    void fetchLogs(activeTab.value)
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>
