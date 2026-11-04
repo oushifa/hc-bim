@@ -125,8 +125,10 @@ import dayjs from 'dayjs'
 import type { ModelLibraryListItem } from '~/lib/projects/composables/modelLibrary'
 import { useModelLibraryApi } from '~/lib/projects/composables/modelLibrary'
 
-defineProps<{
+const props = defineProps<{
   activeDirName: string
+  /** 当前项目 id：导入列表会排除该项目自身的模型 */
+  projectId: string
   importing?: boolean
   progress?: number
   statusText?: string
@@ -172,7 +174,8 @@ const loadModels = async () => {
     const result = await listModels({
       search: searchQuery.value.trim(),
       page: 1,
-      pageSize: 30
+      pageSize: 30,
+      excludeProjectId: props.projectId
     })
     models.value = result.data
   } finally {

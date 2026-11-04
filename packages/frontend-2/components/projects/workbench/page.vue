@@ -498,6 +498,7 @@
     <ImportDialog
       v-if="showImportModal"
       :active-dir-name="activeDirName"
+      :project-id="props.projectId"
       :importing="isImportingFromLibrary"
       :progress="importProgress"
       :status-text="importStatusText"
@@ -1821,23 +1822,23 @@ const getApiHeaders = () => {
 }
 
 /**
- * 从模型库导入：让后端按源模型 root 的 __closure 把整棵对象树
- * （root + 全部子对象）复制到目标项目。必须在创建导入版本前调用，
- * 因为创建版本时会校验 referencedObject 在目标项目中已存在。
+ * 从模型库导入：让后端按源模型 root 的 __closure 校验并复制整棵对象树
+ * （root + 全部子对象）到目标项目。
+ *
+ * 源模型残缺时后端会直接报错，此时不会创建模型/版本，等同于取消导入。
+ * 也必须在创建导入版本前调用，因为创建版本时会校验 referencedObject 已存在。
  */
 const importModelObjectTree = async (params: {
-  modelId: string
   sourceProjectId: string
   sourceModelId: string
 }) => {
-  return await $fetch<{
-    data: {
-      referencedObject: string
-      objectCount: number
-    }
-  }>(
-    `${apiOrigin}/api/v1/projects/${props.projectId}/models/${params.modelId}/import-object-tree`,
-    {
+  try {
+    return await $fetch<{
+      data: {
+        referencedObject: string
+        objectCount: number
+      }
+    }>(`${apiOrigin}/api/v1/projects/${props.projectId}/import-object-tree`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1847,8 +1848,14 @@ const importModelObjectTree = async (params: {
         sourceProjectId: params.sourceProjectId,
         sourceModelId: params.sourceModelId
       }
-    }
-  )
+    })
+  } catch (err) {
+    // 把后端的业务错误（如「源模型数据不完整」）透传给上层提示用户
+    const data = (err as { data?: { error?: string | { message?: string } } })?.data
+    const serverMessage =
+      typeof data?.error === 'string' ? data.error : data?.error?.message
+    throw new Error(serverMessage || '导入失败，请稍后重试')
+  }
 }
 
 /**
@@ -2415,6 +2422,23 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
         throw new Error(`模型 ${sourceModel.title} 缺少可导入的快照数据`)
       }
 
+      // 先让后端按 root.__closure 校验并复制整棵对象树：
+      // 源模型残缺（例如残缺副本）时这里会直接报错、中断导入，
+      // 且因为此时还没创建模型/版本，不会留下任何残留。
+      setImportStage({
+        index,
+        total,
+        modelName: sourceModel.title,
+        stage: 'objects'
+      })
+      const copyRes = await importModelObjectTree({
+        sourceProjectId: sourceModel.projectId,
+        sourceModelId: sourceModel.id
+      })
+      if (!copyRes.data?.objectCount) {
+        throw new Error(`模型 ${sourceModel.title} 的对象复制失败`)
+      }
+
       const createModelRes = await apollo.mutate<{
         modelMutations?: {
           create?: {
@@ -2435,23 +2459,6 @@ const handleImport = async (models: ModelLibraryListItem[]) => {
       const createdModelId = createModelRes.data?.modelMutations?.create?.id
       if (!createdModelId) {
         throw new Error(`模型 ${sourceModel.title} 创建失败`)
-      }
-
-      // 后端按 root.__closure 复制整棵对象树，保证 root 声明的子对象全部到位
-      // （必须在创建版本前完成，否则版本创建时校验 referencedObject 会失败）
-      setImportStage({
-        index,
-        total,
-        modelName: sourceModel.title,
-        stage: 'objects'
-      })
-      const copyRes = await importModelObjectTree({
-        modelId: createdModelId,
-        sourceProjectId: sourceModel.projectId,
-        sourceModelId: sourceModel.id
-      })
-      if (!copyRes.data?.objectCount) {
-        throw new Error(`模型 ${sourceModel.title} 的对象复制失败`)
       }
 
       setImportStage({

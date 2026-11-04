@@ -66,9 +66,6 @@ export type ModelLibraryListResponse = {
 
 type UploadProgressCallback = (percentage: number) => void
 
-/** 模型库项目 id 的进程内缓存，避免每次列表都多打一次接口 */
-let modelLibraryProjectIdPromise: Promise<string> | undefined
-
 export function useModelLibraryApi() {
   const apiOrigin = useApiOrigin()
   const authCookie = useAuthCookie()
@@ -96,27 +93,13 @@ export function useModelLibraryApi() {
     return res.data
   }
 
-  /** 解析模型库（models_lib）项目 id，结果缓存在模块级 */
-  const resolveModelLibraryProjectId = async () => {
-    if (!modelLibraryProjectIdPromise) {
-      modelLibraryProjectIdPromise = ensureProject()
-        .then((project) => project.id)
-        .catch((err) => {
-          modelLibraryProjectIdPromise = undefined
-          throw err
-        })
-    }
-    return modelLibraryProjectIdPromise
-  }
-
   const listModels = async (params?: {
     search?: string
     page?: number
     pageSize?: number
+    /** 排除该项目自身的模型（例如导入弹窗排除当前项目） */
+    excludeProjectId?: string
   }): Promise<ModelLibraryListResponse> => {
-    // 只列模型库里的模型：/api/v1/models 默认返回所有项目的模型，
-    // 会混入用户此前导入产生的同名残缺副本，导致误选坏源
-    const streamId = await resolveModelLibraryProjectId()
     const res = await $fetch<{ data: ModelLibraryListItem[]; total?: number }>(
       `${apiOrigin}/api/v1/models`,
       {
@@ -125,7 +108,7 @@ export function useModelLibraryApi() {
           search: params?.search || '',
           member: 'all',
           source: 'all',
-          streamId,
+          excludeStreamId: params?.excludeProjectId || undefined,
           page: params?.page || 1,
           pageSize: params?.pageSize || 30
         }
