@@ -179,7 +179,8 @@ function createTreeStateManager() {
           if (treeItems.length > 0) {
             treeItems[0].isFirstChildOfModel = true
             treeItems[treeItems.length - 1].isLastChildOfModel = true
-            result.push(...treeItems)
+            // Avoid spreading huge arrays (big containers) - it can blow the call stack
+            for (let i = 0; i < treeItems.length; i++) result.push(treeItems[i])
           }
         }
       }
@@ -217,13 +218,18 @@ function createTreeStateManager() {
           if (treeItems.length > 0) {
             treeItems[0].isFirstChildOfModel = true
             treeItems[treeItems.length - 1].isLastChildOfModel = true
-            result.push(...treeItems)
+            // Avoid spreading huge arrays (big containers) - it can blow the call stack
+            for (let i = 0; i < treeItems.length; i++) result.push(treeItems[i])
           }
         }
       }
     })
 
-    // Cache the result
+    // Cache the result. Keep it bounded to a single entry: the cache key contains the
+    // current selection, so a growing cache would retain a full copy of the flattened
+    // tree (tens of thousands of items for big containers) on every selection change and
+    // quickly exhaust memory / freeze the tab.
+    flattenedTreeCache.clear()
     flattenedTreeCache.set(cacheKey, result)
     lastCacheKey = cacheKey
 
@@ -261,6 +267,80 @@ export function useTreeManagement() {
     return isAllowed
   }
 
+  // Memoized per-node derived data. Nodes come from the (immutable) world tree, so the
+  // expensive per-node work - scanning every object property and filtering children -
+  // only has to run once and can be reused by every following flatten pass (expand/
+  // collapse/selection). Without this, a single selection change would re-do all of that
+  // work for every node of a large expanded container.
+  const arrayCollectionsCache = new WeakMap<ExplorerNode, ExplorerNode[]>()
+  const expandedChildrenCache = new WeakMap<ExplorerNode, ExplorerNode[]>()
+
+  const isNonEmptyArray = (x: unknown): x is Array<unknown> =>
+    !!x && Array.isArray(x) && x.length > 0
+  const isNonEmptyObjectArray = (x: unknown) =>
+    isNonEmptyArray(x) &&
+    typeof x[0] === 'object' &&
+    !Array.isArray(x[0]) &&
+    x[0] !== null
+
+  const getArrayCollections = (node: ExplorerNode): ExplorerNode[] => {
+    const cached = arrayCollectionsCache.get(node)
+    if (cached) return cached
+
+    const collections: ExplorerNode[] = []
+    const speckleData = node.raw
+
+    if (speckleData) {
+      for (const [k, val] of Object.entries(speckleData)) {
+        if (
+          EXCLUDED_COLLECTION_KEYS.has(k as 'children' | 'elements') ||
+          k.includes(DISPLAY_VALUE_KEY)
+        )
+          continue
+        if (!isReferencedIdArray(val)) continue
+
+        const ids = new Set(val.map((ref) => ref.referencedId))
+        const actualRawRefs =
+          node.children?.filter((childNode) => {
+            const childId = childNode.raw?.id as string
+            return ids.has(childId) && isAllowedType(childNode)
+          }) || []
+
+        if (actualRawRefs.length > 0) {
+          collections.push({
+            raw: {
+              name: k,
+              id: k,
+              speckle_type: 'Array Collection', // eslint-disable-line camelcase
+              children: val
+            },
+            children: actualRawRefs
+          })
+        }
+      }
+    }
+
+    arrayCollectionsCache.set(node, collections)
+    return collections
+  }
+
+  const getExpandedChildren = (node: ExplorerNode): ExplorerNode[] => {
+    const cached = expandedChildrenCache.get(node)
+    if (cached) return cached
+
+    const speckleData = node.raw
+    let children =
+      node.children?.filter((child) => !!child.raw?.id && isAllowedType(child)) || []
+
+    if (isReferencedIdArray(speckleData?.elements) && speckleData?.atomic === true) {
+      const elementIds = new Set(speckleData.elements.map((obj) => obj.referencedId))
+      children = children.filter((item) => elementIds.has(item.raw?.id as string))
+    }
+
+    expandedChildrenCache.set(node, children)
+    return children
+  }
+
   const flattenModelTree = (
     nodes: ExplorerNode[],
     modelId: string,
@@ -272,122 +352,59 @@ export function useTreeManagement() {
     const result: UnifiedVirtualItem[] = []
     const selectedObjectIds = new Set(selectedObjects.map((obj) => obj.id))
 
-    for (const node of nodes) {
-      const nodeId = node.raw?.id || node.guid || ''
-      if (!nodeId) continue
+    const walk = (
+      currentNodes: ExplorerNode[],
+      currentIndent: number,
+      parentIsDescendantOfSelected: boolean
+    ) => {
+      for (const node of currentNodes) {
+        const nodeId = node.raw?.id || node.guid || ''
+        if (!nodeId) continue
 
-      // Display-only: keep unhelpful collections (e.g. "definitionGeometry") out of the
-      // tree entirely, including their subtree. See lib/viewer/helpers/treeDisplay.ts
-      if (isHiddenTreeNode(node)) continue
+        // Display-only: keep unhelpful collections (e.g. "definitionGeometry") out of the
+        // tree entirely, including their subtree. See lib/viewer/helpers/treeDisplay.ts
+        if (isHiddenTreeNode(node)) continue
 
-      const speckleData = node.raw
-      const isNodeSelected = selectedObjectIds.has(nodeId)
-      const shouldMarkDescendantsAsSelected = isDescendantOfSelected || isNodeSelected
+        const speckleData = node.raw
+        const isNodeSelected = selectedObjectIds.has(nodeId)
+        const shouldMarkDescendantsAsSelected =
+          parentIsDescendantOfSelected || isNodeSelected
 
-      const isNonEmptyArray = (x: unknown): x is Array<unknown> =>
-        !!x && Array.isArray(x) && x.length > 0
-      const isNonEmptyObjectArray = (x: unknown) =>
-        isNonEmptyArray(x) &&
-        typeof x[0] === 'object' &&
-        !Array.isArray(x[0]) &&
-        x[0] !== null
+        const isSingleCollection =
+          isNonEmptyObjectArray(speckleData?.children) ||
+          isNonEmptyObjectArray(speckleData?.elements)
+        const arrayCollections = getArrayCollections(node)
+        const isMultipleCollection = arrayCollections.length > 0
+        const hasChildren = isSingleCollection || isMultipleCollection
+        const isExpanded = hasChildren && expandedNodes.has(nodeId)
 
-      const isSingleCollection =
-        isNonEmptyObjectArray(speckleData?.children) ||
-        isNonEmptyObjectArray(speckleData?.elements)
-      const arrayCollections: ExplorerNode[] = []
-
-      if (speckleData) {
-        Object.entries(speckleData).forEach(([k, val]) => {
-          if (
-            EXCLUDED_COLLECTION_KEYS.has(k as 'children' | 'elements') ||
-            k.includes(DISPLAY_VALUE_KEY)
-          )
-            return
-          if (!isReferencedIdArray(val)) return
-
-          const ids = new Set(val.map((ref) => ref.referencedId))
-          const actualRawRefs =
-            node.children?.filter((childNode) => {
-              const childId = childNode.raw?.id as string
-              return ids.has(childId) && isAllowedType(childNode)
-            }) || []
-
-          if (actualRawRefs.length > 0) {
-            arrayCollections.push({
-              raw: {
-                name: k,
-                id: k,
-                speckle_type: 'Array Collection', // eslint-disable-line camelcase
-                children: val
-              },
-              children: actualRawRefs
-            })
-          }
+        result.push({
+          type: 'tree-item',
+          id: nodeId,
+          modelId,
+          data: node,
+          indent: currentIndent,
+          hasChildren,
+          isExpanded,
+          isDescendantOfSelected: parentIsDescendantOfSelected
         })
-      }
 
-      const isMultipleCollection = arrayCollections.length > 0
-      const hasChildren = isSingleCollection || isMultipleCollection
-      const isExpanded = hasChildren && expandedNodes.has(nodeId)
+        if (!isExpanded) continue
 
-      result.push({
-        type: 'tree-item',
-        id: nodeId,
-        modelId,
-        data: node,
-        indent,
-        hasChildren,
-        isExpanded,
-        isDescendantOfSelected
-      })
-
-      if (isExpanded) {
         if (isMultipleCollection) {
-          result.push(
-            ...flattenModelTree(
-              arrayCollections,
-              modelId,
-              expandedNodes,
-              selectedObjects,
-              indent + 1,
-              shouldMarkDescendantsAsSelected
-            )
-          )
+          walk(arrayCollections, currentIndent + 1, shouldMarkDescendantsAsSelected)
         }
-
         if (isSingleCollection) {
-          const treeItems =
-            node.children?.filter((child) => !!child.raw?.id && isAllowedType(child)) ||
-            []
-
-          let filteredItems = treeItems
-          if (
-            isReferencedIdArray(speckleData?.elements) &&
-            speckleData?.atomic === true
-          ) {
-            const elementIds = new Set(
-              speckleData.elements.map((obj) => obj.referencedId)
-            )
-            filteredItems = treeItems.filter((item) =>
-              elementIds.has(item.raw?.id as string)
-            )
-          }
-
-          result.push(
-            ...flattenModelTree(
-              filteredItems,
-              modelId,
-              expandedNodes,
-              selectedObjects,
-              indent + 1,
-              shouldMarkDescendantsAsSelected
-            )
+          walk(
+            getExpandedChildren(node),
+            currentIndent + 1,
+            shouldMarkDescendantsAsSelected
           )
         }
       }
     }
 
+    walk(nodes, indent, isDescendantOfSelected)
     return result
   }
 
