@@ -66,8 +66,7 @@ import { useMeasurementsPostSetup } from '~/lib/viewer/composables/setup/measure
 import { useFilterColoringPostSetup } from '~/lib/viewer/composables/setup/coloring'
 import {
   usePropertyFilteringPostSetup,
-  useManualFilteringPostSetup,
-  useDefaultHiddenNodesPostSetup
+  useManualFilteringPostSetup
 } from '~/lib/viewer/composables/setup/filters'
 import { useFilterUtilities } from '~/lib/viewer/composables/filtering/filtering'
 import { useFilteringSetup } from '~/lib/viewer/composables/filtering/setup'
@@ -975,7 +974,6 @@ export function useViewerPostSetup() {
   useFilterColoringPostSetup()
   usePropertyFilteringPostSetup()
   useManualFilteringPostSetup()
-  useDefaultHiddenNodesPostSetup()
   useDisableZoomOnEmbed()
   useViewerCursorIntegration()
   useViewerTreeIntegration()
