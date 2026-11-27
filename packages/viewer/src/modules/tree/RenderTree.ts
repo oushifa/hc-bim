@@ -1,6 +1,6 @@
 import { Matrix4 } from 'three'
 import { type TreeNode, WorldTree } from './WorldTree.js'
-import Materials from '../materials/Materials.js'
+import Materials, { type BlobResourceContext } from '../materials/Materials.js'
 import { type NodeRenderData, NodeRenderView } from './NodeRenderView.js'
 import { GeometryConverter, SpeckleType } from '../loaders/GeometryConverter.js'
 import Logger from '../utils/Logger.js'
@@ -15,6 +15,11 @@ export class RenderTree {
   public getNodeTime = 0
   public otherTime = 0
   private count = 0
+  private blobContext?: BlobResourceContext
+
+  public setBlobContext(context: BlobResourceContext) {
+    this.blobContext = context
+  }
 
   public get id(): string {
     return this.root.model.id
@@ -101,7 +106,8 @@ export class RenderTree {
         geometry: geometryData,
         renderMaterial: Materials.renderMaterialFromNode(
           renderMaterialNode || displayStyleNode,
-          node
+          node,
+          this.blobContext
         ),
         /** Line-type geometry can also use a renderMaterial*/
         displayStyle: Materials.displayStyleFromNode(

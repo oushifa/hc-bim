@@ -951,6 +951,7 @@ export default class SpeckleConverter {
       node.model.raw.faces = []
       node.model.raw.colors = []
       node.model.raw.vertexNormals = []
+      node.model.raw.textureCoordinates = []
       return
     }
     if (!obj.faces || (obj.faces as Array<number>).length === 0) {
@@ -961,6 +962,7 @@ export default class SpeckleConverter {
       node.model.raw.faces = []
       node.model.raw.colors = []
       node.model.raw.vertexNormals = []
+      node.model.raw.textureCoordinates = []
       return
     }
 
@@ -976,6 +978,9 @@ export default class SpeckleConverter {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     //@ts-ignore
     node.model.raw.vertexNormals = await this.dechunk(obj.vertexNormals)
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    //@ts-ignore
+    node.model.raw.textureCoordinates = await this.dechunk(obj.textureCoordinates)
   }
 
   private async RegionToNode(obj: SpeckleObject, node: TreeNode) {

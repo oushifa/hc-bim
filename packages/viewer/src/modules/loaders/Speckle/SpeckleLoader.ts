@@ -3,6 +3,7 @@ import { Loader, LoaderEvent } from '../Loader.js'
 import { SpeckleGeometryConverter } from './SpeckleGeometryConverter.js'
 import { WorldTree, type SpeckleObject } from '../../../index.js'
 import Logger from '../../utils/Logger.js'
+import { type BlobResourceContext } from '../../materials/Materials.js'
 import {
   getFeatureFlag,
   ObjectLoader2Flags,
@@ -19,6 +20,7 @@ export class SpeckleLoader extends Loader {
   protected isCancelled = false
   protected isFinished = false
   protected log: (message?: string, ...args: unknown[]) => void
+  protected blobContext?: BlobResourceContext
 
   public get resource(): string {
     return this._resource
@@ -94,6 +96,12 @@ export class SpeckleLoader extends Loader {
     const serverUrl = url.origin
     const streamId = segments[2]
     const objectId = segments[4]
+
+    this.blobContext = {
+      serverUrl,
+      streamId,
+      authToken: token
+    }
 
     return ObjectLoader2Factory.createFromUrl({
       serverUrl,
@@ -171,6 +179,9 @@ export class SpeckleLoader extends Loader {
 
     const renderTree = this.tree.getRenderTree(this.resource)
     if (!renderTree) return Promise.resolve(false)
+    if (this.blobContext) {
+      renderTree.setBlobContext(this.blobContext)
+    }
     const p = renderTree.buildRenderTree(geometryConverter, (count: number) => {
       this.emit(LoaderEvent.Converted, {
         count

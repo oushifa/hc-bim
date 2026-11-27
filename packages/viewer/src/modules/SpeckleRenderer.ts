@@ -445,7 +445,9 @@ export default class SpeckleRenderer {
     container.appendChild(this._renderer.domElement)
     this.updateCanvasBackground()
 
-    this.batcher = new Batcher(this.renderer.capabilities)
+    this.batcher = new Batcher(this.renderer.capabilities, () => {
+      this.needsRender = true
+    })
 
     this._pipeline = new DefaultPipeline(this)
 

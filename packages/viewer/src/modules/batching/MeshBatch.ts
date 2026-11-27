@@ -217,6 +217,9 @@ export class MeshBatch extends PrimitiveBatch {
 
     const hasVertexColors =
       this.renderViews[0].renderData.geometry.attributes?.COLOR !== undefined
+    const hasUVs = this.renderViews.some(
+      (rv) => rv.renderData.geometry.attributes?.UV !== undefined
+    )
     const indices =
       attributeCount >= 65535 || indicesCount >= 65535
         ? new Uint32Array(indicesCount)
@@ -228,6 +231,7 @@ export class MeshBatch extends PrimitiveBatch {
     color.fill(1)
     const batchIndices = new Float32Array(attributeCount / 3)
     const normals = new Float32Array(attributeCount)
+    const uvs = hasUVs ? new Float32Array((attributeCount / 3) * 2) : undefined
 
     let offset = 0
     let arrayOffset = 0
@@ -264,6 +268,10 @@ export class MeshBatch extends PrimitiveBatch {
 
       if (geometry.attributes.COLOR) {
         geometry.attributes?.COLOR.copyToBuffer(color, offset)
+      }
+
+      if (uvs && geometry.attributes.UV) {
+        geometry.attributes.UV.copyToBuffer(uvs, (offset / 3) * 2)
       }
 
       /** We either copy over the provided vertex normals */
@@ -329,7 +337,8 @@ export class MeshBatch extends PrimitiveBatch {
       position,
       normals,
       batchIndices,
-      hasVertexColors ? color : undefined
+      hasVertexColors ? color : undefined,
+      uvs
     )
 
     if (needsRTE) Geometry.updateRTEGeometry(geometry, position)
@@ -359,7 +368,8 @@ export class MeshBatch extends PrimitiveBatch {
     position: Float64Array | Float32Array,
     normals: Float32Array,
     batchIndices: Float32Array,
-    color?: Float32Array
+    color?: Float32Array,
+    uvs?: Float32Array
   ): BufferGeometry {
     const geometry = new BufferGeometry()
     if (position.length >= 65535 || indices.length >= 65535) {
@@ -391,6 +401,10 @@ export class MeshBatch extends PrimitiveBatch {
 
     if (color) {
       geometry.setAttribute('color', new Float32BufferAttribute(color, 3))
+    }
+
+    if (uvs) {
+      geometry.setAttribute('uv', new Float32BufferAttribute(uvs, 2))
     }
 
     const buffer = new Float32Array(position.length / 3)

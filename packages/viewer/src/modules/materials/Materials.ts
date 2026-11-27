@@ -1,4 +1,14 @@
-import { Color, DoubleSide, FrontSide, Material, Texture, Vector2 } from 'three'
+import {
+  Color,
+  DoubleSide,
+  FrontSide,
+  Material,
+  RepeatWrapping,
+  sRGBEncoding,
+  Texture,
+  Vector2
+} from 'three'
+import Logger from '../utils/Logger.js'
 import { GeometryType } from '../batching/Batch.js'
 import { type TreeNode } from '../tree/WorldTree.js'
 import { NodeRenderView } from '../tree/NodeRenderView.js'
@@ -23,6 +33,19 @@ const defaultGradient: Asset = {
   type: AssetType.TEXTURE_8BPP
 }
 
+export interface BlobResourceContext {
+  serverUrl: string
+  streamId: string
+  authToken?: string
+}
+
+export interface RenderMaterialTexture {
+  blobId: string
+  url: string
+  mimeType?: string
+  authToken?: string
+}
+
 export interface RenderMaterial extends MinimalMaterial {
   id: string
   emissive: number
@@ -30,6 +53,7 @@ export interface RenderMaterial extends MinimalMaterial {
   roughness: number
   metalness: number
   vertexColors: boolean
+  diffuseTexture?: RenderMaterialTexture
 }
 
 export interface DisplayStyle extends MinimalMaterial {
@@ -71,7 +95,13 @@ export default class Materials {
   public static readonly DEFAULT_LINE_GHOST_OPACITY = 0.1
   public static readonly DEFAULT_POINT_GHOST_OPACITY = 0.01
   public static readonly DEFAULT_TEXT_GHOST_OPACITY = 0.1
+  private static textureCache: Map<string, Promise<Texture>> = new Map()
   private readonly materialMap: { [hash: number]: Material } = {}
+  private onMaterialUpdated?: (material: Material) => void
+
+  public constructor(onMaterialUpdated?: (material: Material) => void) {
+    this.onMaterialUpdated = onMaterialUpdated
+  }
   private meshGhostMaterial: Material
   private meshGradientMaterial: Material
   private meshTransparentGradientMaterial: Material
@@ -130,7 +160,8 @@ export default class Materials {
 
   public static renderMaterialFromNode(
     materialNode: TreeNode | null,
-    geometryNode: TreeNode | null
+    geometryNode: TreeNode | null,
+    blobContext?: BlobResourceContext
   ): RenderMaterial | null {
     if (!materialNode) return null
     let renderMaterial: RenderMaterial | null = null
@@ -138,6 +169,16 @@ export default class Materials {
       const colorsChunkArray = geometryNode?.model.raw.colors
         ? new ChunkArray(geometryNode?.model.raw.colors)
         : undefined
+      const rawDiffuseTex = materialNode.model.raw.renderMaterial.diffuseTexture
+      let diffuseTexture: RenderMaterialTexture | undefined = undefined
+      if (rawDiffuseTex?.blobId && blobContext) {
+        diffuseTexture = {
+          blobId: rawDiffuseTex.blobId,
+          url: `${blobContext.serverUrl}/api/stream/${blobContext.streamId}/blob/${rawDiffuseTex.blobId}`,
+          mimeType: rawDiffuseTex.mimeType,
+          authToken: blobContext.authToken
+        }
+      }
 
       renderMaterial = {
         id: materialNode.model.raw.renderMaterial.id,
@@ -150,7 +191,8 @@ export default class Materials {
         roughness: materialNode.model.raw.renderMaterial.roughness,
         metalness: materialNode.model.raw.renderMaterial.metalness,
         vertexColors:
-          (geometryNode && colorsChunkArray && colorsChunkArray.length > 0) ?? false
+          (geometryNode && colorsChunkArray && colorsChunkArray.length > 0) ?? false,
+        ...(diffuseTexture && { diffuseTexture })
       }
     }
     return renderMaterial
@@ -210,7 +252,8 @@ export default class Materials {
       '/' +
       renderMaterial.roughness.toString() +
       '/' +
-      renderMaterial.metalness.toString()
+      renderMaterial.metalness.toString() +
+      (renderMaterial.diffuseTexture ? '/' + renderMaterial.diffuseTexture.blobId : '')
     )
   }
 
@@ -323,8 +366,11 @@ export default class Materials {
     }
 
     let geometry = ''
-    if (renderView.renderData.geometry.attributes)
-      geometry = renderView.renderData.geometry.attributes.COLOR ? 'vertexColors' : ''
+    if (renderView.renderData.geometry.attributes) {
+      geometry =
+        (renderView.renderData.geometry.attributes.COLOR ? 'vertexColors' : '') +
+        (renderView.renderData.geometry.attributes.UV ? 'uv' : '')
+    }
 
     const s =
       renderView.geometryType.toString() +
@@ -744,6 +790,53 @@ export default class Materials {
     )
   }
 
+  private loadBlobTexture(texInfo: RenderMaterialTexture): Promise<Texture> {
+    const cached = Materials.textureCache.get(texInfo.url)
+    if (cached) {
+      return cached
+    }
+
+    const promise = (async () => {
+      const res = await fetch(texInfo.url, {
+        headers: texInfo.authToken
+          ? { Authorization: `Bearer ${texInfo.authToken}` }
+          : undefined
+      })
+      if (!res.ok) {
+        throw new Error(`Failed to fetch blob texture ${texInfo.url}: ${res.status}`)
+      }
+      const buf = await res.arrayBuffer()
+      const blob = new Blob([buf], { type: texInfo.mimeType || 'image/png' })
+      const objectUrl = URL.createObjectURL(blob)
+
+      return await new Promise<Texture>((resolve, reject) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl)
+          const texture = new Texture(img)
+          texture.wrapS = RepeatWrapping
+          texture.wrapT = RepeatWrapping
+          texture.encoding = sRGBEncoding
+          texture.flipY = true
+          texture.needsUpdate = true
+          resolve(texture)
+        }
+        img.onerror = (ev) => {
+          URL.revokeObjectURL(objectUrl)
+          reject(new Error(`Failed to decode texture ${texInfo.url}: ${ev.toString()}`))
+        }
+        img.src = objectUrl
+      })
+    })().catch((err) => {
+      Materials.textureCache.delete(texInfo.url)
+      throw err
+    })
+
+    Materials.textureCache.set(texInfo.url, promise)
+    return promise
+  }
+
   private makeMeshMaterial(materialData: RenderMaterial): Material {
     const mat: SpeckleStandardMaterial = new SpeckleStandardMaterial({
       color: materialData.color,
@@ -760,6 +853,27 @@ export default class Materials {
     mat.color.convertSRGBToLinear()
     mat.emissive.convertSRGBToLinear()
     mat.updateArtificialRoughness(Materials.DEFAULT_ARTIFICIAL_ROUGHNESS)
+
+    if (materialData.diffuseTexture?.url) {
+      this.loadBlobTexture(materialData.diffuseTexture)
+        .then((texture) => {
+          mat.map = texture
+          mat.color.setHex(0xffffff)
+          mat.color.convertSRGBToLinear()
+          if (!mat.transparent) {
+            mat.alphaTest = 0.5
+          }
+          mat.needsUpdate = true
+          mat.needsCopy = true
+          this.onMaterialUpdated?.(mat)
+        })
+        .catch((err) => {
+          Logger.warn(
+            `Failed to load diffuseTexture ${materialData.diffuseTexture?.blobId}: ${err}`
+          )
+        })
+    }
+
     return mat
   }
 

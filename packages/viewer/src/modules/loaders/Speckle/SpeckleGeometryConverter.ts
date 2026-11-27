@@ -107,6 +107,7 @@ export class SpeckleGeometryConverter extends GeometryConverter {
         node.raw.faces = []
         node.raw.colors = []
         node.raw.normals = []
+        node.raw.textureCoordinates = []
 
         // /** We can already delete these because we don't need them after triangulation */
         // node.raw.faces.forEach((c: DataChunk) => {
@@ -309,6 +310,9 @@ export class SpeckleGeometryConverter extends GeometryConverter {
     let normals = node.raw.vertexNormals
       ? new ChunkArray(node.raw.vertexNormals)
       : undefined
+    let uvs = node.raw.textureCoordinates
+      ? new ChunkArray(node.raw.textureCoordinates)
+      : undefined
     let colors = undefined
     let k = 0
     let triangulated = true
@@ -419,6 +423,17 @@ export class SpeckleGeometryConverter extends GeometryConverter {
       normals = undefined
     }
 
+    if (uvs && uvs.length !== 0) {
+      if (uvs.length !== (vertices.length / 3) * 2) {
+        Logger.warn(
+          `Mesh (id ${node.raw.id}) texture coordinates are mismatched with vertex counts.`
+        )
+        uvs = undefined
+      }
+    } else {
+      uvs = undefined
+    }
+
     return {
       attributes: {
         POSITION: vertices,
@@ -432,7 +447,8 @@ export class SpeckleGeometryConverter extends GeometryConverter {
               }
             ]),
         ...(colors && { COLOR: colors }),
-        ...(normals && { NORMAL: normals })
+        ...(normals && { NORMAL: normals }),
+        ...(uvs && { UV: uvs })
       },
       bakeTransform: new Matrix4().makeScale(
         conversionFactor,

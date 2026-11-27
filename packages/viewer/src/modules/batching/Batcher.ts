@@ -43,14 +43,33 @@ export default class Batcher {
   private maxBatchTextObjects = 5000
   public materials: Materials
   public batches: { [id: string]: Batch } = {}
+  private onTextureLoaded?: () => void
 
-  public constructor(caps: WebGLCapabilities) {
+  public constructor(caps: WebGLCapabilities, onTextureLoaded?: () => void) {
     this.caps = caps
+    this.onTextureLoaded = onTextureLoaded
     this.maxBatchObjects = Math.floor(
       (this.caps.maxVertexUniforms - Materials.UNIFORM_VECTORS_USED) / 4
     )
-    this.materials = new Materials()
+    this.materials = new Materials((updatedMaterial) =>
+      this.handleMaterialUpdated(updatedMaterial)
+    )
     void this.materials.createDefaultMaterials()
+  }
+
+  private handleMaterialUpdated(material: Material) {
+    for (const batch of Object.values(this.batches)) {
+      if (batch instanceof MeshBatch && batch.batchMaterial === material) {
+        batch.mesh.getCachedMaterial(material, true)
+      } else if (
+        batch instanceof InstancedMeshBatch &&
+        batch.batchMaterial === material
+      ) {
+        batch.mesh.getCachedMaterial(material, true)
+        batch.batchMaterial.needsUpdate = true
+      }
+    }
+    this.onTextureLoaded?.()
   }
 
   public async *makeBatches(

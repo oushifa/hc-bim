@@ -564,6 +564,8 @@ export class InstancedMeshBatch implements Batch {
       this.renderViews[0].renderData.geometry.attributes?.COLOR?.getFloat32Array()
     const normals =
       this.renderViews[0].renderData.geometry.attributes?.NORMAL?.getFloat32Array()
+    const uvs =
+      this.renderViews[0].renderData.geometry.attributes?.UV?.getFloat32Array()
 
     for (let k = 0; k < this.renderViews.length; k++) {
       /** Catering to typescript
@@ -615,7 +617,13 @@ export class InstancedMeshBatch implements Batch {
     if (!indices || !positions) {
       throw new Error(`Cannot build batch ${this.id}. Undefined indices or positions`)
     }
-    this.geometry = this.makeInstancedMeshGeometry(indices, positions, normals, colors)
+    this.geometry = this.makeInstancedMeshGeometry(
+      indices,
+      positions,
+      normals,
+      colors,
+      uvs
+    )
 
     this.mesh = new SpeckleInstancedMesh(this.geometry)
     this.mesh.setBatchObjects(batchObjects)
@@ -675,7 +683,8 @@ export class InstancedMeshBatch implements Batch {
     indices: Uint32Array | Uint16Array,
     position: Float32Array,
     normal?: Float32Array,
-    color?: Float32Array
+    color?: Float32Array,
+    uvs?: Float32Array
   ): BufferGeometry {
     const geometry = new BufferGeometry()
     if (position) {
@@ -684,6 +693,9 @@ export class InstancedMeshBatch implements Batch {
 
     if (color) {
       geometry.setAttribute('color', new Float32BufferAttribute(color, 3))
+    }
+    if (uvs) {
+      geometry.setAttribute('uv', new Float32BufferAttribute(uvs, 2))
     }
     let indexBuffer = null
     if (position.length >= 65535 || indices.length >= 65535) {
